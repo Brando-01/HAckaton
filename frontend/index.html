@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta content="initial-scale=1.0, width=device-width" name="viewport">
+    <title>Internet Hogar | Movistar Perú</title>
+    
+    <link rel="stylesheet" href="./chat.css">
+
+    <style>
+        .pricing-section {
+            padding: 40px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            font-family: 'Telefonica', sans-serif;
+        }
+        .toggle-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 30px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px; width: 22px;
+            left: 4px; bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider { background-color: #019DF4; }
+        input:checked + .slider:before { transform: translateX(30px); }
+
+        .plans-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .plan-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 24px;
+            background: #fff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            text-align: center;
+            position: relative;
+            transition: transform 0.2s;
+        }
+        .plan-card:hover { transform: translateY(-5px); }
+        .plan-card.featured { border: 2px solid #019DF4; }
+        .badge {
+            position: absolute;
+            top: -12px; left: 50%;
+            transform: translateX(-50%);
+            background: #E63780; color: white;
+            padding: 4px 12px; border-radius: 12px;
+            font-size: 12px; font-weight: bold;
+        }
+        .price-container { margin: 20px 0; }
+        .price { font-size: 36px; font-weight: bold; color: #019DF4; }
+        .price-period { font-size: 14px; color: #666; }
+        .savings { color: #E63780; font-size: 13px; font-weight: bold; height: 18px; }
+        .btn-buy {
+            display: inline-block; width: 100%; padding: 12px 0;
+            background-color: #019DF4; color: white;
+            border-radius: 25px; text-decoration: none;
+            font-weight: bold; border: none; cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-buy:hover { background-color: #0081c9; }
+
+        /* CHATBOT FLOTANTE */
+        .chat-widget-toggle {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            width: 60px;
+            height: 60px;
+            background-color: #019DF4;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 28px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 9999;
+        }
+
+        .chat-box {
+            position: fixed;
+            bottom: 95px;
+            right: 25px;
+            width: 340px;
+            height: 450px;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 9999;
+            border: 1px solid #e0e0e0;
+            font-family: Arial, sans-serif;
+        }
+
+        .chat-header {
+            background-color: #019DF4;
+            color: white;
+            padding: 15px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .close-btn { cursor: pointer; font-size: 18px; }
+
+        .chat-messages {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background-color: #f9f9f9;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .message.bot {
+            background-color: #e8f4fd;
+            color: #333;
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+        }
+        .message.user {
+            background-color: #019DF4;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+        }
+
+        .chat-input-area {
+            display: flex;
+            padding: 10px;
+            background: #fff;
+            border-top: 1px solid #eee;
+        }
+        .chat-input-area input {
+            flex: 1;
+            border: 1px solid #ccc;
+            padding: 8px 12px;
+            border-radius: 20px;
+            outline: none;
+            font-size: 13px;
+        }
+        .chat-input-area button {
+            background: #019DF4;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            margin-left: 5px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="chrome controls-visible public-page">
+
+    <header class="stweb-header stweb-header--nav" id="natHeaderNavigation">
+        <div class="container">
+            <a class="navbar__brand" href="#">
+                <img src="./logo-2.svg" alt="Movistar Logo">
+            </a>
+        </div>
+    </header>
+
+    <main class="pricing-section">
+        <h2 style="text-align: center; color: #019DF4;">Elige el plan ideal para tu hogar</h2>
+        
+        <div class="toggle-container">
+            <span>Pago Mensual</span>
+            <label class="switch">
+                <input type="checkbox" id="billingToggle" onchange="toggleBilling()">
+                <span class="slider"></span>
+            </label>
+            <span>Pago Anual <strong>(Ahorra 20%)</strong></span>
+        </div>
+
+        <div class="plans-grid" id="plansContainer"></div>
+    </main>
+
+    <!-- BURBUJA Y CHATBOT -->
+    <div class="chat-widget-toggle" onclick="toggleChat()">💬</div>
+
+    <div class="chat-box" id="chatBox">
+        <div class="chat-header">
+            <span>Asistente Virtual Movistar 🤖</span>
+            <span class="close-btn" onclick="toggleChat()">✕</span>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="message bot">
+                ¡Hola! 👋 Soy tu asistente Movistar.<br><br>
+                Puedo indicarte los <b>motivos de variación en tu recibo</b> o consultar tu información actual ingresando tu <b>DNI</b>.
+            </div>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" id="userInput" placeholder="Escribe tu consulta o DNI..." onkeypress="handleKeyPress(event)">
+            <button onclick="sendMessage()">➢</button>
+        </div>
+    </div>
+
+    <script src="./chat.js"></script>
+</body>
+</html>

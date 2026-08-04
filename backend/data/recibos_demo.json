@@ -1,0 +1,37 @@
+{
+  "72819345": {
+    "nombre": "Carlos Mendoza",
+    "dni": "72819345",
+    "plan": "Movistar Fibra 200Mbps",
+    "recibo_actual": {
+      "periodo": "Julio 2026",
+      "monto": 125.00,
+      "vencimiento": "15/08/2026"
+    },
+    "recibos_anteriores": [
+      { "periodo": "Junio 2026", "monto": 95.00 },
+      { "periodo": "Mayo 2026", "monto": 95.00 }
+    ],
+    "variacion": {
+      "diferencia": "+ S/ 30.00",
+      "motivo": "Vencimiento del descuento de bienvenida (-S/ 20) + cobro de cargo por mora/reconexión (S/ 10)."
+    }
+  },
+  "10293847": {
+    "nombre": "Ana Torres",
+    "dni": "10293847",
+    "plan": "Plan Móvil ilimitado",
+    "recibo_actual": {
+      "periodo": "Julio 2026",
+      "monto": 80.00,
+      "vencimiento": "20/08/2026"
+    },
+    "recibos_anteriores": [
+      { "periodo": "Junio 2026", "monto": 55.00 }
+    ],
+    "variacion": {
+      "diferencia": "+ S/ 25.00",
+      "motivo": "Compra de paquete adicional de Gigas en roamiang (S/ 25)."
+    }
+  }
+}
