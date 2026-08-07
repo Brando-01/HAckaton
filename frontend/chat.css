@@ -1,1 +1,337 @@
-.chat-widget-toggle{position:fixed;bottom:25px;right:25px;width:60px;height:60px;background-color:#019DF4;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.2);z-index:9999}.chat-widget-toggle:hover{transform:scale(1.06)}.chat-box{position:fixed;bottom:95px;right:25px;width:340px;height:450px;background:#fff;border-radius:16px;box-shadow:0 10px 25px rgba(0,0,0,0.2);display:flex;flex-direction:column;overflow:hidden;z-index:9999;border:1px solid #e0e0e0;font-family:Arial,Helvetica,sans-serif}.chat-header{background:#019DF4;color:#fff;padding:12px 14px;display:flex;justify-content:space-between;align-items:center}.chat-messages{flex:1;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;background:#f9f9f9}.message{max-width:80%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.4}.message.bot{background:#e8f4fd;color:#333;align-self:flex-start;border-bottom-left-radius:2px}.message.user{background:#019DF4;color:#fff;align-self:flex-end;border-bottom-right-radius:2px}.chat-input-area{display:flex;padding:10px;background:#fff;border-top:1px solid #eee}.chat-input-area input{flex:1;border:1px solid #ccc;padding:8px 12px;border-radius:20px;outline:none;font-size:13px}.chat-input-area button{background:#019DF4;color:#fff;border:none;padding:8px 14px;margin-left:5px;border-radius:50%;cursor:pointer}
+:root {
+    --movistar-blue: #00A9E0;        /* Azul idéntico a tu logo.png */
+    --movistar-blue-dark: #0081C9;   /* Hover en botones */
+    --movistar-navy: #0B2739;        /* Fondo sidebar */
+    --bg-main: #F4F7FB;              /* Fondo de pantalla suave */
+    --bg-card: #FFFFFF;
+    --text-primary: #1C2833;
+    --text-muted: #627180;
+    --border-color: #E2E8F0;
+    --sidebar-width: 260px;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+body {
+    display: flex;
+    height: 100vh;
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    overflow: hidden;
+}
+
+/* SIDEBAR CON EL LOGO */
+.sidebar {
+    width: var(--sidebar-width);
+    background-color: var(--movistar-navy);
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    padding: 20px 16px;
+    gap: 20px;
+    transition: transform 0.3s ease, margin-left 0.3s ease;
+    z-index: 10;
+}
+
+.sidebar.collapsed {
+    margin-left: calc(var(--sidebar-width) * -1);
+}
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.brand-logo {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+.brand-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.brand-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.1;
+}
+
+.brand-subtitle {
+    font-size: 11px;
+    color: #00A9E0;
+    font-weight: 600;
+}
+
+.btn-new-chat {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 10px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.btn-new-chat:hover {
+    background: var(--movistar-blue);
+    border-color: var(--movistar-blue);
+}
+
+.sidebar-menu {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.menu-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: #8CA0B3;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.menu-item {
+    background: transparent;
+    border: none;
+    color: #D1DCE5;
+    text-align: left;
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.2s, color 0.2s;
+}
+
+.menu-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+}
+
+.timer-card {
+    background: rgba(0, 169, 224, 0.12);
+    border: 1px solid rgba(0, 169, 224, 0.3);
+    border-radius: 12px;
+    padding: 12px;
+    text-align: center;
+}
+
+.timer-title {
+    display: block;
+    font-size: 11px;
+    color: #A3D8F4;
+}
+
+.timer-clock {
+    font-size: 18px;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+/* ÁREA DE CHAT */
+.chat-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.chat-topbar {
+    height: 60px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+}
+
+.topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.btn-toggle-sidebar {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: var(--text-muted);
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #22C55E;
+    border-radius: 50%;
+}
+
+.user-badge {
+    background: #E6F7FC;
+    color: var(--movistar-blue-dark);
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* ÁREA DE SCROLL PRINCIPAL */
+.chat-messages-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    justify-content: center;
+    scroll-behavior: smooth; /* Animación suave del scroll */
+}
+
+.chat-messages {
+    width: 100%;
+    max-width: 760px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+/* BUBBLES / MENSAJES */
+.message {
+    max-width: 85%;
+    padding: 14px 18px;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.5;
+    animation: fadeIn 0.25s ease-out;
+}
+
+.message.user {
+    align-self: flex-end;
+    background-color: var(--movistar-blue);
+    color: #ffffff;
+    border-bottom-right-radius: 4px;
+    box-shadow: 0 3px 10px rgba(0, 169, 224, 0.2);
+}
+
+.message.bot {
+    align-self: flex-start;
+    background-color: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-bottom-left-radius: 4px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+}
+
+.message.bot strong {
+    color: var(--movistar-blue-dark);
+}
+
+.message.typing {
+    color: var(--text-muted);
+    font-style: italic;
+    animation: pulse 1.5s infinite;
+}
+
+/* INPUT COMPONENT */
+.chat-input-wrapper {
+    padding: 12px 24px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.chat-input-box {
+    width: 100%;
+    max-width: 760px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 24px;
+    padding: 10px 16px;
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.chat-input-box:focus-within {
+    border-color: var(--movistar-blue);
+    box-shadow: 0 4px 16px rgba(0, 169, 224, 0.18);
+}
+
+#userInput {
+    flex: 1;
+    border: none;
+    outline: none;
+    resize: none;
+    max-height: 120px;
+    min-height: 24px;
+    font-size: 14px;
+    line-height: 1.4;
+    background: transparent;
+}
+
+#sendButton {
+    background: var(--movistar-blue);
+    color: white;
+    border: none;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    flex-shrink: 0;
+}
+
+#sendButton:hover {
+    background: var(--movistar-blue-dark);
+}
+
+#sendButton:active {
+    transform: scale(0.92);
+}
+
+.disclaimer {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* ANIMACIONES */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}

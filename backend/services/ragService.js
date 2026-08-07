@@ -1,120 +1,182 @@
-const fs = require('fs');
+// services/ragService.js
+const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-const Groq = require('groq-sdk');
+const fs = require('fs');
+const csv = require('csv-parser');
+const { Groq } = require('groq-sdk');
 
-const groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// Sesiones en memoria (dev). Cambiar por Redis/DB en producción.
-const sessions = new Map();
-
-function construirRespuestaFallback(mensajeUsuario, contextoCliente, dni) {
-  const texto = mensajeUsuario.toLowerCase();
-
-  if (texto.includes('recibo') || texto.includes('subió')) {
-    if (dni && contextoCliente.includes('DATOS OFICIALES')) {
-      return 'Tu recibo subió porque se terminó la promoción inicial y el plan volvió a su precio normal. Además, si pagaste unos días después de la fecha, puede haber un pequeño recargo por demora. Si quieres, te explico esto de forma aún más sencilla.';
-    }
-
-    return 'El aumento del recibo suele deberse a que terminó la promoción inicial o a un pequeño recargo por pago tardío. Te puedo explicar el detalle si me compartes tu DNI de 8 dígitos.';
-  }
-
-  if (texto.includes('dni') || /\b\d{8}\b/.test(mensajeUsuario)) {
-    return 'Perfecto. Puedes enviarme tu DNI de 8 dígitos y te ayudo a revisar el detalle de tu recibo de forma clara y sencilla.';
-  }
-
-  return 'Hola, puedo ayudarte a revisar tu recibo, explicar por qué subió y orientarte sobre tu plan. Si quieres, dime tu DNI de 8 dígitos o escribe “mi recibo subió”.';
-}
-
-async function procesarConsultaFactura(mensajeUsuario, sessionId = 'default') {
-  const rutaDataset = path.join(__dirname, '../data/recibos_demo.json');
-  const rawData = fs.readFileSync(rutaDataset, 'utf-8');
-  const dataset = JSON.parse(rawData);
-
-  // Recuperar o inicializar sesión
-  const sessKey = sessionId || 'default';
-  let session = sessions.get(sessKey) || { history: [] };
-
-  // Añadir el mensaje del usuario al historial
-  session.history.push({ role: 'user', text: mensajeUsuario, ts: Date.now() });
-
-  // Mantener sólo últimos 12 mensajes para control de tokens
-  session.history = session.history.slice(-12);
-
-  // Buscar DNI en el mensaje actual o en el historial reciente
-  let dniMatch = mensajeUsuario.match(/\b\d{8}\b/);
-  if (!dniMatch) {
-    for (let i = session.history.length - 1; i >= 0 && !dniMatch; i--) {
-      const h = session.history[i];
-      const m = h.text.match(/\b\d{8}\b/);
-      if (m) dniMatch = m;
-    }
-  }
-  const dni = dniMatch ? dniMatch[0] : null;
-
-  let contextoCliente = "";
-
-  let cliente = null;
-  let clienteEncontrado = false;
-
-  if (dni) {
-    cliente = dataset[dni];
-    if (cliente) {
-      clienteEncontrado = true;
-      contextoCliente = `\nDATOS OFICIALES DEL CLIENTE:\n- Nombre: ${cliente.nombre}\n- DNI: ${cliente.dni}\n- Plan: ${cliente.plan}\n- Recibo Actual (${cliente.recibo_actual.periodo}): S/ ${cliente.recibo_actual.monto}\n- Recibo Mes Pasado: S/ ${cliente.recibos_anteriores[0].monto}\n- Aumento: ${cliente.variacion.diferencia}\n- Causa Real: ${cliente.variacion.motivo}\n`;
-    } else {
-      // Si se provee un DNI pero no está en el dataset, no inventamos datos.
-      const reply = `No hemos encontrado registros para el DNI ${dni}. No puedo inventar información. Por favor verifica el DNI o consulta con soporte.`;
-      session.history.push({ role: 'assistant', text: reply, ts: Date.now() });
-      sessions.set(sessKey, session);
-      return { reply, foundData: false };
-    }
-  } else {
-    contextoCliente = `\nEl usuario está haciendo una consulta sin DNI. Pide el DNI si necesita un detalle personal.\nSi quiere una explicación general sobre por qué un recibo sube, explica de forma simple sin usar datos personales.`;
-  }
-
-  const systemPrompt = `\nEres un asistente virtual empático, cálido y transparente de telecomunicaciones.\n\nREGLAS DE ORO:\n1. Si te piden explicar para un adulto mayor o explicar "más fácil", usa palabras muy sencillas, ejemplos cotidianos y evita tecnicismos.\n2. En lugar de decir "cargo por mora o reconexión", explica: "un pequeño recargo por pagar unos días después de la fecha".\n3. En lugar de "vencimiento del descuento de bienvenida", explica: "se terminó la promoción inicial de descuento y el plan volvió a su precio normal".\n4. Sé breve, transparente y directo (máximo 2 a 3 párrafos cortos).\n\n${contextoCliente}\n`;
-
-  if (!groq) {
-    const fallbackResponse = construirRespuestaFallback(mensajeUsuario, contextoCliente, dni, clienteEncontrado);
-    session.history.push({ role: 'assistant', text: fallbackResponse, ts: Date.now() });
-    session.history = session.history.slice(-12);
-    sessions.set(sessKey, session);
-    return { reply: fallbackResponse, foundData: clienteEncontrado };
-  }
-
-  // Construir mensajes para el modelo usando el historial
-  const messages = [
-    { role: 'system', content: systemPrompt }
+// Función auxiliar para resolver archivos CSV en varias ubicaciones posibles (raíz, /data, etc.)
+function obtenerRutaArchivo(nombreArchivo) {
+  const opcionesRuta = [
+    path.resolve(__dirname, '../data', nombreArchivo),
+    path.resolve(__dirname, 'data', nombreArchivo),
+    path.resolve(__dirname, '..', nombreArchivo),
+    path.resolve(__dirname, nombreArchivo)
   ];
 
-  session.history.forEach(h => {
-    messages.push({ role: h.role, content: h.text });
-  });
-
-  try {
-    // Llamada al modelo con el historial
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages
-    });
-
-    const assistantResponse = completion.choices[0].message.content;
-
-    // Guardar respuesta en la sesión
-    session.history.push({ role: 'assistant', text: assistantResponse, ts: Date.now() });
-    session.history = session.history.slice(-12);
-    sessions.set(sessKey, session);
-
-    return { reply: assistantResponse, foundData: clienteEncontrado };
-  } catch (error) {
-    console.warn('Fallo Groq, usando respuesta local:', error.message);
-    const fallbackResponse = construirRespuestaFallback(mensajeUsuario, contextoCliente, dni, clienteEncontrado);
-    session.history.push({ role: 'assistant', text: fallbackResponse, ts: Date.now() });
-    session.history = session.history.slice(-12);
-    sessions.set(sessKey, session);
-    return { reply: fallbackResponse, foundData: clienteEncontrado };
+  for (const ruta of opcionesRuta) {
+    if (fs.existsSync(ruta)) return ruta;
   }
-
+  return opcionesRuta[0];
 }
 
-module.exports = { procesarConsultaFactura };
+// Función auxiliar para ubicar la base de datos app.db dentro de /data/ o la raíz
+function obtenerRutaBD() {
+  const opcionesBD = [
+    path.resolve(__dirname, '../data/app.db'),
+    path.resolve(__dirname, 'data/app.db'),
+    path.resolve(__dirname, '../app.db'),
+    path.resolve(__dirname, 'app.db')
+  ];
+
+  for (const ruta of opcionesBD) {
+    if (fs.existsSync(ruta)) return ruta;
+  }
+  return opcionesBD[0];
+}
+
+const dbPath = obtenerRutaBD();
+console.log(`🔗 Conectando RAG a base de datos en: ${dbPath}`);
+
+// Cargar catálogo de ofertas en memoria al iniciar
+let catalogoOfertasTexto = '';
+
+function cargarCatalogoOfertas() {
+  const rutaCatalogo = obtenerRutaArchivo('catalogo_ofertas_entrega.csv');
+
+  if (!fs.existsSync(rutaCatalogo)) {
+    console.error(`❌ No se encontró el archivo del catálogo en: ${rutaCatalogo}`);
+    return;
+  }
+
+  const ofertas = [];
+  fs.createReadStream(rutaCatalogo)
+    .pipe(csv())
+    .on('data', (row) => {
+      ofertas.push(`- ID: ${row.oferta_id} | Plan: ${row.nombre_oferta} | Tipo: ${row.tipo_oferta} | Precio: S/ ${row.precio_mensual} | GB: ${row.gb_incluidos || 'N/A'} | Movistar Total: ${row.es_movistar_total}`);
+    })
+    .on('end', () => {
+      catalogoOfertasTexto = ofertas.join('\n');
+      console.log(`✅ Catálogo cargado con éxito (${ofertas.length} ofertas disponibles).`);
+    });
+}
+
+cargarCatalogoOfertas();
+
+function obtenerConexionDB() {
+  return new sqlite3.Database(dbPath);
+}
+
+function obtenerInformacionCliente(identificador) {
+  return new Promise((resolve) => {
+    if (!identificador) return resolve(null);
+    const db = obtenerConexionDB();
+
+    // 1. DNI numérico (Tabla de clientes/recibos de facturación)
+    if (/^\d+$/.test(identificador)) {
+      db.get('SELECT * FROM clientes WHERE dni = ?', [identificador], (err, cliente) => {
+        if (err || !cliente) {
+          db.close();
+          return resolve(null);
+        }
+        db.all('SELECT periodo, monto FROM recibos_anteriores WHERE dni = ?', [identificador], (err, historial) => {
+          db.close();
+          cliente.recibos_anteriores = historial || [];
+          resolve({ tipo: 'facturacion', datos: cliente });
+        });
+      });
+      return;
+    }
+
+    // 2. ID Cliente NBO (dataset_clientes e historial_campanias)
+    const idNormalizado = identificador.toUpperCase();
+    db.get('SELECT * FROM dataset_clientes WHERE cliente_id = ?', [idNormalizado], (err, clienteNBO) => {
+      if (err || !clienteNBO) {
+        db.close();
+        return resolve(null);
+      }
+      db.all('SELECT fecha, canal, nombre_oferta, resultado, motivo_rechazo FROM historial_campanias WHERE cliente_id = ? LIMIT 5', [idNormalizado], (err, historialCamp) => {
+        db.close();
+        clienteNBO.historial_campanias = historialCamp || [];
+        resolve({ tipo: 'nbo', datos: clienteNBO });
+      });
+    });
+  });
+}
+
+async function procesarConsultaFactura(mensajeTexto, identificador) {
+  try {
+    let idBuscar = identificador;
+    const matchCLI = mensajeTexto.match(/CLI_\d+/i);
+    const matchDNI = mensajeTexto.match(/\b\d{8}\b/);
+
+    if (matchCLI) idBuscar = matchCLI[0].toUpperCase();
+    else if (matchDNI) idBuscar = matchDNI[0];
+
+    const infoCliente = await obtenerInformacionCliente(idBuscar);
+
+    let contextoCliente = '';
+    if (infoCliente) {
+      if (infoCliente.tipo === 'facturacion') {
+        const c = infoCliente.datos;
+        contextoCliente = `
+DATOS DEL CLIENTE (DNI: ${c.dni}):
+- Nombre: ${c.nombre} | Plan: ${c.plan}
+- Recibo actual: S/ ${c.recibo_actual_monto} (${c.recibo_actual_periodo})
+- Variación: ${c.variacion_diferencia} | Motivo: ${c.variacion_motivo}
+- Historial: ${JSON.stringify(c.recibos_anteriores)}`;
+      } else if (infoCliente.tipo === 'nbo') {
+        const c = infoCliente.datos;
+        contextoCliente = `
+PERFIL CLIENTE NBO (${c.cliente_id}):
+- Tipo: ${c.tipo_cliente} | Antigüedad: ${c.antiguedad_meses} meses | Dpto: ${c.ubicacion_departamento}
+- Elegible Movistar Total: ${c.elegible_mt} | Es Movistar Total: ${c.es_movistar_total}
+- Consumo GB promedio: ${c.consumo_datos_gb_prom} GB | Reclamos: ${c.n_reclamos}
+- Historial de ofertas presentadas: ${JSON.stringify(c.historial_campanias)}`;
+      }
+    } else {
+      contextoCliente = 'No se especificó un ID de cliente concreto o es una consulta sobre el catálogo comercial general.';
+    }
+
+    // En services/ragService.js (Actualiza la función procesarConsultaFactura)
+
+const promptSistema = `Eres el Asistente Inteligente Oficial de Movistar Perú para la Hackathon AI Telecom Challenge 2026.
+
+REGLAS DE RESPUESTA Y FORMATO ESTRICTAS:
+1. SOLO DATOS OFICIALES (CERO ALUCINACIONES): Responde ÚNICAMENTE con las ofertas, planes y paquetes contenidos en el CATÁLOGO OFICIAL provisto. NUNCA menciones planes prepago, promociones externas ni servicios que "no estén en el catálogo". Si no está en la lista, indica de forma directa que no contamos con esa oferta actualmente.
+2. PRECIOS Y MONEDA: Muestra siempre los precios en Soles peruanos (ej. S/ 39.90). Nunca en dólares.
+3. EVALUACIÓN MATEMÁTICA: Si el cliente da un presupuesto (ej. S/ 40), los planes con precio menor o igual (ej. S/ 39.90) SÍ le alcanzan. Confírmaselo amablemente en la primera oración.
+4. FORMATO ORDENADO Y VISUALMENTE ATRACTIVO:
+   - Usa párrafos cortos y lenguaje natural, cercano y respetuoso.
+   - Organiza los planes con listas claras usando viñetas con guiones (-) o números.
+   - Destaca los nombres y precios en **negrita**.
+   - Usa líneas separadoras (---) para dividir secciones si la respuesta es amplia.
+
+--- CATÁLOGO DE OFERTAS OFICIAL ---
+${catalogoOfertasTexto || 'Catálogo no disponible.'}
+
+--- CONTEXTO DEL CLIENTE ---
+${contextoCliente}
+`;
+    const completion = await groq.chat.completions.create({
+      messages: [
+        { role: 'system', content: promptSistema },
+        { role: 'user', content: mensajeTexto }
+      ],
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.1,
+      max_tokens: 500
+    });
+
+    return completion.choices[0]?.message?.content || 'Lo siento, no pude procesar tu consulta en este momento.';
+  } catch (error) {
+    console.error('Error en RAG Service:', error);
+    return 'Hubo un inconveniente al procesar tu consulta. Por favor, intenta más tarde.';
+  }
+}
+
+module.exports = {
+  procesarConsultaFactura
+};

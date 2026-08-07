@@ -4,6 +4,7 @@ const path = require('path');
 require('dotenv').config();
 
 const { procesarConsultaFactura } = require('./services/ragService');
+const { dbReady } = require('./db');
 
 function createApp() {
   const app = express();
@@ -23,15 +24,15 @@ function createApp() {
 
   // Endpoint de Chat
   app.post('/api/chat', async (req, res) => {
-    const { message, sessionId } = req.body;
+    const { message, sessionId, promptSent } = req.body;
 
     if (!message) {
       return res.status(400).json({ error: 'El mensaje no puede estar vacío' });
     }
 
     try {
-      console.log('[API] /api/chat message=', message, 'sessionId=', sessionId);
-      const result = await procesarConsultaFactura(message, sessionId || 'web');
+      console.log('[API] /api/chat message=', message, 'sessionId=', sessionId, 'promptSent=', promptSent);
+      const result = await procesarConsultaFactura(message, sessionId || 'web', Boolean(promptSent));
       // result can be either a string (legacy) or an object { reply, foundData }
       if (typeof result === 'string') {
         res.json({ reply: result, foundData: false });
@@ -51,8 +52,14 @@ const app = createApp();
 
 if (require.main === module) {
   const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
-    console.log(`🚀 Servidor ejecutándose en http://localhost:${PORT}`);
+
+  dbReady.then(() => {
+    app.listen(PORT, () => {
+      console.log(`🚀 Servidor ejecutándose en http://localhost:${PORT}`);
+    });
+  }).catch(error => {
+    console.error('No se pudo inicializar la base de datos:', error);
+    process.exit(1);
   });
 }
 
