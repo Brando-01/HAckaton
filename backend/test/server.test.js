@@ -18,7 +18,7 @@ test('sirve la landing page en la raíz', async () => {
     const body = await response.text();
 
     assert.equal(response.status, 200);
-    assert.match(body, /Asistente Movistar/);
+    assert.match(body, /Asistente Virtual/);
   } finally {
     server.close();
   }

@@ -4,6 +4,12 @@ const path = require('path');
 const fs = require('fs');
 const csv = require('csv-parser');
 const { Groq } = require('groq-sdk');
+const {
+  getOrCreateSession,
+  addMessage,
+  getHistory,
+  updateContext
+} = require('./sessionService');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -106,16 +112,53 @@ function obtenerInformacionCliente(identificador) {
   });
 }
 
-async function procesarConsultaFactura(mensajeTexto, identificador) {
+function extraerIdentificadorCliente(mensajeTexto) {
+  if (!mensajeTexto) return null;
+
+  // IDs como CLI000001 o CLI_000001
+  const matchCLI = mensajeTexto.match(/\bCLI_?\d+\b/i);
+
+  if (matchCLI) {
+    return matchCLI[0]
+      .replace('_', '')
+      .toUpperCase();
+  }
+
+  // Compatibilidad temporal con DNI demo actual
+  const matchDNI = mensajeTexto.match(/\b\d{8}\b/);
+
+  if (matchDNI) {
+    return matchDNI[0];
+  }
+
+  return null;
+}
+
+async function procesarConsultaFactura(mensajeTexto, sessionId) {
   try {
-    let idBuscar = identificador;
-    const matchCLI = mensajeTexto.match(/CLI_\d+/i);
-    const matchDNI = mensajeTexto.match(/\b\d{8}\b/);
+    const session = getOrCreateSession(sessionId);
+    const activeSessionId = session.sessionId;
 
-    if (matchCLI) idBuscar = matchCLI[0].toUpperCase();
-    else if (matchDNI) idBuscar = matchDNI[0];
+    // Revisamos si el mensaje actual especifica un cliente.
+    const identificadorEncontrado =
+      extraerIdentificadorCliente(mensajeTexto);
 
-    const infoCliente = await obtenerInformacionCliente(idBuscar);
+    // Si encontramos uno, pasa a ser el cliente activo de la sesión.
+    if (identificadorEncontrado) {
+      updateContext(activeSessionId, {
+        customerIdentifier: identificadorEncontrado
+      });
+    }
+
+    // Si este mensaje no especifica cliente,
+    // reutilizamos el que ya estaba activo.
+    const idBuscar =
+      identificadorEncontrado ||
+      session.context.customerIdentifier;
+
+    const infoCliente = idBuscar
+      ? await obtenerInformacionCliente(idBuscar)
+      : null;
 
     let contextoCliente = '';
     if (infoCliente) {
@@ -137,22 +180,54 @@ PERFIL CLIENTE NBO (${c.cliente_id}):
 - Historial de ofertas presentadas: ${JSON.stringify(c.historial_campanias)}`;
       }
     } else {
-      contextoCliente = 'No se especificó un ID de cliente concreto o es una consulta sobre el catálogo comercial general.';
+      contextoCliente = `
+      No hay información de un cliente activo disponible para esta consulta.
+
+      Si la pregunta requiere información personal de facturación,
+      no inventes montos, fechas, conceptos ni causas.
+      Indica que no tienes información suficiente para responderla.
+      `;
     }
 
     // En services/ragService.js (Actualiza la función procesarConsultaFactura)
 
-const promptSistema = `Eres el Asistente Inteligente Oficial de Movistar Perú para la Hackathon AI Telecom Challenge 2026.
+const promptSistema = `
+Eres el Asistente Inteligente Oficial de Movistar Perú para la
+Hackathon AI Telecom Challenge 2026.
 
-REGLAS DE RESPUESTA Y FORMATO ESTRICTAS:
-1. SOLO DATOS OFICIALES (CERO ALUCINACIONES): Responde ÚNICAMENTE con las ofertas, planes y paquetes contenidos en el CATÁLOGO OFICIAL provisto. NUNCA menciones planes prepago, promociones externas ni servicios que "no estén en el catálogo". Si no está en la lista, indica de forma directa que no contamos con esa oferta actualmente.
-2. PRECIOS Y MONEDA: Muestra siempre los precios en Soles peruanos (ej. S/ 39.90). Nunca en dólares.
-3. EVALUACIÓN MATEMÁTICA: Si el cliente da un presupuesto (ej. S/ 40), los planes con precio menor o igual (ej. S/ 39.90) SÍ le alcanzan. Confírmaselo amablemente en la primera oración.
-4. FORMATO ORDENADO Y VISUALMENTE ATRACTIVO:
+REGLAS DE RESPUESTA:
+
+1. CERO ALUCINACIONES:
+   Responde únicamente utilizando información disponible en el contexto
+   proporcionado al sistema. Nunca inventes montos, fechas, cargos,
+   promociones, planes, causas ni información del cliente.
+
+2. CONSULTAS DE FACTURACIÓN:
+   Si el usuario pregunta por su recibo, variaciones, montos o historial,
+   utiliza exclusivamente los datos disponibles en el CONTEXTO DEL CLIENTE.
+
+3. CONSULTAS COMERCIALES:
+   Si el usuario pregunta específicamente por ofertas, planes o paquetes,
+   utiliza exclusivamente el CATÁLOGO DE OFERTAS OFICIAL proporcionado.
+
+4. FORMATO:
    - Usa párrafos cortos y lenguaje natural, cercano y respetuoso.
-   - Organiza los planes con listas claras usando viñetas con guiones (-) o números.
-   - Destaca los nombres y precios en **negrita**.
-   - Usa líneas separadoras (---) para dividir secciones si la respuesta es amplia.
+   - Muestra los montos en soles peruanos.
+   - Prioriza explicaciones simples y directas.
+
+5. CONTEXTO CONVERSACIONAL:
+   - Utiliza los mensajes anteriores para interpretar preguntas de seguimiento.
+   - Si el usuario pregunta "¿y el mes pasado?", "¿qué descuento?",
+     "¿cuándo terminó?" o expresiones similares, interpreta la referencia
+     usando la conversación anterior.
+   - No obligues al usuario a repetir información que ya proporcionó
+     durante la misma sesión.
+
+6. FALTA DE ENTENDIMIENTO:
+   - Si el usuario dice "no entendí", "explícamelo mejor",
+     "explícamelo más fácil" o algo equivalente, reformula
+     la explicación anterior de manera más sencilla.
+   - No inventes datos que no estén disponibles.
 
 --- CATÁLOGO DE OFERTAS OFICIAL ---
 ${catalogoOfertasTexto || 'Catálogo no disponible.'}
@@ -160,17 +235,34 @@ ${catalogoOfertasTexto || 'Catálogo no disponible.'}
 --- CONTEXTO DEL CLIENTE ---
 ${contextoCliente}
 `;
+    const historialConversacion = getHistory(activeSessionId);
     const completion = await groq.chat.completions.create({
       messages: [
-        { role: 'system', content: promptSistema },
-        { role: 'user', content: mensajeTexto }
-      ],
+                  {
+                    role: 'system',
+                    content: promptSistema
+                  },
+
+                  ...historialConversacion,
+
+                  {
+                    role: 'user',
+                    content: mensajeTexto
+                  }
+                ],
       model: 'llama-3.3-70b-versatile',
       temperature: 0.1,
       max_tokens: 500
     });
 
-    return completion.choices[0]?.message?.content || 'Lo siento, no pude procesar tu consulta en este momento.';
+    const respuesta =
+        completion.choices[0]?.message?.content ||
+        'Lo siento, no pude procesar tu consulta en este momento.';
+
+      addMessage(activeSessionId, 'user', mensajeTexto);
+      addMessage(activeSessionId, 'assistant', respuesta);
+
+      return respuesta;
   } catch (error) {
     console.error('Error en RAG Service:', error);
     return 'Hubo un inconveniente al procesar tu consulta. Por favor, intenta más tarde.';
