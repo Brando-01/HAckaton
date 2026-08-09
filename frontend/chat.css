@@ -335,3 +335,232 @@ body {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.4; }
 }
+
+.btn-finish-chat {
+    width: 100%;
+    margin-top: 12px;
+    padding: 12px 14px;
+
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 10px;
+
+    background: transparent;
+    color: inherit;
+
+    font-size: 14px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+        background 0.2s ease,
+        transform 0.2s ease;
+}
+
+.btn-finish-chat:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.btn-finish-chat:active {
+    transform: scale(0.98);
+}
+
+.btn-finish-chat:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+
+/* MODAL */
+
+.satisfaction-modal {
+    position: fixed;
+    inset: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 20px;
+
+    background: rgba(0, 0, 0, 0.55);
+
+    z-index: 9999;
+}
+
+.satisfaction-modal.hidden {
+    display: none;
+}
+
+.satisfaction-card {
+    width: min(460px, 100%);
+
+    padding: 28px;
+
+    border-radius: 18px;
+
+    background: #ffffff;
+    color: #222222;
+
+    box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.25);
+}
+
+.satisfaction-card h2 {
+    margin: 0 0 8px;
+
+    font-size: 24px;
+}
+
+.satisfaction-card > p {
+    margin: 0 0 24px;
+
+    color: #666666;
+}
+
+
+/* CALIFICACIÓN */
+
+.rating-options {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+
+    gap: 10px;
+
+    margin-bottom: 8px;
+}
+
+.rating-button {
+    height: 52px;
+
+    border: 1px solid #d9d9d9;
+    border-radius: 12px;
+
+    background: #ffffff;
+    color: #333333;
+
+    font-size: 18px;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    transition:
+        transform 0.15s ease,
+        border-color 0.15s ease,
+        background 0.15s ease;
+}
+
+.rating-button:hover {
+    transform: translateY(-2px);
+
+    border-color: #019be1;
+}
+
+.rating-button.selected {
+    border-color: #019be1;
+
+    background: #e9f7fd;
+    color: #0078ad;
+}
+
+.rating-labels {
+    display: flex;
+    justify-content: space-between;
+
+    margin-bottom: 22px;
+
+    color: #777777;
+
+    font-size: 12px;
+}
+
+
+/* COMENTARIO */
+
+.comment-label {
+    display: block;
+
+    margin-bottom: 8px;
+
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.satisfaction-comment {
+    width: 100%;
+
+    resize: vertical;
+
+    padding: 12px;
+
+    border: 1px solid #d9d9d9;
+    border-radius: 10px;
+
+    font-family: inherit;
+    font-size: 14px;
+
+    outline: none;
+}
+
+.satisfaction-comment:focus {
+    border-color: #019be1;
+}
+
+
+/* ERROR */
+
+.satisfaction-error {
+    margin: 12px 0 0;
+
+    color: #c62828;
+
+    font-size: 13px;
+}
+
+.satisfaction-error.hidden {
+    display: none;
+}
+
+
+/* BOTONES DEL MODAL */
+
+.satisfaction-actions {
+    display: flex;
+    justify-content: flex-end;
+
+    gap: 10px;
+
+    margin-top: 22px;
+}
+
+.btn-skip-rating,
+.btn-submit-rating {
+    padding: 11px 16px;
+
+    border-radius: 10px;
+
+    font-size: 14px;
+    font-weight: 600;
+
+    cursor: pointer;
+}
+
+.btn-skip-rating {
+    border: 1px solid #dddddd;
+
+    background: #ffffff;
+    color: #444444;
+}
+
+.btn-submit-rating {
+    border: none;
+
+    background: #019be1;
+    color: #ffffff;
+}
+
+.btn-submit-rating:disabled {
+    opacity: 0.6;
+
+    cursor: not-allowed;
+}

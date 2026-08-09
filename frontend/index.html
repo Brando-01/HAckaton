@@ -43,7 +43,13 @@
                 <span class="timer-title">Tiempo de sesión</span>
                 <span id="chatTimer" class="timer-clock">10:00</span>
             </div>
-        </div>
+                <button
+                    class="btn-finish-chat"
+                    id="finishChatButton"
+                >
+                    ✓ Finalizar consulta
+                </button>
+            </div>
     </aside>
 
     <!-- CONTENEDOR PRINCIPAL -->
@@ -89,7 +95,112 @@
         </footer>
 
     </main>
+    <!-- ENCUESTA DE SATISFACCIÓN -->
+<div
+    class="satisfaction-modal hidden"
+    id="satisfactionModal"
+>
+    <div class="satisfaction-card">
 
+        <h2>
+            ¿Cómo fue tu experiencia?
+        </h2>
+
+        <p>
+            Califica la atención del
+            asistente.
+        </p>
+
+        <div
+            class="rating-options"
+            id="ratingOptions"
+        >
+            <button
+                class="rating-button"
+                data-rating="1"
+                title="Muy mala"
+            >
+                1
+            </button>
+
+            <button
+                class="rating-button"
+                data-rating="2"
+                title="Mala"
+            >
+                2
+            </button>
+
+            <button
+                class="rating-button"
+                data-rating="3"
+                title="Regular"
+            >
+                3
+            </button>
+
+            <button
+                class="rating-button"
+                data-rating="4"
+                title="Buena"
+            >
+                4
+            </button>
+
+            <button
+                class="rating-button"
+                data-rating="5"
+                title="Excelente"
+            >
+                5
+            </button>
+        </div>
+
+        <div class="rating-labels">
+            <span>Muy mala</span>
+            <span>Excelente</span>
+        </div>
+
+        <label
+            for="satisfactionComment"
+            class="comment-label"
+        >
+            Comentario opcional
+        </label>
+
+        <textarea
+            id="satisfactionComment"
+            class="satisfaction-comment"
+            placeholder="Cuéntanos qué podríamos mejorar..."
+            maxlength="500"
+            rows="4"
+        ></textarea>
+
+        <p
+            class="satisfaction-error hidden"
+            id="satisfactionError"
+        ></p>
+
+        <div class="satisfaction-actions">
+
+            <button
+                class="btn-skip-rating"
+                id="skipSatisfactionButton"
+            >
+                Ahora no
+            </button>
+
+            <button
+                class="btn-submit-rating"
+                id="submitSatisfactionButton"
+            >
+                Enviar calificación
+            </button>
+
+        </div>
+
+    </div>
+</div>
     <script src="./chat.js"></script>
 </body>
 </html>

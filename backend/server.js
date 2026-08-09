@@ -26,6 +26,17 @@ const {
   actualizarEstadoCaso
 } = require('./services/handoffService');
 
+const {
+  registerMessage,
+  registerHandoff,
+  endInteraction,
+  registerSatisfaction,
+  getInteraction,
+  getInteractions,
+  getDashboardSummary
+} = require('./services/metricsService');
+
+
 function createApp() {
   const app = express();
 
@@ -38,13 +49,24 @@ function createApp() {
     'frontend'
   );
 
-  app.use(express.static(frontendPath));
+  app.use(
+    express.static(frontendPath)
+  );
+
+
+  // =========================================================
+  // VISTAS
+  // =========================================================
 
   app.get('/', (req, res) => {
     res.sendFile(
-      path.join(frontendPath, 'index.html')
+      path.join(
+        frontendPath,
+        'index.html'
+      )
     );
   });
+
 
   app.get('/advisor', (req, res) => {
     res.sendFile(
@@ -55,175 +77,382 @@ function createApp() {
     );
   });
 
-  app.get('/health', (req, res) => {
-    res.json({ ok: true });
+
+  app.get('/dashboard', (req, res) => {
+    res.sendFile(
+      path.join(
+        frontendPath,
+        'dashboard.html'
+      )
+    );
   });
+
+
+  // =========================================================
+  // HEALTH
+  // =========================================================
+
+  app.get('/health', (req, res) => {
+    return res.json({
+      ok: true
+    });
+  });
+
+
+  // =========================================================
+  // SESIONES
+  // =========================================================
 
   app.delete(
     '/api/session/:sessionId',
     (req, res) => {
-      const { sessionId } = req.params;
+      const { sessionId } =
+        req.params;
+
+      const interaction =
+        getInteraction(sessionId);
+
+      // Si la interacción todavía estaba activa,
+      // "Nueva consulta" finaliza la conversación anterior.
+      if (
+        interaction &&
+        interaction.status === 'ACTIVE'
+      ) {
+        endInteraction(
+          sessionId,
+          'NEW_CHAT'
+        );
+      }
 
       resetSession(sessionId);
 
       return res.json({
         ok: true,
-        message: 'Sesión eliminada correctamente'
+        message:
+          'Sesión eliminada correctamente'
       });
     }
   );
 
-  // Endpoint de Chat
-app.post('/api/chat', async (req, res) => {
-  const { message, sessionId } = req.body || {};
 
-  if (
-    !message ||
-    typeof message !== 'string' ||
-    !message.trim()
-  ) {
-    return res.status(400).json({
-      error: 'El mensaje no puede estar vacío'
-    });
-  }
+  // =========================================================
+  // CHAT
+  // =========================================================
 
-  const activeSessionId =
-    sessionId || `s_${randomUUID()}`;
+  app.post(
+    '/api/chat',
+    async (req, res) => {
+      const {
+        message,
+        sessionId
+      } = req.body || {};
 
-  try {
-    console.log(
-      '[API] /api/chat message=',
-      message,
-      'sessionId=',
-      activeSessionId
-    );
+      if (
+        !message ||
+        typeof message !== 'string' ||
+        !message.trim()
+      ) {
+        return res.status(400).json({
+          error:
+            'El mensaje no puede estar vacío'
+        });
+      }
 
-    const cleanMessage =
-      message.trim();
+      const activeSessionId =
+        sessionId ||
+        `s_${randomUUID()}`;
 
-    if (esSolicitudAsesor(cleanMessage)) {
-      const session =
-        getOrCreateSession(
+      try {
+        console.log(
+          '[API] /api/chat message=',
+          message,
+          'sessionId=',
           activeSessionId
         );
 
-      const ultimaConsultaPrevia =
-        [...session.history]
-          .reverse()
-          .find(
-            (mensaje) =>
-              mensaje.role === 'user'
-          );
+        const cleanMessage =
+          message.trim();
 
-      const conversation =
-        session.history.map(
-          ({ role, content }) => ({
-            role,
-            content
-          })
+        const existingInteraction =
+            getInteraction(
+              activeSessionId
+            );
+
+          if (
+            existingInteraction &&
+            existingInteraction.status === 'ENDED' &&
+            existingInteraction.endReason === 'HANDOFF'
+          ) {
+            return res.json({
+              reply:
+                `Tu consulta ya fue derivada al asesor en el caso ${existingInteraction.handoffCaseId}. ` +
+                'Si deseas iniciar una consulta diferente, selecciona "Nueva consulta".',
+
+              sessionId:
+                activeSessionId,
+
+              handoff: {
+                caseId:
+                  existingInteraction.handoffCaseId,
+
+                status:
+                  'PENDING',
+
+                alreadyTransferred:
+                  true
+              }
+            });
+          }
+
+        // Persona 3:
+        // registramos cada mensaje real del usuario.
+        registerMessage(
+          activeSessionId,
+          'user'
         );
 
-      conversation.push({
-        role: 'user',
-        content: cleanMessage
-      });
 
-      const caso = crearCaso({
-        sessionId:
-          activeSessionId,
+        // =====================================================
+        // HANDOFF A ASESOR
+        // Persona 2
+        // =====================================================
 
-        customerIdentifier:
-          session.context
-            .customerIdentifier,
-
-        originalQuery:
-          ultimaConsultaPrevia
-            ? ultimaConsultaPrevia.content
-            : cleanMessage,
-
-        conversation,
-
-        reason:
-          determinarMotivoDerivacion(
+        if (
+          esSolicitudAsesor(
             cleanMessage
           )
-      });
+        ) {
+          const session =
+            getOrCreateSession(
+              activeSessionId
+            );
 
-      const reply =
-        `Listo. Generé el caso ${caso.caseId}. ` +
-        'Un asesor podrá revisar el contexto de esta conversación para que no tengas que explicar todo nuevamente.';
+          // Tomamos la última consulta previa
+          // del cliente para mostrarla al asesor.
+          const ultimaConsultaPrevia =
+            [...session.history]
+              .reverse()
+              .find(
+                (mensaje) =>
+                  mensaje.role ===
+                  'user'
+              );
 
-      addMessage(
-        activeSessionId,
-        'user',
-        cleanMessage
-      );
+          const conversation =
+            session.history.map(
+              ({
+                role,
+                content
+              }) => ({
+                role,
+                content
+              })
+            );
 
-      addMessage(
-        activeSessionId,
-        'assistant',
-        reply
-      );
+          // El mensaje actual todavía no se
+          // encuentra en SessionService.
+          conversation.push({
+            role: 'user',
+            content: cleanMessage
+          });
 
-      return res.json({
-        reply,
-        foundData: Boolean(
-          session.context
-            .customerIdentifier
-        ),
-        sessionId:
-          activeSessionId,
-        handoff: {
-          caseId:
-            caso.caseId,
-          status:
-            caso.status,
-          reason:
-            caso.reason
+          const caso =
+            crearCaso({
+              sessionId:
+                activeSessionId,
+
+              customerIdentifier:
+                session.context
+                  .customerIdentifier,
+
+              originalQuery:
+                ultimaConsultaPrevia
+                  ? ultimaConsultaPrevia
+                      .content
+                  : cleanMessage,
+
+              conversation,
+
+              reason:
+                determinarMotivoDerivacion(
+                  cleanMessage
+                )
+            });
+
+
+          // Persona 3:
+          // registramos que la interacción
+          // terminó siendo derivada.
+          registerHandoff(
+            activeSessionId,
+            caso.caseId
+          );
+
+
+          const reply =
+            `Listo. Generé el caso ${caso.caseId}. ` +
+            'Un asesor podrá revisar el contexto de esta conversación para que no tengas que explicar todo nuevamente.';
+
+
+          // Persona 1:
+          // historial conversacional.
+          addMessage(
+            activeSessionId,
+            'user',
+            cleanMessage
+          );
+
+          addMessage(
+            activeSessionId,
+            'assistant',
+            reply
+          );
+
+
+          // Persona 3:
+          // métrica de respuesta.
+          registerMessage(
+            activeSessionId,
+            'assistant'
+          );
+
+
+          // El handoff finaliza esta
+          // interacción de atención automática.
+          endInteraction(
+            activeSessionId,
+            'HANDOFF'
+          );
+
+
+          return res.json({
+            reply,
+
+            foundData:
+              Boolean(
+                session.context
+                  .customerIdentifier
+              ),
+
+            sessionId:
+              activeSessionId,
+
+            handoff: {
+              caseId:
+                caso.caseId,
+
+              status:
+                caso.status,
+
+              reason:
+                caso.reason
+            }
+          });
         }
-      });
+
+
+        // =====================================================
+        // CONSULTA NORMAL AL RAG
+        // =====================================================
+
+        const result =
+          await procesarConsultaFactura(
+            cleanMessage,
+            activeSessionId
+          );
+
+
+        // Compatibilidad con respuestas
+        // antiguas tipo string.
+        if (
+          typeof result === 'string'
+        ) {
+          registerMessage(
+            activeSessionId,
+            'assistant'
+          );
+
+          return res.json({
+            reply: result,
+            foundData: false,
+            sessionId:
+              activeSessionId
+          });
+        }
+
+
+        // Si tenemos una respuesta normal,
+        // registramos el mensaje del asistente.
+        if (
+          result &&
+          typeof result.reply ===
+            'string'
+        ) {
+          registerMessage(
+            activeSessionId,
+            'assistant'
+          );
+        }
+
+
+        return res.json({
+          ...result,
+          sessionId:
+            activeSessionId
+        });
+
+      } catch (error) {
+        console.error(
+          'Error en servidor:',
+          error
+        );
+
+        // Aunque haya fallado el procesamiento,
+        // el sistema sí está enviando una respuesta
+        // al cliente, así que la contamos.
+        try {
+          registerMessage(
+            activeSessionId,
+            'assistant'
+          );
+        } catch (
+          metricsError
+        ) {
+          console.error(
+            'Error registrando métrica:',
+            metricsError
+          );
+        }
+
+        return res
+          .status(500)
+          .json({
+            reply:
+              'Lo siento, tuve un problema al procesar tu consulta. Intenta de nuevo.',
+
+            sessionId:
+              activeSessionId
+          });
+      }
     }
+  );
 
-    const result =
-      await procesarConsultaFactura(
-        cleanMessage,
-        activeSessionId
-      );
 
-    if (typeof result === 'string') {
-      return res.json({
-        reply: result,
-        foundData: false,
-        sessionId: activeSessionId
-      });
-    }
-
-    return res.json({
-      ...result,
-      sessionId: activeSessionId
-    });
-  } catch (error) {
-    console.error(
-      'Error en servidor:',
-      error
-    );
-
-    return res.status(500).json({
-      reply:
-        'Lo siento, tuve un problema al procesar tu consulta. Intenta de nuevo.',
-      sessionId: activeSessionId
-    });
-  }
-});
+  // =========================================================
+  // ASESOR
+  // Persona 2
+  // =========================================================
 
   app.get(
     '/api/advisor/cases',
     (req, res) => {
       return res.json({
-        cases: listarCasos()
+        cases:
+          listarCasos()
       });
     }
   );
+
 
   app.get(
     '/api/advisor/cases/:caseId',
@@ -234,21 +463,25 @@ app.post('/api/chat', async (req, res) => {
         );
 
       if (!caso) {
-        return res.status(404).json({
-          error:
-            'Caso no encontrado'
-        });
+        return res
+          .status(404)
+          .json({
+            error:
+              'Caso no encontrado'
+          });
       }
 
       return res.json(caso);
     }
   );
 
+
   app.patch(
     '/api/advisor/cases/:caseId',
     (req, res) => {
-      const { status } =
-        req.body || {};
+      const {
+        status
+      } = req.body || {};
 
       if (
         ![
@@ -256,10 +489,12 @@ app.post('/api/chat', async (req, res) => {
           'ATTENDED'
         ].includes(status)
       ) {
-        return res.status(400).json({
-          error:
-            'Estado inválido'
-        });
+        return res
+          .status(400)
+          .json({
+            error:
+              'Estado inválido'
+          });
       }
 
       const caso =
@@ -269,31 +504,144 @@ app.post('/api/chat', async (req, res) => {
         );
 
       if (!caso) {
-        return res.status(404).json({
-          error:
-            'Caso no encontrado'
-        });
+        return res
+          .status(404)
+          .json({
+            error:
+              'Caso no encontrado'
+          });
       }
 
       return res.json(caso);
     }
   );
 
+
+  // =========================================================
+  // SATISFACCIÓN
+  // HU05
+  // =========================================================
+
+  app.post(
+    '/api/metrics/:sessionId/satisfaction',
+    (req, res) => {
+      const {
+        rating,
+        comment
+      } = req.body || {};
+
+      try {
+        const interaction =
+          registerSatisfaction(
+            req.params.sessionId,
+            rating,
+            comment
+          );
+
+        return res.json({
+          ok: true,
+
+          satisfaction:
+            interaction
+              .satisfaction
+        });
+
+      } catch (error) {
+        return res
+          .status(400)
+          .json({
+            error:
+              error.message
+          });
+      }
+    }
+  );
+
+
+  // =========================================================
+  // FINALIZAR INTERACCIÓN
+  // HU06
+  // =========================================================
+
+  app.post(
+    '/api/metrics/:sessionId/end',
+    (req, res) => {
+      const interaction =
+        getInteraction(
+          req.params.sessionId
+        );
+
+      if (!interaction) {
+        return res
+          .status(404)
+          .json({
+            error:
+              'Interacción no encontrada'
+          });
+      }
+
+      const ended =
+        endInteraction(
+          req.params.sessionId,
+          'USER_ENDED'
+        );
+
+      return res.json({
+        ok: true,
+        interaction: ended
+      });
+    }
+  );
+
+
+  // =========================================================
+  // DASHBOARD
+  // HU07
+  // =========================================================
+
+  app.get(
+    '/api/metrics/dashboard',
+    (req, res) => {
+      return res.json(
+        getDashboardSummary()
+      );
+    }
+  );
+
+
+  app.get(
+    '/api/metrics/interactions',
+    (req, res) => {
+      return res.json({
+        interactions:
+          getInteractions()
+      });
+    }
+  );
+
+
   return app;
 }
 
+
 const app = createApp();
 
+
 if (require.main === module) {
-  const PORT = process.env.PORT || 3000;
+  const PORT =
+    process.env.PORT ||
+    3000;
 
   dbReady
     .then(() => {
-      app.listen(PORT, () => {
-        console.log(
-          `🚀 Servidor ejecutándose en http://localhost:${PORT}`
-        );
-      });
+      app.listen(
+        PORT,
+        () => {
+          console.log(
+            `🚀 Servidor ejecutándose en http://localhost:${PORT}`
+          );
+        }
+      );
     })
     .catch((error) => {
       console.error(
@@ -304,6 +652,7 @@ if (require.main === module) {
       process.exit(1);
     });
 }
+
 
 module.exports = {
   app,
