@@ -1186,6 +1186,92 @@
     );
   }
 
+  async function bootstrapFromApp() {
+    const params =
+      new URLSearchParams(
+        window.location.search
+      );
+
+    if (
+      params.get('source') !==
+      'app'
+    ) {
+      return;
+    }
+
+    const customerId =
+      params.get(
+        'customerId'
+      );
+
+    const prompt =
+      params.get(
+        'prompt'
+      );
+
+    if (!customerId) {
+      return;
+    }
+
+    try {
+      const response =
+        await fetch(
+          `/api/session/${encodeURIComponent(
+            currentSessionId
+          )}/customer`,
+          {
+            method: 'POST',
+
+            headers: {
+              'Content-Type':
+                'application/json'
+            },
+
+            body: JSON.stringify({
+              customerId
+            })
+          }
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          'No se pudo asociar el cliente'
+        );
+      }
+
+      console.log(
+        '[CHAT] Cliente autenticado desde app:',
+        customerId
+      );
+
+
+      if (
+        prompt &&
+        userInput
+      ) {
+        userInput.value =
+          prompt;
+
+        await sendMessage();
+      }
+
+
+      // Limpiamos parámetros para evitar
+      // repetir la acción al refrescar.
+      history.replaceState(
+        {},
+        '',
+        '/'
+      );
+
+    } catch (error) {
+      console.error(
+        '[CHAT] Error cargando contexto de app:',
+        error
+      );
+    }
+  }
+
 
   // =========================================================
   // INICIO
@@ -1193,7 +1279,7 @@
 
   document.addEventListener(
     'DOMContentLoaded',
-    () => {
+    async () => {
       appendMessage(
         '¡Hola! Soy tu asistente virtual Movistar. ¿En qué puedo ayudarte hoy?',
         'bot'
@@ -1211,9 +1297,11 @@
       startTimer();
 
       if (finishChatButton) {
-        finishChatButton.disabled = true;
+        finishChatButton.disabled =
+          true;
       }
 
+      await bootstrapFromApp();
     }
   );
 })();

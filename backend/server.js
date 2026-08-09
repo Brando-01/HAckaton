@@ -14,8 +14,15 @@ const { dbReady } = require('./db');
 const {
   resetSession,
   getOrCreateSession,
-  addMessage
+  addMessage,
+  updateContext
 } = require('./services/sessionService');
+
+const {
+  getCustomerExperience,
+  getAvailableCustomers,
+  customerExists
+} = require('./services/appExperienceService');
 
 const {
   esSolicitudAsesor,
@@ -77,6 +84,14 @@ function createApp() {
     );
   });
 
+  app.get('/app', (req, res) => {
+    res.sendFile(
+      path.join(
+        frontendPath,
+        'app.html'
+      )
+    );
+  });
 
   app.get('/dashboard', (req, res) => {
     res.sendFile(
@@ -615,6 +630,87 @@ function createApp() {
       return res.json({
         interactions:
           getInteractions()
+      });
+    }
+  );
+
+  // =========================================================
+  // APP MI MOVISTAR SIMULADA
+  // PERSONA 4
+  // =========================================================
+
+  app.get(
+    '/api/app/customers',
+    (req, res) => {
+      return res.json({
+        customers:
+          getAvailableCustomers()
+      });
+    }
+  );
+
+
+  app.get(
+    '/api/app/customers/:customerId',
+    (req, res) => {
+      const experience =
+        getCustomerExperience(
+          req.params.customerId
+        );
+
+      if (!experience) {
+        return res
+          .status(404)
+          .json({
+            error:
+              'Cliente no encontrado'
+          });
+      }
+
+      return res.json(
+        experience
+      );
+    }
+  );
+
+
+  // En producción esto vendría de la
+  // autenticación real del usuario.
+  // Para el hackathon simulamos ese contexto.
+  app.post(
+    '/api/session/:sessionId/customer',
+    (req, res) => {
+      const {
+        customerId
+      } = req.body || {};
+
+      if (
+        !customerId ||
+        !customerExists(customerId)
+      ) {
+        return res
+          .status(400)
+          .json({
+            error:
+              'Cliente inválido'
+          });
+      }
+
+      updateContext(
+        req.params.sessionId,
+        {
+          customerIdentifier:
+            customerId
+        }
+      );
+
+      return res.json({
+        ok: true,
+
+        sessionId:
+          req.params.sessionId,
+
+        customerId
       });
     }
   );

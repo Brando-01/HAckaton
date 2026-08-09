@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        Mi Movistar | Recibos
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="./app.css"
+    >
+</head>
+
+<body>
+
+    <header class="app-header">
+
+        <div class="brand">
+            <span class="brand-icon">
+                M
+            </span>
+
+            <div>
+                <strong>Mi Movistar</strong>
+                <span>Resumen de tu servicio</span>
+            </div>
+        </div>
+
+        <div class="profile-selector">
+
+            <label for="customerSelector">
+                Perfil demo
+            </label>
+
+            <select id="customerSelector">
+            </select>
+
+        </div>
+
+    </header>
+
+
+    <main class="app-container">
+
+        <section class="welcome">
+
+            <p>Hola,</p>
+
+            <h1 id="customerName">
+                Cargando...
+            </h1>
+
+            <span id="customerPlan">
+            </span>
+
+        </section>
+
+
+        <section class="bill-summary">
+
+            <div class="current-bill">
+
+                <span class="section-label">
+                    Tu recibo actual
+                </span>
+
+                <h2 id="currentPeriod">
+                    —
+                </h2>
+
+                <strong
+                    class="current-total"
+                    id="currentTotal"
+                >
+                    S/ 0
+                </strong>
+
+                <div class="bill-meta">
+
+                    <span id="currentStatus">
+                    </span>
+
+                    <span id="dueDate">
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <div class="variation-card">
+
+                <span>
+                    Comparado con el mes anterior
+                </span>
+
+                <strong id="variationAmount">
+                    —
+                </strong>
+
+                <p id="variationPercentage">
+                </p>
+
+            </div>
+
+        </section>
+
+
+        <section class="comparison-section">
+
+            <div class="section-title">
+                <div>
+                    <h2>
+                        ¿Qué cambió en tu recibo?
+                    </h2>
+
+                    <p>
+                        Comparación entre el mes
+                        actual y el anterior.
+                    </p>
+                </div>
+            </div>
+
+
+            <div class="comparison-grid">
+
+                <article class="bill-card">
+
+                    <span class="bill-card-label">
+                        Mes anterior
+                    </span>
+
+                    <h3 id="previousPeriod">
+                        —
+                    </h3>
+
+                    <strong
+                        id="previousTotal"
+                        class="bill-total"
+                    >
+                        —
+                    </strong>
+
+                    <div
+                        id="previousItems"
+                        class="bill-items"
+                    >
+                    </div>
+
+                </article>
+
+
+                <article class="bill-card highlighted">
+
+                    <span class="bill-card-label">
+                        Mes actual
+                    </span>
+
+                    <h3 id="comparisonCurrentPeriod">
+                        —
+                    </h3>
+
+                    <strong
+                        id="comparisonCurrentTotal"
+                        class="bill-total"
+                    >
+                        —
+                    </strong>
+
+                    <div
+                        id="currentItems"
+                        class="bill-items"
+                    >
+                    </div>
+
+                </article>
+
+            </div>
+
+        </section>
+
+
+        <section class="causes-section">
+
+            <h2>
+                Principales motivos
+            </h2>
+
+            <div
+                id="causesList"
+                class="causes-list"
+            >
+            </div>
+
+        </section>
+
+
+        <section class="actions-section">
+
+            <div>
+                <h2>
+                    ¿Qué deseas hacer?
+                </h2>
+
+                <p>
+                    Podemos ayudarte con el
+                    siguiente paso.
+                </p>
+            </div>
+
+            <div
+                id="nextActions"
+                class="actions-grid"
+            >
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <script src="./app.js"></script>
+
+</body>
+
+</html>
