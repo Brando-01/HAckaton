@@ -1,0 +1,137 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f5f6f8;
+  color: #222;
+}
+
+.advisor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 32px;
+  background: white;
+  border-bottom: 1px solid #ddd;
+}
+
+.advisor-header h1 {
+  margin: 0 0 4px;
+}
+
+.advisor-header p {
+  margin: 0;
+  color: #666;
+}
+
+.advisor-header button {
+  padding: 10px 18px;
+  cursor: pointer;
+}
+
+.advisor-layout {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 20px;
+  padding: 20px;
+  min-height: calc(100vh - 100px);
+}
+
+.cases-panel,
+.detail-panel {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.case-card {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+
+  padding: 14px;
+  margin-bottom: 10px;
+
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  background: white;
+
+  cursor: pointer;
+  text-align: left;
+}
+
+.case-card:hover,
+.case-card.selected {
+  border-color: #777;
+}
+
+.case-id {
+  font-size: 15px;
+}
+
+.case-reason {
+  color: #555;
+}
+
+.case-status {
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.case-status.pending {
+  color: #9a6700;
+}
+
+.case-status.attended {
+  color: #18794e;
+}
+
+.detail-row {
+  margin: 10px 0;
+}
+
+.conversation {
+  margin-top: 12px;
+}
+
+.conversation-message {
+  padding: 12px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+}
+
+.conversation-message.user {
+  background: #eef6ff;
+}
+
+.conversation-message.assistant {
+  background: #f3f3f3;
+}
+
+.conversation-message p {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+}
+
+.attend-button {
+  margin-top: 20px;
+  padding: 12px 18px;
+  cursor: pointer;
+}
+
+.empty-state {
+  color: #777;
+  padding: 30px;
+  text-align: center;
+}
+
+@media (max-width: 800px) {
+  .advisor-layout {
+    grid-template-columns: 1fr;
+  }
+}
