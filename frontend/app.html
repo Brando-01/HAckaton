@@ -17,6 +17,7 @@
         rel="stylesheet"
         href="./app.css"
     >
+    <link rel="stylesheet" href="./demo-nav.css">
 </head>
 
 <body>
@@ -34,21 +35,37 @@
             </div>
         </div>
 
-        <div class="profile-selector">
+        <div class="app-header-actions">
+            <nav class="demo-nav" aria-label="Navegación de demo">
+                <a class="demo-nav-link home-link" href="/">Inicio demo</a>
+                <a class="demo-nav-link" id="openAssistantLink" href="/chat?source=app">Abrir Lucía</a>
+            </nav>
 
-            <label for="customerSelector">
-                Perfil demo
-            </label>
+            <div class="authenticated-profile">
+                <div class="authenticated-profile-copy">
+                    <span id="authModeBadge" class="auth-mode-badge">Sesión</span>
+                    <strong id="authenticatedUserName">Cargando...</strong>
+                    <small id="authenticatedUserEmail"></small>
+                </div>
 
-            <select id="customerSelector">
-            </select>
-
+                <button id="logoutButton" class="logout-button" type="button">
+                    Cerrar sesión
+                </button>
+            </div>
         </div>
 
     </header>
 
 
-    <main class="app-container">
+    <main class="auth-loading" id="authLoading">
+        <div class="auth-loading-card">
+            <strong>Validando tu sesión...</strong>
+            <span>Estamos cargando tu información de Mi Movistar.</span>
+        </div>
+    </main>
+
+
+    <main class="app-container" id="customerExperience" hidden>
 
         <section class="welcome">
 

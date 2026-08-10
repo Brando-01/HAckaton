@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   esSolicitudAsesor,
   determinarMotivoDerivacion,
+  obtenerConsultaOriginal,
   crearCaso,
   listarCasos,
   obtenerCaso,
@@ -66,6 +67,39 @@ test('clasifica correctamente el motivo de derivación', () => {
   );
 });
 
+
+
+test('identifica la primera consulta útil y omite mensajes de identificación', () => {
+  const originalQuery =
+    obtenerConsultaOriginal([
+      {
+        role: 'user',
+        content: 'Mi DNI es 72819345'
+      },
+      {
+        role: 'assistant',
+        content: 'Cliente identificado'
+      },
+      {
+        role: 'user',
+        content: 'Explícame por qué aumentó mi recibo'
+      },
+      {
+        role: 'assistant',
+        content: 'Tu recibo aumentó por dos motivos.'
+      },
+      {
+        role: 'user',
+        content: '¿Cuánto es mi recibo actual?'
+      }
+    ]);
+
+  assert.equal(
+    originalQuery,
+    'Explícame por qué aumentó mi recibo'
+  );
+});
+
 test('crea un caso con el contexto de la conversación', () => {
   resetHandoffCases();
 
@@ -76,6 +110,45 @@ test('crea un caso con el contexto de la conversación', () => {
       '¿Qué información tienes de mi recibo?',
     reason:
       'CUSTOMER_DISAGREES',
+
+    handoffMessage:
+      'No estoy de acuerdo, quiero hablar con un asesor',
+
+    customerContext: {
+      customerId: 'CLI000001',
+      name: 'Carlos Mendoza',
+      plan: 'Movistar Fibra 200 Mbps'
+    },
+
+    billingContext: {
+      previousBill: {
+        period: 'Junio 2026',
+        total: 95
+      },
+      currentBill: {
+        period: 'Julio 2026',
+        total: 125
+      },
+      comparison: {
+        difference: 30,
+        percentage: 31.6,
+        direction: 'UP',
+        causes: [
+          {
+            code: 'DISCOUNT_ENDED',
+            title: 'Finalizó tu descuento',
+            description: 'El descuento terminó.',
+            impact: 20
+          },
+          {
+            code: 'RECONNECTION',
+            title: 'Cargo por reconexión',
+            description: 'Se aplicó reconexión.',
+            impact: 10
+          }
+        ]
+      }
+    },
 
     conversation: [
       {
@@ -133,6 +206,51 @@ test('crea un caso con el contexto de la conversación', () => {
   assert.equal(
     caso.status,
     'PENDING'
+  );
+
+  assert.equal(
+    caso.customer.name,
+    'Carlos Mendoza'
+  );
+
+  assert.equal(
+    caso.customer.plan,
+    'Movistar Fibra 200 Mbps'
+  );
+
+  assert.equal(
+    caso.billing.previousBill.total,
+    95
+  );
+
+  assert.equal(
+    caso.billing.currentBill.total,
+    125
+  );
+
+  assert.equal(
+    caso.billing.comparison.difference,
+    30
+  );
+
+  assert.equal(
+    caso.billing.comparison.causes.length,
+    2
+  );
+
+  assert.equal(
+    caso.handoffMessage,
+    'No estoy de acuerdo, quiero hablar con un asesor'
+  );
+
+  assert.equal(
+    caso.advisorSummary.headline,
+    'Variación de S/ 30 en el recibo'
+  );
+
+  assert.match(
+    caso.advisorSummary.outcome,
+    /no está de acuerdo/i
   );
 
   assert.equal(

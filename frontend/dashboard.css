@@ -275,3 +275,20 @@ tbody tr:hover {
         padding-top: 16px;
     }
 }
+
+.header-actions {
+    flex-wrap: wrap;
+}
+
+@media (max-width: 900px) {
+    .dashboard-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .header-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}

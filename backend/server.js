@@ -12,6 +12,16 @@ const {
 const { dbReady } = require('./db');
 
 const {
+  SESSION_TTL_MS,
+  authenticateUser,
+  authenticateDemoCustomer,
+  createAuthSession,
+  getAuthSession,
+  destroyAuthSession,
+  getDemoProfiles
+} = require('./services/authService');
+
+const {
   resetSession,
   getOrCreateSession,
   addMessage,
@@ -27,6 +37,7 @@ const {
 const {
   esSolicitudAsesor,
   determinarMotivoDerivacion,
+  obtenerConsultaOriginal,
   crearCaso,
   listarCasos,
   obtenerCaso,
@@ -44,6 +55,127 @@ const {
 } = require('./services/metricsService');
 
 
+const AUTH_COOKIE_NAME =
+  'movistarAuth';
+
+function parseCookies(header) {
+  const cookies = {};
+
+  String(header || '')
+    .split(';')
+    .forEach((part) => {
+      const separator =
+        part.indexOf('=');
+
+      if (separator < 0) {
+        return;
+      }
+
+      const key =
+        part
+          .slice(0, separator)
+          .trim();
+
+      const value =
+        part
+          .slice(separator + 1)
+          .trim();
+
+      if (!key) {
+        return;
+      }
+
+      try {
+        cookies[key] =
+          decodeURIComponent(value);
+      } catch (error) {
+        cookies[key] = value;
+      }
+    });
+
+  return cookies;
+}
+
+function getAuthToken(req) {
+  return parseCookies(
+    req.headers.cookie
+  )[AUTH_COOKIE_NAME];
+}
+
+function getRequestAuth(req) {
+  const token =
+    getAuthToken(req);
+
+  const session =
+    getAuthSession(token);
+
+  return session
+    ? {
+        token,
+        session
+      }
+    : null;
+}
+
+function setAuthCookie(
+  res,
+  token
+) {
+  const maxAgeSeconds =
+    Math.floor(
+      SESSION_TTL_MS / 1000
+    );
+
+  res.setHeader(
+    'Set-Cookie',
+    `${AUTH_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}`
+  );
+}
+
+function clearAuthCookie(res) {
+  res.setHeader(
+    'Set-Cookie',
+    `${AUTH_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
+  );
+}
+
+function requirePageAuth(
+  req,
+  res,
+  next
+) {
+  if (!getRequestAuth(req)) {
+    return res.redirect(
+      302,
+      '/login'
+    );
+  }
+
+  return next();
+}
+
+function requireApiAuth(
+  req,
+  res,
+  next
+) {
+  const auth =
+    getRequestAuth(req);
+
+  if (!auth) {
+    return res
+      .status(401)
+      .json({
+        error:
+          'Debes iniciar sesión'
+      });
+  }
+
+  req.auth = auth;
+  return next();
+}
+
+
 function createApp() {
   const app = express();
 
@@ -57,15 +189,41 @@ function createApp() {
   );
 
   app.use(
-    express.static(frontendPath)
+    express.static(frontendPath, {
+      index: false
+    })
   );
-
 
   // =========================================================
   // VISTAS
   // =========================================================
 
   app.get('/', (req, res) => {
+    res.sendFile(
+      path.join(
+        frontendPath,
+        'demo.html'
+      )
+    );
+  });
+
+  app.get('/login', (req, res) => {
+    if (getRequestAuth(req)) {
+      return res.redirect(
+        302,
+        '/app'
+      );
+    }
+
+    return res.sendFile(
+      path.join(
+        frontendPath,
+        'login.html'
+      )
+    );
+  });
+
+  app.get('/chat', (req, res) => {
     res.sendFile(
       path.join(
         frontendPath,
@@ -84,14 +242,18 @@ function createApp() {
     );
   });
 
-  app.get('/app', (req, res) => {
-    res.sendFile(
-      path.join(
-        frontendPath,
-        'app.html'
-      )
-    );
-  });
+  app.get(
+    '/app',
+    requirePageAuth,
+    (req, res) => {
+      res.sendFile(
+        path.join(
+          frontendPath,
+          'app.html'
+        )
+      );
+    }
+  );
 
   app.get('/dashboard', (req, res) => {
     res.sendFile(
@@ -101,6 +263,152 @@ function createApp() {
       )
     );
   });
+
+
+  // =========================================================
+  // AUTENTICACIÓN LOCAL DE DEMO
+  // =========================================================
+
+  app.get(
+    '/api/auth/demo-profiles',
+    (req, res) => {
+      return res.json({
+        profiles:
+          getDemoProfiles()
+      });
+    }
+  );
+
+  app.post(
+    '/api/auth/login',
+    (req, res) => {
+      const {
+        email,
+        password
+      } = req.body || {};
+
+      const user =
+        authenticateUser(
+          email,
+          password
+        );
+
+      if (!user) {
+        return res
+          .status(401)
+          .json({
+            error:
+              'Correo o contraseña incorrectos'
+          });
+      }
+
+      const authSession =
+        createAuthSession(user);
+
+      setAuthCookie(
+        res,
+        authSession.token
+      );
+
+      return res.json({
+        ok: true,
+        user:
+          authSession.user
+      });
+    }
+  );
+
+  app.post(
+    '/api/auth/demo-login',
+    (req, res) => {
+      const {
+        customerId
+      } = req.body || {};
+
+      const user =
+        authenticateDemoCustomer(
+          customerId
+        );
+
+      if (!user) {
+        return res
+          .status(400)
+          .json({
+            error:
+              'Perfil demo inválido'
+          });
+      }
+
+      const authSession =
+        createAuthSession(user);
+
+      setAuthCookie(
+        res,
+        authSession.token
+      );
+
+      return res.json({
+        ok: true,
+        user:
+          authSession.user
+      });
+    }
+  );
+
+  app.get(
+    '/api/auth/me',
+    requireApiAuth,
+    (req, res) => {
+      return res.json({
+        authenticated: true,
+        user:
+          req.auth.session.user
+      });
+    }
+  );
+
+  app.post(
+    '/api/auth/logout',
+    (req, res) => {
+      const token =
+        getAuthToken(req);
+
+      destroyAuthSession(token);
+      clearAuthCookie(res);
+
+      return res.json({
+        ok: true
+      });
+    }
+  );
+
+  app.get(
+    '/api/app/me',
+    requireApiAuth,
+    (req, res) => {
+      const customerId =
+        req.auth.session.user
+          .customerId;
+
+      const experience =
+        getCustomerExperience(
+          customerId
+        );
+
+      if (!experience) {
+        return res
+          .status(404)
+          .json({
+            error:
+              'Cliente autenticado no encontrado'
+          });
+      }
+
+      return res.json(
+        experience
+      );
+    }
+  );
 
 
   // =========================================================
@@ -242,16 +550,14 @@ function createApp() {
               activeSessionId
             );
 
-          // Tomamos la última consulta previa
-          // del cliente para mostrarla al asesor.
-          const ultimaConsultaPrevia =
-            [...session.history]
-              .reverse()
-              .find(
-                (mensaje) =>
-                  mensaje.role ===
-                  'user'
-              );
+          // Conservamos la primera consulta útil del cliente
+          // como motivo original. Así evitamos mostrar como
+          // "consulta original" la última pregunta de seguimiento.
+          const originalQuery =
+            obtenerConsultaOriginal(
+              session.history,
+              cleanMessage
+            );
 
           const conversation =
             session.history.map(
@@ -271,27 +577,55 @@ function createApp() {
             content: cleanMessage
           });
 
+          const customerIdentifier =
+            session.context
+              .customerIdentifier;
+
+          const customerExperience =
+            customerIdentifier
+              ? getCustomerExperience(
+                  customerIdentifier
+                )
+              : null;
+
           const caso =
             crearCaso({
               sessionId:
                 activeSessionId,
 
-              customerIdentifier:
-                session.context
-                  .customerIdentifier,
+              customerIdentifier,
 
-              originalQuery:
-                ultimaConsultaPrevia
-                  ? ultimaConsultaPrevia
-                      .content
-                  : cleanMessage,
+              originalQuery,
+
+              handoffMessage:
+                cleanMessage,
 
               conversation,
 
               reason:
                 determinarMotivoDerivacion(
                   cleanMessage
-                )
+                ),
+
+              // Transferimos un snapshot de los datos que el bot
+              // ya utilizó. El asesor recibe contexto útil sin tener
+              // que reconstruirlo leyendo todo el transcript.
+              customerContext:
+                customerExperience
+                  ? customerExperience.customer
+                  : null,
+
+              billingContext:
+                customerExperience
+                  ? {
+                      previousBill:
+                        customerExperience.previousBill,
+                      currentBill:
+                        customerExperience.currentBill,
+                      comparison:
+                        customerExperience.comparison
+                    }
+                  : null
             });
 
 
@@ -680,9 +1014,35 @@ function createApp() {
   app.post(
     '/api/session/:sessionId/customer',
     (req, res) => {
-      const {
-        customerId
-      } = req.body || {};
+      const auth =
+        getRequestAuth(req);
+
+      const requestedCustomerId =
+        req.body &&
+        req.body.customerId;
+
+      const customerId =
+        auth
+          ? auth.session.user
+              .customerId
+          : requestedCustomerId;
+
+      // Si existe una sesión autenticada,
+      // la identidad de la cookie manda sobre
+      // cualquier customerId enviado por el cliente.
+      if (
+        auth &&
+        requestedCustomerId &&
+        requestedCustomerId !==
+          customerId
+      ) {
+        return res
+          .status(403)
+          .json({
+            error:
+              'El cliente no coincide con la sesión autenticada'
+          });
+      }
 
       if (
         !customerId ||

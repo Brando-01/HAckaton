@@ -16,6 +16,7 @@
     rel="stylesheet"
     href="./advisor.css"
   >
+  <link rel="stylesheet" href="./demo-nav.css">
 </head>
 
 <body>
@@ -29,9 +30,17 @@
       </p>
     </div>
 
-    <button id="refreshButton">
-      Actualizar
-    </button>
+    <div class="advisor-header-actions">
+      <nav class="demo-nav" aria-label="Navegación de demo">
+        <a class="demo-nav-link home-link" href="/">Inicio demo</a>
+        <a class="demo-nav-link active" href="/advisor">Casos</a>
+        <a class="demo-nav-link" href="/dashboard">Dashboard</a>
+      </nav>
+
+      <button id="refreshButton">
+        Actualizar
+      </button>
+    </div>
   </header>
 
   <main class="advisor-layout">

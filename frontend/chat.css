@@ -564,3 +564,44 @@ body {
 
     cursor: not-allowed;
 }
+
+.topbar-right.demo-nav {
+    justify-content: flex-end;
+}
+
+@media (max-width: 900px) {
+    .chat-topbar {
+        height: auto;
+        min-height: 60px;
+        gap: 12px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+    }
+
+    .topbar-right.demo-nav {
+        width: auto;
+    }
+}
+
+@media (max-width: 680px) {
+    .status-indicator {
+        display: none;
+    }
+
+    .topbar-right.demo-nav .demo-nav-link:not(.home-link):not(#backToAppLink) {
+        display: none;
+    }
+}
+
+.auth-context-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 6px 10px;
+    border: 1px solid #bce5f5;
+    border-radius: 999px;
+    background: #eaf8fd;
+    color: #007eaf;
+    font-size: 12px;
+    font-weight: 700;
+}

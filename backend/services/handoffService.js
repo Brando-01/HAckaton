@@ -57,18 +57,303 @@ function determinarMotivoDerivacion(mensaje) {
   return 'CLIENT_REQUEST';
 }
 
+function esMensajeIdentificacion(mensaje = '') {
+  const texto = normalizarTexto(mensaje);
+
+  if (!texto) {
+    return true;
+  }
+
+  return (
+    /^\d{8}$/.test(texto) ||
+    /\b(mi\s+)?dni\b/.test(texto) ||
+    /\bdocumento\b/.test(texto)
+  );
+}
+
+function obtenerConsultaOriginal(
+  conversation = [],
+  fallback = null
+) {
+  const mensajesCliente =
+    conversation.filter(
+      (mensaje) =>
+        mensaje &&
+        mensaje.role === 'user' &&
+        typeof mensaje.content === 'string' &&
+        mensaje.content.trim()
+    );
+
+  const primeraConsulta =
+    mensajesCliente.find(
+      (mensaje) =>
+        !esMensajeIdentificacion(
+          mensaje.content
+        )
+    );
+
+  if (primeraConsulta) {
+    return primeraConsulta.content.trim();
+  }
+
+  if (mensajesCliente.length) {
+    return mensajesCliente[0]
+      .content
+      .trim();
+  }
+
+  return fallback || null;
+}
+
 function clonarCaso(caso) {
   return JSON.parse(
     JSON.stringify(caso)
   );
 }
 
+function normalizarContextoCliente(
+  customerContext,
+  customerIdentifier
+) {
+  if (!customerContext) {
+    return customerIdentifier
+      ? {
+          customerId:
+            customerIdentifier,
+          name: null,
+          plan: null
+        }
+      : null;
+  }
+
+  return {
+    customerId:
+      customerContext.customerId ||
+      customerIdentifier ||
+      null,
+
+    name:
+      customerContext.name ||
+      null,
+
+    plan:
+      customerContext.plan ||
+      null
+  };
+}
+
+function normalizarContextoFacturacion(
+  billingContext
+) {
+  if (!billingContext) {
+    return null;
+  }
+
+  return {
+    previousBill:
+      billingContext.previousBill
+        ? {
+            period:
+              billingContext.previousBill.period ||
+              null,
+            total:
+              Number.isFinite(
+                billingContext.previousBill.total
+              )
+                ? billingContext.previousBill.total
+                : null
+          }
+        : null,
+
+    currentBill:
+      billingContext.currentBill
+        ? {
+            period:
+              billingContext.currentBill.period ||
+              null,
+            total:
+              Number.isFinite(
+                billingContext.currentBill.total
+              )
+                ? billingContext.currentBill.total
+                : null
+          }
+        : null,
+
+    comparison:
+      billingContext.comparison
+        ? {
+            difference:
+              Number.isFinite(
+                billingContext.comparison.difference
+              )
+                ? billingContext.comparison.difference
+                : null,
+
+            percentage:
+              Number.isFinite(
+                billingContext.comparison.percentage
+              )
+                ? billingContext.comparison.percentage
+                : null,
+
+            direction:
+              billingContext.comparison.direction ||
+              null,
+
+            causes:
+              Array.isArray(
+                billingContext.comparison.causes
+              )
+                ? billingContext.comparison.causes.map(
+                    (cause) => ({
+                      code:
+                        cause.code || null,
+                      title:
+                        cause.title ||
+                        'Variación detectada',
+                      description:
+                        cause.description ||
+                        null,
+                      impact:
+                        Number.isFinite(
+                          cause.impact
+                        )
+                          ? cause.impact
+                          : null
+                    })
+                  )
+                : []
+          }
+        : null
+  };
+}
+
+function crearResumenAsesor({
+  customer,
+  billing,
+  originalQuery,
+  reason,
+  handoffMessage,
+  conversation = []
+}) {
+  const customerName =
+    customer && customer.name
+      ? customer.name
+      : 'El cliente';
+
+  const normalizedQuery =
+    normalizarTexto(originalQuery || '');
+
+  const isBillingQuery =
+    /(recibo|factura|facturacion|cobro|monto|pagar|pague|pagaba|aumento|subio|variacion|descuento|reconexion|cargo)/.test(
+      normalizedQuery
+    );
+
+  const findings = [];
+
+  if (
+    isBillingQuery &&
+    billing &&
+    billing.comparison &&
+    Array.isArray(
+      billing.comparison.causes
+    )
+  ) {
+    billing.comparison.causes
+      .forEach((cause) => {
+        const impact =
+          Number.isFinite(cause.impact)
+            ? cause.impact
+            : null;
+
+        findings.push({
+          title: cause.title,
+          detail:
+            cause.description || null,
+          impact
+        });
+      });
+  }
+
+  let headline =
+    'Consulta derivada a asesor';
+
+  let overview = originalQuery
+    ? `${customerName} inició la consulta por: “${originalQuery}”.`
+    : `${customerName} solicitó apoyo de un asesor.`;
+
+  if (
+    isBillingQuery &&
+    billing &&
+    billing.previousBill &&
+    billing.currentBill &&
+    billing.comparison &&
+    Number.isFinite(
+      billing.comparison.difference
+    )
+  ) {
+    const difference =
+      billing.comparison.difference;
+
+    const absDifference =
+      Math.abs(difference);
+
+    const movement =
+      difference >= 0
+        ? 'aumentó'
+        : 'disminuyó';
+
+    headline =
+      `Variación de S/ ${absDifference} en el recibo`;
+
+    overview =
+      `${customerName} consultó por su facturación. ` +
+      `El recibo ${movement} de S/ ${billing.previousBill.total} ` +
+      `a S/ ${billing.currentBill.total}.`;
+  }
+
+  const assistantMessages =
+    conversation.filter(
+      (mensaje) =>
+        mensaje &&
+        mensaje.role === 'assistant'
+    );
+
+  let outcome =
+    'El cliente solicitó continuar la atención con una persona.';
+
+  if (reason === 'CUSTOMER_DISAGREES') {
+    outcome = assistantMessages.length
+      ? 'Lucía brindó una explicación, pero el cliente indicó que no está de acuerdo y solicitó atención humana.'
+      : 'El cliente indicó que no está de acuerdo y solicitó atención humana.';
+  } else if (reason === 'NOT_RESOLVED') {
+    outcome =
+      'El cliente indicó que la consulta no quedó resuelta y solicitó atención humana.';
+  } else if (assistantMessages.length) {
+    outcome =
+      'Después de conversar con Lucía, el cliente solicitó continuar con un asesor humano.';
+  }
+
+  return {
+    headline,
+    overview,
+    findings,
+    outcome,
+    handoffMessage:
+      handoffMessage || null
+  };
+}
+
 function crearCaso({
   sessionId,
   customerIdentifier = null,
   originalQuery,
+  handoffMessage = null,
   conversation = [],
-  reason = 'CLIENT_REQUEST'
+  reason = 'CLIENT_REQUEST',
+  customerContext = null,
+  billingContext = null
 }) {
   const ahora =
     new Date().toISOString();
@@ -78,22 +363,52 @@ function crearCaso({
       .slice(0, 8)
       .toUpperCase()}`;
 
+  const customer =
+    normalizarContextoCliente(
+      customerContext,
+      customerIdentifier
+    );
+
+  const billing =
+    normalizarContextoFacturacion(
+      billingContext
+    );
+
+  const safeConversation =
+    conversation.map(
+      ({ role, content }) => ({
+        role,
+        content
+      })
+    );
+
   const caso = {
     caseId,
     sessionId,
     customerIdentifier,
+    customer,
+    billing,
     originalQuery:
       originalQuery || null,
+    handoffMessage:
+      handoffMessage || null,
     reason,
     status: 'PENDING',
 
+    advisorSummary:
+      crearResumenAsesor({
+        customer,
+        billing,
+        originalQuery:
+          originalQuery || null,
+        reason,
+        handoffMessage,
+        conversation:
+          safeConversation
+      }),
+
     conversation:
-      conversation.map(
-        ({ role, content }) => ({
-          role,
-          content
-        })
-      ),
+      safeConversation,
 
     createdAt: ahora,
     updatedAt: ahora
@@ -156,6 +471,7 @@ function resetHandoffCases() {
 module.exports = {
   esSolicitudAsesor,
   determinarMotivoDerivacion,
+  obtenerConsultaOriginal,
   crearCaso,
   listarCasos,
   obtenerCaso,

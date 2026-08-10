@@ -749,6 +749,12 @@
       currentSessionId
     );
 
+    // Si el cliente inició sesión en Mi Movistar,
+    // una nueva consulta conserva su identidad.
+    await associateAuthenticatedCustomer(
+      currentSessionId
+    );
+
     chatState.lastActivity =
       Date.now();
 
@@ -1186,7 +1192,109 @@
     );
   }
 
-  async function bootstrapFromApp() {
+  async function associateAuthenticatedCustomer(
+    sessionId
+  ) {
+    try {
+      const authResponse =
+        await fetch(
+          '/api/auth/me'
+        );
+
+      if (
+        authResponse.status === 401
+      ) {
+        sessionStorage.removeItem(
+          'movistarDemoCustomerId'
+        );
+
+        const authContextBadge =
+          document.getElementById(
+            'authContextBadge'
+          );
+
+        if (authContextBadge) {
+          authContextBadge.hidden = true;
+        }
+
+        return null;
+      }
+
+      if (!authResponse.ok) {
+        throw new Error(
+          'No se pudo validar la sesión de Mi Movistar'
+        );
+      }
+
+      const authData =
+        await authResponse.json();
+
+      const customerId =
+        authData.user &&
+        authData.user.customerId;
+
+      if (!customerId) {
+        return null;
+      }
+
+      const response =
+        await fetch(
+          `/api/session/${encodeURIComponent(
+            sessionId
+          )}/customer`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json'
+            },
+            body: JSON.stringify({
+              customerId
+            })
+          }
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          'No se pudo asociar el cliente autenticado al chat'
+        );
+      }
+
+      sessionStorage.setItem(
+        'movistarDemoCustomerId',
+        customerId
+      );
+
+      const authContextBadge =
+        document.getElementById(
+          'authContextBadge'
+        );
+
+      if (authContextBadge) {
+        authContextBadge.textContent =
+          `${authData.user.name} · autenticado`;
+        authContextBadge.hidden = false;
+      }
+
+      console.log(
+        '[CHAT] Contexto autenticado:',
+        customerId
+      );
+
+      return customerId;
+    } catch (error) {
+      console.warn(
+        '[CHAT] No se pudo recuperar el contexto autenticado:',
+        error
+      );
+      return null;
+    }
+  }
+
+
+  async function bootstrapFromApp(
+    authenticatedCustomerId
+  ) {
     const params =
       new URLSearchParams(
         window.location.search
@@ -1199,76 +1307,54 @@
       return;
     }
 
-    const customerId =
-      params.get(
-        'customerId'
-      );
-
     const prompt =
       params.get(
         'prompt'
       );
 
-    if (!customerId) {
-      return;
-    }
-
-    try {
-      const response =
-        await fetch(
-          `/api/session/${encodeURIComponent(
-            currentSessionId
-          )}/customer`,
-          {
-            method: 'POST',
-
-            headers: {
-              'Content-Type':
-                'application/json'
-            },
-
-            body: JSON.stringify({
-              customerId
-            })
-          }
-        );
-
-      if (!response.ok) {
-        throw new Error(
-          'No se pudo asociar el cliente'
-        );
-      }
-
-      console.log(
-        '[CHAT] Cliente autenticado desde app:',
-        customerId
+    if (!authenticatedCustomerId) {
+      appendMessage(
+        'Tu sesión de Mi Movistar ya no está activa. Puedes iniciar sesión nuevamente para continuar con tu información personal.',
+        'bot'
       );
 
-
-      if (
-        prompt &&
-        userInput
-      ) {
-        userInput.value =
-          prompt;
-
-        await sendMessage();
-      }
-
-
-      // Limpiamos parámetros para evitar
-      // repetir la acción al refrescar.
       history.replaceState(
         {},
         '',
-        '/'
+        '/chat'
+      );
+      return;
+    }
+
+    if (
+      prompt &&
+      userInput
+    ) {
+      userInput.value =
+        prompt;
+
+      await sendMessage();
+    }
+
+    // Limpiamos parámetros para evitar
+    // repetir el prompt al refrescar.
+    history.replaceState(
+      {},
+      '',
+      '/chat'
+    );
+  }
+
+
+  function syncBackToAppLink() {
+    const backToAppLink =
+      document.getElementById(
+        'backToAppLink'
       );
 
-    } catch (error) {
-      console.error(
-        '[CHAT] Error cargando contexto de app:',
-        error
-      );
+    if (backToAppLink) {
+      backToAppLink.href =
+        '/app';
     }
   }
 
@@ -1294,6 +1380,13 @@
 
       hideSatisfactionModal();
 
+      syncBackToAppLink();
+
+      const authenticatedCustomerId =
+        await associateAuthenticatedCustomer(
+          currentSessionId
+        );
+
       startTimer();
 
       if (finishChatButton) {
@@ -1301,7 +1394,9 @@
           true;
       }
 
-      await bootstrapFromApp();
+      await bootstrapFromApp(
+        authenticatedCustomerId
+      );
     }
   );
 })();

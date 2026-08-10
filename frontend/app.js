@@ -1,7 +1,37 @@
 (function () {
-  const customerSelector =
+  const customerExperience =
     document.getElementById(
-      'customerSelector'
+      'customerExperience'
+    );
+
+  const authLoading =
+    document.getElementById(
+      'authLoading'
+    );
+
+  const authenticatedUserName =
+    document.getElementById(
+      'authenticatedUserName'
+    );
+
+  const authenticatedUserEmail =
+    document.getElementById(
+      'authenticatedUserEmail'
+    );
+
+  const authModeBadge =
+    document.getElementById(
+      'authModeBadge'
+    );
+
+  const logoutButton =
+    document.getElementById(
+      'logoutButton'
+    );
+
+  const openAssistantLink =
+    document.getElementById(
+      'openAssistantLink'
     );
 
   const customerName =
@@ -84,13 +114,7 @@
       'nextActions'
     );
 
-
-  let activeCustomerId =
-    new URLSearchParams(
-      window.location.search
-    ).get('customerId') ||
-    'CLI000001';
-
+  let activeCustomerId = null;
 
   function formatMoney(value) {
     const number =
@@ -108,7 +132,6 @@
     );
   }
 
-
   function createElement(
     tag,
     className,
@@ -122,16 +145,13 @@
         className;
     }
 
-    if (
-      text !== undefined
-    ) {
+    if (text !== undefined) {
       element.textContent =
         text;
     }
 
     return element;
   }
-
 
   function renderItems(
     container,
@@ -165,17 +185,12 @@
           )
         );
 
-        container.appendChild(
-          row
-        );
+        container.appendChild(row);
       }
     );
   }
 
-
-  function renderCauses(
-    causes
-  ) {
+  function renderCauses(causes) {
     causesList.innerHTML = '';
 
     (causes || []).forEach(
@@ -187,9 +202,7 @@
           );
 
         const content =
-          createElement(
-            'div'
-          );
+          createElement('div');
 
         content.appendChild(
           createElement(
@@ -216,49 +229,34 @@
             )}`
           );
 
-        card.appendChild(
-          content
-        );
-
-        card.appendChild(
-          impact
-        );
-
-        causesList.appendChild(
-          card
-        );
+        card.appendChild(content);
+        card.appendChild(impact);
+        causesList.appendChild(card);
       }
     );
   }
-
 
   function openChat(prompt) {
     const params =
       new URLSearchParams();
 
     params.set(
-      'customerId',
-      activeCustomerId
-    );
-
-    params.set(
-      'prompt',
-      prompt
-    );
-
-    params.set(
       'source',
       'app'
     );
 
+    if (prompt) {
+      params.set(
+        'prompt',
+        prompt
+      );
+    }
+
     window.location.href =
-      `/?${params.toString()}`;
+      `/chat?${params.toString()}`;
   }
 
-
-  function renderActions(
-    actions
-  ) {
+  function renderActions(actions) {
     nextActions.innerHTML = '';
 
     (actions || []).forEach(
@@ -269,6 +267,8 @@
             'action-button',
             action.label
           );
+
+        button.type = 'button';
 
         button.addEventListener(
           'click',
@@ -289,7 +289,6 @@
       }
     );
   }
-
 
   function renderExperience(data) {
     customerName.textContent =
@@ -337,12 +336,10 @@
         data.previousBill.total
       );
 
-    comparisonCurrentPeriod
-      .textContent =
+    comparisonCurrentPeriod.textContent =
       data.currentBill.period;
 
-    comparisonCurrentTotal
-      .textContent =
+    comparisonCurrentTotal.textContent =
       formatMoney(
         data.currentBill.total
       );
@@ -366,63 +363,38 @@
     );
   }
 
-
-  async function loadCustomers() {
+  async function loadAuth() {
     const response =
       await fetch(
-        '/api/app/customers'
+        '/api/auth/me'
       );
+
+    if (response.status === 401) {
+      window.location.href =
+        '/login';
+      return null;
+    }
 
     if (!response.ok) {
       throw new Error(
-        'No se pudieron cargar los perfiles'
+        'No se pudo validar la sesión'
       );
     }
 
-    const data =
-      await response.json();
-
-    customerSelector.innerHTML =
-      '';
-
-    data.customers.forEach(
-      (customer) => {
-        const option =
-          document.createElement(
-            'option'
-          );
-
-        option.value =
-          customer.customerId;
-
-        option.textContent =
-          `${customer.name} — ${customer.plan}`;
-
-        if (
-          customer.customerId ===
-          activeCustomerId
-        ) {
-          option.selected =
-            true;
-        }
-
-        customerSelector.appendChild(
-          option
-        );
-      }
-    );
+    return response.json();
   }
 
-
-  async function loadExperience(
-    customerId
-  ) {
+  async function loadExperience() {
     const response =
       await fetch(
-        `/api/app/customers/${encodeURIComponent(
-          customerId
-        )}`
+        '/api/app/me'
       );
+
+    if (response.status === 401) {
+      window.location.href =
+        '/login';
+      return null;
+    }
 
     if (!response.ok) {
       throw new Error(
@@ -430,68 +402,99 @@
       );
     }
 
-    const data =
-      await response.json();
-
-    renderExperience(data);
+    return response.json();
   }
 
+  function renderAuthenticatedUser(user) {
+    activeCustomerId =
+      user.customerId;
 
-  customerSelector.addEventListener(
-    'change',
-    async () => {
-      activeCustomerId =
-        customerSelector.value;
+    authenticatedUserName.textContent =
+      user.name;
 
-      const url =
-        new URL(
-          window.location.href
-        );
+    authenticatedUserEmail.textContent =
+      user.email;
 
-      url.searchParams.set(
-        'customerId',
-        activeCustomerId
+    authModeBadge.textContent =
+      user.mode === 'DEMO'
+        ? 'Perfil demo'
+        : 'Sesión autenticada';
+
+    openAssistantLink.href =
+      '/chat?source=app';
+  }
+
+  async function logout() {
+    logoutButton.disabled = true;
+    logoutButton.textContent =
+      'Cerrando...';
+
+    try {
+      await fetch(
+        '/api/auth/logout',
+        {
+          method: 'POST'
+        }
       );
-
-      history.replaceState(
-        {},
-        '',
-        url
+    } finally {
+      sessionStorage.removeItem(
+        'movistarDemoCustomerId'
       );
-
-      try {
-        await loadExperience(
-          activeCustomerId
-        );
-      } catch (error) {
-        console.error(
-          '[APP] Error:',
-          error
-        );
-      }
+      sessionStorage.removeItem(
+        'chatSessionId'
+      );
+      window.location.href =
+        '/login';
     }
-  );
+  }
 
+  logoutButton.addEventListener(
+    'click',
+    logout
+  );
 
   async function init() {
     try {
-      await loadCustomers();
+      const auth =
+        await loadAuth();
 
-      await loadExperience(
-        activeCustomerId
+      if (!auth) {
+        return;
+      }
+
+      renderAuthenticatedUser(
+        auth.user
       );
 
+      const experience =
+        await loadExperience();
+
+      if (!experience) {
+        return;
+      }
+
+      if (
+        activeCustomerId !==
+        experience.customer.customerId
+      ) {
+        throw new Error(
+          'El cliente de la sesión no coincide con la información cargada'
+        );
+      }
+
+      renderExperience(experience);
+      authLoading.hidden = true;
+      customerExperience.hidden = false;
     } catch (error) {
       console.error(
         '[APP] Error:',
         error
       );
 
-      customerName.textContent =
-        'No se pudo cargar tu información';
+      authLoading.innerHTML =
+        '<div class="auth-loading-card auth-error"><strong>No pudimos cargar Mi Movistar.</strong><span>Vuelve al inicio de sesión e inténtalo nuevamente.</span><a href="/login">Ir al login</a></div>';
     }
   }
-
 
   init();
 })();

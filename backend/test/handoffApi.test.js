@@ -28,13 +28,13 @@ test(
     resetHandoffCases();
     resetSession(sessionId);
 
-    // Simulamos que Persona 1 ya identificó
-    // al cliente.
+    // Simulamos que Mi Movistar ya autenticó
+    // al cliente Carlos.
     updateContext(
       sessionId,
       {
         customerIdentifier:
-          '72819345'
+          'CLI000001'
       }
     );
 
@@ -43,25 +43,25 @@ test(
     addMessage(
       sessionId,
       'user',
-      'Mi DNI es 72819345'
+      'Explícame por qué aumentó mi recibo'
     );
 
     addMessage(
       sessionId,
       'assistant',
-      'Hola Carlos, ¿en qué puedo ayudarte?'
+      'Tu recibo aumentó por el fin de un descuento y una reconexión.'
     );
 
     addMessage(
       sessionId,
       'user',
-      '¿Qué información tienes de mi recibo?'
+      '¿Cuánto es mi recibo actual?'
     );
 
     addMessage(
       sessionId,
       'assistant',
-      'Tu recibo actual presenta una variación.'
+      'Tu recibo actual es de S/ 125.'
     );
 
     const app = createApp();
@@ -194,12 +194,57 @@ test(
 
     assert.equal(
       caseData.customerIdentifier,
-      '72819345'
+      'CLI000001'
+    );
+
+    assert.equal(
+      caseData.customer.name,
+      'Carlos Mendoza'
+    );
+
+    assert.equal(
+      caseData.customer.plan,
+      'Movistar Fibra 200 Mbps'
     );
 
     assert.equal(
       caseData.originalQuery,
-      '¿Qué información tienes de mi recibo?'
+      'Explícame por qué aumentó mi recibo'
+    );
+
+    assert.equal(
+      caseData.handoffMessage,
+      'No estoy de acuerdo, quiero hablar con un asesor'
+    );
+
+    assert.equal(
+      caseData.billing.previousBill.total,
+      95
+    );
+
+    assert.equal(
+      caseData.billing.currentBill.total,
+      125
+    );
+
+    assert.equal(
+      caseData.billing.comparison.difference,
+      30
+    );
+
+    assert.equal(
+      caseData.billing.comparison.causes.length,
+      2
+    );
+
+    assert.equal(
+      caseData.advisorSummary.headline,
+      'Variación de S/ 30 en el recibo'
+    );
+
+    assert.match(
+      caseData.advisorSummary.outcome,
+      /no está de acuerdo/i
     );
 
     assert.equal(
