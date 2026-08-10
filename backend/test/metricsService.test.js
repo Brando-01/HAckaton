@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   ensureInteraction,
+  registerInteractionContext,
   registerMessage,
   registerHandoff,
   endInteraction,
@@ -56,6 +57,38 @@ test('crea una interacción y registra mensajes', () => {
   assert.equal(
     interaction.endedAt,
     null
+  );
+});
+
+test('asocia el cliente identificado a la interacción', () => {
+  resetMetrics();
+
+  registerMessage(
+    'customer-context',
+    'user'
+  );
+
+  registerInteractionContext(
+    'customer-context',
+    {
+      customerIdentifier: 'CLI000001',
+      customerName: 'Carlos Mendoza'
+    }
+  );
+
+  const interaction =
+    getInteraction(
+      'customer-context'
+    );
+
+  assert.equal(
+    interaction.customerIdentifier,
+    'CLI000001'
+  );
+
+  assert.equal(
+    interaction.customerName,
+    'Carlos Mendoza'
   );
 });
 
@@ -123,7 +156,8 @@ test('registra una derivación a asesor', () => {
 
   registerHandoff(
     'handoff-session',
-    'CASO-12345678'
+    'CASO-12345678',
+    'CUSTOMER_DISAGREES'
   );
 
   const interaction =
@@ -139,6 +173,11 @@ test('registra una derivación a asesor', () => {
   assert.equal(
     interaction.handoffCaseId,
     'CASO-12345678'
+  );
+
+  assert.equal(
+    interaction.handoffReason,
+    'CUSTOMER_DISAGREES'
   );
 });
 
@@ -295,6 +334,14 @@ test('calcula correctamente los indicadores del dashboard', () => {
     'assistant'
   );
 
+  registerInteractionContext(
+    'summary-a',
+    {
+      customerIdentifier: 'CLI000001',
+      customerName: 'Carlos Mendoza'
+    }
+  );
+
   registerSatisfaction(
     'summary-a',
     5
@@ -316,9 +363,18 @@ test('calcula correctamente los indicadores del dashboard', () => {
     'assistant'
   );
 
+  registerInteractionContext(
+    'summary-b',
+    {
+      customerIdentifier: 'CLI000001',
+      customerName: 'Carlos Mendoza'
+    }
+  );
+
   registerHandoff(
     'summary-b',
-    'CASO-ABC12345'
+    'CASO-ABC12345',
+    'CUSTOMER_DISAGREES'
   );
 
   registerSatisfaction(
@@ -366,6 +422,21 @@ test('calcula correctamente los indicadores del dashboard', () => {
   );
 
   assert.equal(
+    summary.completionRate,
+    66.7
+  );
+
+  assert.equal(
+    summary.digitalResolutionInteractions,
+    1
+  );
+
+  assert.equal(
+    summary.digitalResolutionRate,
+    50
+  );
+
+  assert.equal(
     summary.ratedInteractions,
     2
   );
@@ -373,6 +444,50 @@ test('calcula correctamente los indicadores del dashboard', () => {
   assert.equal(
     summary.averageSatisfaction,
     4
+  );
+
+  assert.equal(
+    summary.satisfactionResponseRate,
+    100
+  );
+
+  assert.equal(
+    summary.positiveSatisfactionRate,
+    50
+  );
+
+  assert.equal(
+    summary.unratedEndedInteractions,
+    0
+  );
+
+  assert.equal(
+    summary.repeatContactInteractions,
+    1
+  );
+
+  assert.equal(
+    summary.repeatContactRate,
+    50
+  );
+
+  assert.equal(
+    summary.uniqueCustomers,
+    1
+  );
+
+  assert.equal(
+    summary.endReasonBreakdown
+      .find((item) => item.reason === 'HANDOFF')
+      .count,
+    1
+  );
+
+  assert.equal(
+    summary.handoffReasonBreakdown
+      .find((item) => item.reason === 'CUSTOMER_DISAGREES')
+      .count,
+    1
   );
 
   assert.equal(

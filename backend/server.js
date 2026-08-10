@@ -45,6 +45,7 @@ const {
 } = require('./services/handoffService');
 
 const {
+  registerInteractionContext,
   registerMessage,
   registerHandoff,
   endInteraction,
@@ -535,6 +536,41 @@ function createApp() {
         );
 
 
+        // Asociamos la interacción de métricas con el cliente
+        // autenticado/conocido. Esto permite medir contactos
+        // repetidos sin confiar en parámetros enviados por URL.
+        const metricsSession =
+          getOrCreateSession(
+            activeSessionId
+          );
+
+        const metricsCustomerId =
+          metricsSession.context
+            .customerIdentifier ||
+          null;
+
+        if (metricsCustomerId) {
+          const metricsExperience =
+            getCustomerExperience(
+              metricsCustomerId
+            );
+
+          registerInteractionContext(
+            activeSessionId,
+            {
+              customerIdentifier:
+                metricsCustomerId,
+
+              customerName:
+                metricsExperience &&
+                metricsExperience.customer
+                  ? metricsExperience.customer.name
+                  : null
+            }
+          );
+        }
+
+
         // =====================================================
         // HANDOFF A ASESOR
         // Persona 2
@@ -634,7 +670,8 @@ function createApp() {
           // terminó siendo derivada.
           registerHandoff(
             activeSessionId,
-            caso.caseId
+            caso.caseId,
+            caso.reason
           );
 
 

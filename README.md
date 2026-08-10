@@ -71,3 +71,20 @@ Contraseña: Demo1234!
 ```
 
 Estas cuentas son exclusivamente para el prototipo. El sistema de autenticación se mantiene en memoria y no sustituye la autenticación real de Mi Movistar.
+
+## Dashboard de métricas del Desafío 1
+
+`http://localhost:3000/dashboard` separa las métricas que sí se pueden observar en el prototipo de las que requieren evaluación con dataset oficial o una línea base productiva.
+
+Métricas calculadas durante la ejecución local:
+
+- resolución digital **proxy**: interacciones finalizadas por el cliente sin derivación / interacciones finalizadas;
+- tasa de derivación y motivos de handoff;
+- satisfacción media, porcentaje de valoraciones positivas y tasa de respuesta a la encuesta;
+- finalizadas sin valoración como **proxy** de ausencia de respuesta post-explicación;
+- contactos repetidos **proxy** por cliente identificado dentro de la misma ejecución;
+- duración, cierre, mensajes y trazabilidad de las interacciones.
+
+El dashboard no inventa valores para `Retrieval Accuracy`, tasa de alucinación financiera ni precisión del handoff. Esos tres indicadores aparecen como pendientes de instrumentación porque requieren ground truth, logs y casos etiquetados para poder calcularse correctamente.
+
+Las métricas se mantienen en memoria para el MVP y se reinician al reiniciar el servidor.

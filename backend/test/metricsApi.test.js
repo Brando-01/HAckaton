@@ -188,6 +188,26 @@ test(
     );
 
     assert.equal(
+      dashboard.completionRate,
+      100
+    );
+
+    assert.equal(
+      dashboard.digitalResolutionRate,
+      100
+    );
+
+    assert.equal(
+      dashboard.satisfactionResponseRate,
+      100
+    );
+
+    assert.equal(
+      dashboard.positiveSatisfactionRate,
+      100
+    );
+
+    assert.equal(
       dashboard.totalUserMessages,
       1
     );

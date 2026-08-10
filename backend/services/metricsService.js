@@ -7,6 +7,12 @@ const VALID_END_REASONS = new Set([
   'HANDOFF'
 ]);
 
+const HANDOFF_REASONS = [
+  'CLIENT_REQUEST',
+  'CUSTOMER_DISAGREES',
+  'NOT_RESOLVED'
+];
+
 function clone(value) {
   return JSON.parse(
     JSON.stringify(value)
@@ -42,11 +48,15 @@ function ensureInteraction(sessionId) {
       status: 'ACTIVE',
       endReason: null,
 
+      customerIdentifier: null,
+      customerName: null,
+
       userMessages: 0,
       assistantMessages: 0,
 
       handoff: false,
       handoffCaseId: null,
+      handoffReason: null,
 
       satisfaction: null
     };
@@ -58,6 +68,35 @@ function ensureInteraction(sessionId) {
   }
 
   return interaction;
+}
+
+function registerInteractionContext(
+  sessionId,
+  context = {}
+) {
+  const interaction =
+    ensureInteraction(sessionId);
+
+  if (
+    context.customerIdentifier &&
+    typeof context.customerIdentifier === 'string'
+  ) {
+    interaction.customerIdentifier =
+      context.customerIdentifier;
+  }
+
+  if (
+    context.customerName &&
+    typeof context.customerName === 'string'
+  ) {
+    interaction.customerName =
+      context.customerName.trim() || null;
+  }
+
+  interaction.lastActivityAt =
+    new Date().toISOString();
+
+  return clone(interaction);
 }
 
 function registerMessage(
@@ -100,7 +139,8 @@ function registerMessage(
 
 function registerHandoff(
   sessionId,
-  caseId
+  caseId,
+  reason = null
 ) {
   const interaction =
     ensureInteraction(sessionId);
@@ -108,6 +148,8 @@ function registerHandoff(
   interaction.handoff = true;
   interaction.handoffCaseId =
     caseId || null;
+  interaction.handoffReason =
+    reason || null;
 
   interaction.lastActivityAt =
     new Date().toISOString();
@@ -243,6 +285,132 @@ function round(
   );
 }
 
+function percentage(
+  numerator,
+  denominator
+) {
+  if (!denominator) {
+    return 0;
+  }
+
+  return round(
+    (numerator / denominator) * 100,
+    1
+  );
+}
+
+function buildEndReasonBreakdown(
+  endedInteractions
+) {
+  const labels = {
+    USER_ENDED: 'Finalizada por cliente',
+    HANDOFF: 'Derivada a asesor',
+    NEW_CHAT: 'Nueva consulta',
+    TIMEOUT: 'Tiempo agotado'
+  };
+
+  return Array.from(
+    VALID_END_REASONS
+  ).map((reason) => {
+    const count =
+      endedInteractions.filter(
+        (item) =>
+          item.endReason === reason
+      ).length;
+
+    return {
+      reason,
+      label: labels[reason],
+      count,
+      rate: percentage(
+        count,
+        endedInteractions.length
+      )
+    };
+  });
+}
+
+function buildHandoffReasonBreakdown(
+  all
+) {
+  const labels = {
+    CLIENT_REQUEST:
+      'Cliente solicita asesor',
+    CUSTOMER_DISAGREES:
+      'Cliente no está de acuerdo',
+    NOT_RESOLVED:
+      'Consulta no resuelta'
+  };
+
+  const handoffs =
+    all.filter(
+      (item) => item.handoff
+    );
+
+  return HANDOFF_REASONS.map(
+    (reason) => {
+      const count =
+        handoffs.filter(
+          (item) =>
+            item.handoffReason === reason
+        ).length;
+
+      return {
+        reason,
+        label: labels[reason],
+        count,
+        rate: percentage(
+          count,
+          handoffs.length
+        )
+      };
+    }
+  );
+}
+
+function buildRepeatContactMetrics(all) {
+  const identified =
+    all.filter(
+      (item) =>
+        item.customerIdentifier
+    );
+
+  const counts =
+    new Map();
+
+  identified.forEach((item) => {
+    const customerId =
+      item.customerIdentifier;
+
+    counts.set(
+      customerId,
+      (counts.get(customerId) || 0) + 1
+    );
+  });
+
+  const repeatContactInteractions =
+    Array.from(
+      counts.values()
+    ).reduce(
+      (sum, count) =>
+        sum + Math.max(0, count - 1),
+      0
+    );
+
+  return {
+    identifiedInteractions:
+      identified.length,
+    uniqueCustomers:
+      counts.size,
+    repeatContactInteractions,
+    repeatContactRate:
+      percentage(
+        repeatContactInteractions,
+        identified.length
+      )
+  };
+}
+
 function getDashboardSummary() {
   const all =
     Array.from(
@@ -275,6 +443,31 @@ function getDashboardSummary() {
       (item) =>
         item.satisfaction
     );
+
+  const ratedEndedInteractions =
+    endedInteractions.filter(
+      (item) =>
+        item.satisfaction
+    );
+
+  const positiveSatisfactionInteractions =
+    ratedInteractions.filter(
+      (item) =>
+        item.satisfaction.rating >= 4
+    ).length;
+
+  const digitalResolutionInteractions =
+    endedInteractions.filter(
+      (item) =>
+        !item.handoff &&
+        item.endReason === 'USER_ENDED'
+    ).length;
+
+  const unratedEndedInteractions =
+    endedInteractions.filter(
+      (item) =>
+        !item.satisfaction
+    ).length;
 
   const totalUserMessages =
     all.reduce(
@@ -327,16 +520,53 @@ function getDashboardSummary() {
         )
       : null;
 
+  const completionRate =
+    percentage(
+      endedInteractions.length,
+      totalInteractions
+    );
+
   const handoffRate =
+    percentage(
+      handoffInteractions,
+      totalInteractions
+    );
+
+  const digitalResolutionRate =
+    percentage(
+      digitalResolutionInteractions,
+      endedInteractions.length
+    );
+
+  const satisfactionResponseRate =
+    percentage(
+      ratedEndedInteractions.length,
+      endedInteractions.length
+    );
+
+  const positiveSatisfactionRate =
+    percentage(
+      positiveSatisfactionInteractions,
+      ratedInteractions.length
+    );
+
+  const unratedEndedRate =
+    percentage(
+      unratedEndedInteractions,
+      endedInteractions.length
+    );
+
+  const averageUserMessages =
     totalInteractions
       ? round(
-          (
-            handoffInteractions /
-            totalInteractions
-          ) * 100,
+          totalUserMessages /
+          totalInteractions,
           1
         )
       : 0;
+
+  const repeatContacts =
+    buildRepeatContactMetrics(all);
 
   return {
     totalInteractions,
@@ -346,20 +576,51 @@ function getDashboardSummary() {
     endedInteractions:
       endedInteractions.length,
 
+    completionRate,
+
     handoffInteractions,
 
     handoffRate,
 
+    digitalResolutionInteractions,
+
+    digitalResolutionRate,
+
     ratedInteractions:
       ratedInteractions.length,
 
+    ratedEndedInteractions:
+      ratedEndedInteractions.length,
+
     averageSatisfaction,
 
+    satisfactionResponseRate,
+
+    positiveSatisfactionInteractions,
+
+    positiveSatisfactionRate,
+
+    unratedEndedInteractions,
+
+    unratedEndedRate,
+
     averageDurationSeconds,
+
+    averageUserMessages,
 
     totalUserMessages,
 
     totalAssistantMessages,
+
+    ...repeatContacts,
+
+    endReasonBreakdown:
+      buildEndReasonBreakdown(
+        endedInteractions
+      ),
+
+    handoffReasonBreakdown:
+      buildHandoffReasonBreakdown(all),
 
     recentInteractions:
       getInteractions().slice(0, 10)
@@ -372,6 +633,7 @@ function resetMetrics() {
 
 module.exports = {
   ensureInteraction,
+  registerInteractionContext,
   registerMessage,
   registerHandoff,
   endInteraction,
