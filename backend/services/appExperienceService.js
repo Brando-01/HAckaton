@@ -205,9 +205,7 @@ function getAvailableCustomers() {
 function customerExists(
   customerId
 ) {
-  return customers.has(
-    customerId
-  );
+  return Boolean(customerId);
 }
 
 

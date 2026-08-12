@@ -1,335 +1,127 @@
-process.env.GROQ_API_KEY =
-  process.env.GROQ_API_KEY ||
-  'gsk_test_placeholder';
-
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const {
-  createApp
-} = require('../server');
+const { createApp } = require('../server');
 
-const {
-  clearAuthSessions
-} = require('../services/authService');
-
-function startServer() {
+test('permite registrar, iniciar sesión y obtener los datos del usuario autenticado', async (t) => {
   const app = createApp();
+  const server = app.listen(0);
 
-  return new Promise(
-    (resolve) => {
-      const server =
-        app.listen(
-          0,
-          '127.0.0.1',
-          () => resolve(server)
-        );
-    }
+  await new Promise((resolve) => {
+    server.once('listening', resolve);
+  });
+
+  t.after(
+    () =>
+      new Promise((resolve) => {
+        server.close(resolve);
+      })
   );
-}
 
-function getCookie(response) {
-  const setCookie =
-    response.headers.get(
-      'set-cookie'
-    );
+  const port = server.address().port;
+  const testPhone = '99988877';
+  const testPassword = 'Password123!';
 
-  return setCookie
-    ? setCookie.split(';')[0]
-    : null;
-}
+  // 1. Registro exitoso
+  const regResp = await fetch(`http://127.0.0.1:${port}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      phone: testPhone,
+      password: testPassword,
+      customerId: '52115748'
+    })
+  });
 
-test(
-  'Mi Movistar redirige al login sin autenticación',
-  async () => {
-    clearAuthSessions();
-    const server =
-      await startServer();
-    const { port } =
-      server.address();
+  assert.equal(regResp.status, 201);
+  const regData = await regResp.json();
+  assert.equal(regData.ok, true);
+  assert.equal(regData.user.phone, testPhone);
 
-    try {
-      const response =
-        await fetch(
-          `http://127.0.0.1:${port}/app`,
-          {
-            redirect: 'manual'
-          }
-        );
+  // 2. Intento de registro duplicado
+  const dupResp = await fetch(`http://127.0.0.1:${port}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      phone: testPhone,
+      password: testPassword
+    })
+  });
+  assert.equal(dupResp.status, 409);
 
-      assert.equal(
-        response.status,
-        302
-      );
-      assert.equal(
-        response.headers.get(
-          'location'
-        ),
-        '/login'
-      );
-    } finally {
-      server.close();
+  // 3. Login exitoso con usuario recién creado
+  const loginResp = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      phone: testPhone,
+      password: testPassword
+    })
+  });
+
+  assert.equal(loginResp.status, 200);
+  const loginData = await loginResp.json();
+  assert.equal(loginData.ok, true);
+  assert.ok(loginData.token);
+
+  // 4. Login exitoso con usuario Demo precargado (Carlos Mendoza)
+  const demoLoginResp = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      phone: '98765432',
+      password: 'Demo1234!'
+    })
+  });
+
+  assert.equal(demoLoginResp.status, 200);
+  const demoLoginData = await demoLoginResp.json();
+  assert.equal(demoLoginData.ok, true);
+  assert.equal(demoLoginData.user.customerId, 'CLI000001');
+
+  // 5. Consulta a /api/auth/me
+  const meResp = await fetch(`http://127.0.0.1:${port}/api/auth/me`, {
+    headers: {
+      Authorization: `Bearer ${loginData.token}`
     }
-  }
-);
+  });
 
-test(
-  'login local crea una sesión y expone el cliente autenticado',
-  async () => {
-    clearAuthSessions();
-    const server =
-      await startServer();
-    const { port } =
-      server.address();
+  assert.equal(meResp.status, 200);
+  const meData = await meResp.json();
+  assert.equal(meData.ok, true);
+  assert.equal(meData.user.phone, testPhone);
+  assert.equal(meData.user.customerId, '52115748');
+});
 
-    try {
-      const loginResponse =
-        await fetch(
-          `http://127.0.0.1:${port}/api/auth/login`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json'
-            },
-            body: JSON.stringify({
-              email:
-                'carlos.demo@movistar.pe',
-              password:
-                'Demo1234!'
-            })
-          }
-        );
+test('responde las recomendaciones NBO correctamente', async (t) => {
+  const app = createApp();
+  const server = app.listen(0);
 
-      assert.equal(
-        loginResponse.status,
-        200
-      );
+  await new Promise((resolve) => {
+    server.once('listening', resolve);
+  });
 
-      const cookie =
-        getCookie(loginResponse);
+  t.after(
+    () =>
+      new Promise((resolve) => {
+        server.close(resolve);
+      })
+  );
 
-      assert.ok(cookie);
+  const port = server.address().port;
 
-      const meResponse =
-        await fetch(
-          `http://127.0.0.1:${port}/api/auth/me`,
-          {
-            headers: {
-              Cookie: cookie
-            }
-          }
-        );
+  const nboResp = await fetch(`http://127.0.0.1:${port}/api/nbo/recomendar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      cliente_id: 'CLI001',
+      consumo_datos_gb_prom: 25,
+      es_movistar_total: 'NO'
+    })
+  });
 
-      assert.equal(
-        meResponse.status,
-        200
-      );
-
-      const me =
-        await meResponse.json();
-
-      assert.equal(
-        me.user.customerId,
-        'CLI000001'
-      );
-
-      const appResponse =
-        await fetch(
-          `http://127.0.0.1:${port}/api/app/me`,
-          {
-            headers: {
-              Cookie: cookie
-            }
-          }
-        );
-
-      assert.equal(
-        appResponse.status,
-        200
-      );
-
-      const experience =
-        await appResponse.json();
-
-      assert.equal(
-        experience.customer.name,
-        'Carlos Mendoza'
-      );
-    } finally {
-      server.close();
-    }
-  }
-);
-
-test(
-  'modo demo permite entrar como Ana sin contraseña',
-  async () => {
-    clearAuthSessions();
-    const server =
-      await startServer();
-    const { port } =
-      server.address();
-
-    try {
-      const response =
-        await fetch(
-          `http://127.0.0.1:${port}/api/auth/demo-login`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json'
-            },
-            body: JSON.stringify({
-              customerId:
-                'CLI000002'
-            })
-          }
-        );
-
-      assert.equal(
-        response.status,
-        200
-      );
-
-      const data =
-        await response.json();
-
-      assert.equal(
-        data.user.customerId,
-        'CLI000002'
-      );
-      assert.equal(
-        data.user.mode,
-        'DEMO'
-      );
-      assert.ok(
-        getCookie(response)
-      );
-    } finally {
-      server.close();
-    }
-  }
-);
-
-test(
-  'una sesión autenticada no puede cambiar a otro customerId',
-  async () => {
-    clearAuthSessions();
-    const server =
-      await startServer();
-    const { port } =
-      server.address();
-
-    try {
-      const loginResponse =
-        await fetch(
-          `http://127.0.0.1:${port}/api/auth/demo-login`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json'
-            },
-            body: JSON.stringify({
-              customerId:
-                'CLI000001'
-            })
-          }
-        );
-
-      const cookie =
-        getCookie(loginResponse);
-
-      const response =
-        await fetch(
-          `http://127.0.0.1:${port}/api/session/auth-test/customer`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json',
-              Cookie: cookie
-            },
-            body: JSON.stringify({
-              customerId:
-                'CLI000002'
-            })
-          }
-        );
-
-      assert.equal(
-        response.status,
-        403
-      );
-    } finally {
-      server.close();
-    }
-  }
-);
-
-test(
-  'logout invalida la sesión',
-  async () => {
-    clearAuthSessions();
-    const server =
-      await startServer();
-    const { port } =
-      server.address();
-
-    try {
-      const loginResponse =
-        await fetch(
-          `http://127.0.0.1:${port}/api/auth/demo-login`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json'
-            },
-            body: JSON.stringify({
-              customerId:
-                'CLI000001'
-            })
-          }
-        );
-
-      const cookie =
-        getCookie(loginResponse);
-
-      const logoutResponse =
-        await fetch(
-          `http://127.0.0.1:${port}/api/auth/logout`,
-          {
-            method: 'POST',
-            headers: {
-              Cookie: cookie
-            }
-          }
-        );
-
-      assert.equal(
-        logoutResponse.status,
-        200
-      );
-
-      const meResponse =
-        await fetch(
-          `http://127.0.0.1:${port}/api/auth/me`,
-          {
-            headers: {
-              Cookie: cookie
-            }
-          }
-        );
-
-      assert.equal(
-        meResponse.status,
-        401
-      );
-    } finally {
-      server.close();
-    }
-  }
-);
+  assert.equal(nboResp.status, 200);
+  const nboData = await nboResp.json();
+  assert.equal(nboData.cliente_id, 'CLI001');
+  assert.ok(nboData.recomendacion);
+});

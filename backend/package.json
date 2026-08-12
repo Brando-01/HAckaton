@@ -17,6 +17,7 @@
     "openai": "^4.55.0",
     "sql.js": "^1.8.0",
     "sqlite3": "^6.0.1"
+    ,"xlsx": "^0.18.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"

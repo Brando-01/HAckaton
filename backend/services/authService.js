@@ -1,253 +1,104 @@
-const {
-  randomBytes,
-  randomUUID,
-  scryptSync,
-  timingSafeEqual
-} = require('crypto');
+const { randomUUID } = require('crypto');
 
-const SESSION_TTL_MS =
-  8 * 60 * 60 * 1000;
+// ─────────────────────────────────────────────────────────
+// In-memory store  (prototype — resets on each server restart)
+// ─────────────────────────────────────────────────────────
+const usersByPhone   = new Map(); // phone  -> user object
+const sessionsByToken = new Map(); // token  -> session object
 
-const DEMO_PASSWORD =
-  'Demo1234!';
+// ─────────────────────────────────────────────────────────
+// Seeded demo accounts  (9-digit Peruvian numbers)
+// Login = phone + password
+// ─────────────────────────────────────────────────────────
+[
+  { phone: '987654321', password: 'Demo1234!', customerId: 'CLI000001', name: 'Carlos Mendoza' },
+  { phone: '912345678', password: 'Demo1234!', customerId: 'CLI000002', name: 'Ana Torres'    },
+].forEach(u => usersByPhone.set(u.phone, u));
 
-function createPasswordRecord(
-  password
-) {
-  const salt =
-    randomBytes(16).toString('hex');
-
-  const hash =
-    scryptSync(
-      password,
-      salt,
-      64
-    ).toString('hex');
-
-  return {
-    salt,
-    hash
-  };
+// ─────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────
+function normalizePhone(phone) {
+  return phone ? String(phone).trim() : null;
 }
 
-const users = [
-  {
-    userId: 'USR000001',
-    customerId: 'CLI000001',
-    name: 'Carlos Mendoza',
-    email: 'carlos.demo@movistar.pe',
-    ...createPasswordRecord(
-      DEMO_PASSWORD
-    )
-  },
-  {
-    userId: 'USR000002',
-    customerId: 'CLI000002',
-    name: 'Ana Torres',
-    email: 'ana.demo@movistar.pe',
-    ...createPasswordRecord(
-      DEMO_PASSWORD
-    )
+/** Peruvian mobile: exactly 9 digits starting with 9 */
+function validatePhone(phone) {
+  return /^9\d{8}$/.test(normalizePhone(phone) || '');
+}
+
+// ─────────────────────────────────────────────────────────
+// REGISTER  — phone + password + (optional DNI)
+// ─────────────────────────────────────────────────────────
+function registerUser({ phone, password, dni }) {
+  const p = normalizePhone(phone);
+
+  if (!p) {
+    const e = new Error('Número de celular requerido'); e.code = 'invalid_input'; throw e;
   }
-];
-
-const authSessions = new Map();
-
-function normalizeEmail(email) {
-  return String(email || '')
-    .trim()
-    .toLowerCase();
-}
-
-function verifyPassword(
-  password,
-  user
-) {
-  const attemptedHash =
-    scryptSync(
-      String(password || ''),
-      user.salt,
-      64
-    );
-
-  const expectedHash =
-    Buffer.from(
-      user.hash,
-      'hex'
-    );
-
-  return (
-    attemptedHash.length ===
-      expectedHash.length &&
-    timingSafeEqual(
-      attemptedHash,
-      expectedHash
-    )
-  );
-}
-
-function sanitizeUser(
-  user,
-  mode = 'ACCOUNT'
-) {
-  return {
-    userId: user.userId,
-    customerId:
-      user.customerId,
-    name: user.name,
-    email: user.email,
-    mode
-  };
-}
-
-function authenticateUser(
-  email,
-  password
-) {
-  const normalizedEmail =
-    normalizeEmail(email);
-
-  const user =
-    users.find(
-      (candidate) =>
-        candidate.email ===
-        normalizedEmail
-    );
-
-  if (
-    !user ||
-    !verifyPassword(
-      password,
-      user
-    )
-  ) {
-    return null;
+  if (!validatePhone(p)) {
+    const e = new Error('Número inválido. Debe tener 9 dígitos y comenzar con 9.');
+    e.code = 'invalid_phone'; throw e;
+  }
+  if (!password || password.length < 4) {
+    const e = new Error('La contraseña debe tener al menos 4 caracteres.');
+    e.code = 'password_too_short'; throw e;
+  }
+  if (usersByPhone.has(p)) {
+    const e = new Error('Este número ya tiene una cuenta registrada.');
+    e.code = 'user_exists'; throw e;
   }
 
-  return sanitizeUser(user);
+  const user = { phone: p, password, customerId: dni ? String(dni).trim() : null, name: null };
+  usersByPhone.set(p, user);
+  return user;
 }
 
-function getDemoProfiles() {
-  return users.map(
-    (user) => ({
-      userId: user.userId,
-      customerId:
-        user.customerId,
-      name: user.name,
-      email: user.email
-    })
-  );
-}
+// ─────────────────────────────────────────────────────────
+// LOGIN  — phone + password
+// ─────────────────────────────────────────────────────────
+function loginUser({ phone, password }) {
+  const p = normalizePhone(phone);
 
-function authenticateDemoCustomer(
-  customerId
-) {
-  const user =
-    users.find(
-      (candidate) =>
-        candidate.customerId ===
-        customerId
-    );
+  if (!p) {
+    const e = new Error('Número de celular requerido'); e.code = 'invalid_credentials'; throw e;
+  }
+
+  const user = usersByPhone.get(p);
 
   if (!user) {
-    return null;
+    const e = new Error('Número no encontrado. Regístrate primero.');
+    e.code = 'invalid_credentials'; throw e;
   }
 
-  return sanitizeUser(
-    user,
-    'DEMO'
-  );
-}
+  if (!password || user.password !== password) {
+    const e = new Error('Contraseña incorrecta.');
+    e.code = 'invalid_credentials'; throw e;
+  }
 
-function createAuthSession(
-  user
-) {
-  const token =
-    randomUUID();
-
-  const session = {
-    token,
-    user: {
-      ...user
-    },
-    createdAt:
-      Date.now(),
-    expiresAt:
-      Date.now() +
-      SESSION_TTL_MS
-  };
-
-  authSessions.set(
-    token,
-    session
-  );
+  const token = randomUUID();
+  sessionsByToken.set(token, {
+    phone:      user.phone,
+    customerId: user.customerId || null,
+    name:       user.name || null,
+  });
 
   return {
-    ...session,
-    user: {
-      ...session.user
-    }
+    token,
+    user: { phone: user.phone, customerId: user.customerId, name: user.name },
   };
 }
 
-function getAuthSession(
-  token
-) {
-  if (!token) {
-    return null;
-  }
-
-  const session =
-    authSessions.get(token);
-
-  if (!session) {
-    return null;
-  }
-
-  if (
-    session.expiresAt <=
-    Date.now()
-  ) {
-    authSessions.delete(token);
-    return null;
-  }
-
-  // Sliding expiration para que una demo
-  // activa no pierda la sesión entre vistas.
-  session.expiresAt =
-    Date.now() +
-    SESSION_TTL_MS;
-
-  return {
-    ...session,
-    user: {
-      ...session.user
-    }
-  };
+// ─────────────────────────────────────────────────────────
+// Session helpers
+// ─────────────────────────────────────────────────────────
+function getSession(token) {
+  if (!token) return null;
+  return sessionsByToken.get(token) || null;
 }
 
-function destroyAuthSession(
-  token
-) {
-  if (!token) {
-    return false;
-  }
-
-  return authSessions.delete(token);
+function logout(token) {
+  sessionsByToken.delete(token);
 }
 
-function clearAuthSessions() {
-  authSessions.clear();
-}
-
-module.exports = {
-  DEMO_PASSWORD,
-  SESSION_TTL_MS,
-  authenticateUser,
-  authenticateDemoCustomer,
-  createAuthSession,
-  getAuthSession,
-  destroyAuthSession,
-  getDemoProfiles,
-  clearAuthSessions
-};
+module.exports = { registerUser, loginUser, getSession, logout, validatePhone };

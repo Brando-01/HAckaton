@@ -3,7 +3,11 @@ const cors = require('cors');
 const path = require('path');
 const { randomUUID } = require('crypto');
 
+// Load environment variables from default .env
 require('dotenv').config();
+
+// Debug: print fallback mode at startup to help diagnose rate-limit/fallback issues
+console.log('GROQ_FALLBACK_MODE=', String(process.env.GROQ_FALLBACK_MODE || '')); 
 
 const {
   procesarConsultaFactura
@@ -11,15 +15,10 @@ const {
 
 const { dbReady } = require('./db');
 
-const {
-  SESSION_TTL_MS,
-  authenticateUser,
-  authenticateDemoCustomer,
-  createAuthSession,
-  getAuthSession,
-  destroyAuthSession,
-  getDemoProfiles
-} = require('./services/authService');
+const authService = require('./services/authService');
+const nboRoutes = require('./routes/nbo');
+const webhookRoutes = require('./routes/webhook');
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // keep a reference if needed
 
 const {
   resetSession,
@@ -33,6 +32,8 @@ const {
   getAvailableCustomers,
   customerExists
 } = require('./services/appExperienceService');
+
+const { getFichaCliente } = require('./services/dbService');
 
 const {
   esSolicitudAsesor,
@@ -104,18 +105,17 @@ function getAuthToken(req) {
 }
 
 function getRequestAuth(req) {
-  const token =
-    getAuthToken(req);
+  const authHeader = req.headers['authorization'] || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : getAuthToken(req);
+  if (!token) return null;
 
-  const session =
-    getAuthSession(token);
-
-  return session
-    ? {
-        token,
-        session
-      }
-    : null;
+  try {
+    const session = authService.getSession(token);
+    if (!session) return null;
+    return { session: { user: { phone: session.phone, customerId: session.customerId } }, token };
+  } catch (e) {
+    return null;
+  }
 }
 
 function setAuthCookie(
@@ -145,13 +145,7 @@ function requirePageAuth(
   res,
   next
 ) {
-  if (!getRequestAuth(req)) {
-    return res.redirect(
-      302,
-      '/login'
-    );
-  }
-
+  // Auth removed: allow all page requests (guest mode)
   return next();
 }
 
@@ -160,19 +154,9 @@ function requireApiAuth(
   res,
   next
 ) {
-  const auth =
-    getRequestAuth(req);
-
-  if (!auth) {
-    return res
-      .status(401)
-      .json({
-        error:
-          'Debes iniciar sesión'
-      });
-  }
-
-  req.auth = auth;
+  // API auth disabled: attach a guest auth object when available
+  const auth = getRequestAuth(req);
+  req.auth = auth || null;
   return next();
 }
 
@@ -181,7 +165,9 @@ function createApp() {
   const app = express();
 
   app.use(cors());
+  // Accept JSON and URL-encoded form bodies for robustness
   app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
 
   const frontendPath = path.join(
     __dirname,
@@ -195,33 +181,90 @@ function createApp() {
     })
   );
 
+  app.use('/api/nbo', nboRoutes);
+  app.use('/api', webhookRoutes);
+
   // =========================================================
   // VISTAS
   // =========================================================
 
   app.get('/', (req, res) => {
+    // Serve the chat-based index as the main entrypoint
     res.sendFile(
       path.join(
         frontendPath,
-        'demo.html'
+        'index.html'
       )
     );
   });
 
   app.get('/login', (req, res) => {
-    if (getRequestAuth(req)) {
-      return res.redirect(
-        302,
-        '/app'
-      );
+    // Login UI removed: redirect all login requests to the app
+    return res.redirect(302, '/app');
+  });
+
+  // =========================================================
+  // AUTH (minimal prototype)
+  // =========================================================
+  app.post('/api/auth/register', (req, res) => {
+    const body = req.body || {};
+    console.log('[API] /api/auth/register body=', body);
+
+    const phone    = (body.phone || body.phoneNumber || req.query.phone || '').toString().trim();
+    const password = (body.password || body.pass || req.query.password || '').toString();
+    const dni      = (body.dni || body.customerId || req.query.dni || '').toString().trim() || null;
+
+    try {
+      if (!phone)    return res.status(400).json({ error: 'Número de celular requerido' });
+      if (!password) return res.status(400).json({ error: 'Contraseña requerida' });
+
+      const user = authService.registerUser({ phone, password, dni });
+      return res.status(201).json({ ok: true, user: { phone: user.phone, customerId: user.customerId } });
+    } catch (err) {
+      if (err.code === 'user_exists')      return res.status(409).json({ error: err.message });
+      if (err.code === 'invalid_phone')    return res.status(400).json({ error: err.message });
+      if (err.code === 'password_too_short') return res.status(400).json({ error: err.message });
+      return res.status(400).json({ error: err.message || 'Error al registrar' });
+    }
+  });
+
+  app.post('/api/auth/login', (req, res) => {
+    const body     = req.body || {};
+    const phone    = (body.phone || body.phoneNumber || req.query.phone || '').toString().trim();
+    const password = (body.password || body.pass || req.query.password || '').toString();
+    try {
+      const result = authService.loginUser({ phone, password });
+      setAuthCookie(res, result.token);
+      return res.json({ ok: true, token: result.token, user: result.user });
+    } catch (err) {
+      return res.status(401).json({ error: err.message || 'Credenciales inválidas' });
+    }
+  });
+
+  app.get('/api/auth/me', (req, res) => {
+    const auth  = req.headers['authorization'] || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : getAuthToken(req);
+    const session = authService.getSession(token);
+    if (!session) return res.status(401).json({ error: 'Not authenticated' });
+
+    // Try to get real name from DB first, then fall back to session name
+    const customerExp = session.customerId ? getCustomerExperience(session.customerId) : null;
+    let name = session.name || 'Usuario Mi Movistar';
+    if (customerExp && customerExp.customer && customerExp.customer.name) {
+      name = customerExp.customer.name;
     }
 
-    return res.sendFile(
-      path.join(
-        frontendPath,
-        'login.html'
-      )
-    );
+    return res.json({ ok: true, user: { phone: session.phone, customerId: session.customerId, name } });
+  });
+
+  app.post('/api/auth/logout', (req, res) => {
+    const auth = req.headers['authorization'] || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : getAuthToken(req);
+    if (token) {
+      authService.logout(token);
+    }
+    clearAuthCookie(res);
+    return res.json({ ok: true, message: 'Sesión cerrada correctamente' });
   });
 
   app.get('/chat', (req, res) => {
@@ -233,183 +276,22 @@ function createApp() {
     );
   });
 
-
+  // Advisor removed — serve chat index instead
   app.get('/advisor', (req, res) => {
-    res.sendFile(
-      path.join(
-        frontendPath,
-        'advisor.html'
-      )
-    );
+    res.sendFile(path.join(frontendPath, 'index.html'));
+  });
+  // Keep /app compatible by serving index (chat UI)
+  app.get('/app', (req, res) => {
+    res.sendFile(path.join(frontendPath, 'index.html'));
   });
 
-  app.get(
-    '/app',
-    requirePageAuth,
-    (req, res) => {
-      res.sendFile(
-        path.join(
-          frontendPath,
-          'app.html'
-        )
-      );
-    }
-  );
-
+  // Dashboard removed — redirect to main chat UI
   app.get('/dashboard', (req, res) => {
-    res.sendFile(
-      path.join(
-        frontendPath,
-        'dashboard.html'
-      )
-    );
+    return res.redirect(302, '/');
   });
 
 
-  // =========================================================
-  // AUTENTICACIÓN LOCAL DE DEMO
-  // =========================================================
-
-  app.get(
-    '/api/auth/demo-profiles',
-    (req, res) => {
-      return res.json({
-        profiles:
-          getDemoProfiles()
-      });
-    }
-  );
-
-  app.post(
-    '/api/auth/login',
-    (req, res) => {
-      const {
-        email,
-        password
-      } = req.body || {};
-
-      const user =
-        authenticateUser(
-          email,
-          password
-        );
-
-      if (!user) {
-        return res
-          .status(401)
-          .json({
-            error:
-              'Correo o contraseña incorrectos'
-          });
-      }
-
-      const authSession =
-        createAuthSession(user);
-
-      setAuthCookie(
-        res,
-        authSession.token
-      );
-
-      return res.json({
-        ok: true,
-        user:
-          authSession.user
-      });
-    }
-  );
-
-  app.post(
-    '/api/auth/demo-login',
-    (req, res) => {
-      const {
-        customerId
-      } = req.body || {};
-
-      const user =
-        authenticateDemoCustomer(
-          customerId
-        );
-
-      if (!user) {
-        return res
-          .status(400)
-          .json({
-            error:
-              'Perfil demo inválido'
-          });
-      }
-
-      const authSession =
-        createAuthSession(user);
-
-      setAuthCookie(
-        res,
-        authSession.token
-      );
-
-      return res.json({
-        ok: true,
-        user:
-          authSession.user
-      });
-    }
-  );
-
-  app.get(
-    '/api/auth/me',
-    requireApiAuth,
-    (req, res) => {
-      return res.json({
-        authenticated: true,
-        user:
-          req.auth.session.user
-      });
-    }
-  );
-
-  app.post(
-    '/api/auth/logout',
-    (req, res) => {
-      const token =
-        getAuthToken(req);
-
-      destroyAuthSession(token);
-      clearAuthCookie(res);
-
-      return res.json({
-        ok: true
-      });
-    }
-  );
-
-  app.get(
-    '/api/app/me',
-    requireApiAuth,
-    (req, res) => {
-      const customerId =
-        req.auth.session.user
-          .customerId;
-
-      const experience =
-        getCustomerExperience(
-          customerId
-        );
-
-      if (!experience) {
-        return res
-          .status(404)
-          .json({
-            error:
-              'Cliente autenticado no encontrado'
-          });
-      }
-
-      return res.json(
-        experience
-      );
-    }
-  );
+  // Authentication endpoints removed: local demo/login/logout and /api/app/me are disabled
 
 
   // =========================================================
@@ -738,6 +620,21 @@ function createApp() {
 
 
         // =====================================================
+            // If the user mentions sensitive terms and no customer is associated,
+            // prompt to login first. procesarConsultaFactura also performs a
+            // server-side check, but deny early to avoid unnecessary processing.
+            const session = getOrCreateSession(activeSessionId);
+            const isSensitive = /\b(deuda|debo pagar|cuánto debo|cuanto debo|tengo deuda|mi recibo|recibo)\b/i.test(cleanMessage);
+            const hasCustomer = Boolean(session.context && session.context.customerIdentifier);
+
+            if (isSensitive && !hasCustomer) {
+              return res.json({
+                reply: 'Para ver información personal sobre tu recibo o deuda debes iniciar sesión. Pulsa "Iniciar sesión" y vuelve a intentarlo.',
+                foundData: false,
+                sessionId: activeSessionId
+              });
+            }
+
         // CONSULTA NORMAL AL RAG
         // =====================================================
 
@@ -811,7 +708,6 @@ function createApp() {
         }
 
         return res
-          .status(500)
           .json({
             reply:
               'Lo siento, tuve un problema al procesar tu consulta. Intenta de nuevo.',
@@ -1044,6 +940,25 @@ function createApp() {
     }
   );
 
+  // =========================================================
+  // DICCIONARIO DE DATOS (endpoint de ejemplo)
+  // =========================================================
+  app.get('/api/dictionary/cliente/:dni', requireApiAuth, async (req, res) => {
+    try {
+      const dni = req.params.dni;
+      const ficha = await getFichaCliente(dni);
+
+      if (!ficha || !ficha.cliente) {
+        return res.status(404).json({ error: 'Cliente no encontrado en el diccionario' });
+      }
+
+      return res.json(ficha);
+    } catch (error) {
+      console.error('Error al consultar diccionario:', error);
+      return res.status(500).json({ error: error.message });
+    }
+  });
+
 
   // En producción esto vendría de la
   // autenticación real del usuario.
@@ -1126,15 +1041,35 @@ if (require.main === module) {
     3000;
 
   dbReady
-    .then(() => {
-      app.listen(
-        PORT,
-        () => {
+    .then(async () => {
+      // Inicializar diccionario de datos (si existe)
+      try {
+        const { initDiccionario } = require('./services/dbService');
+        await initDiccionario();
+      } catch (err) {
+        // ya se imprime dentro de initDiccionario
+      }
+
+      const startServer = (port) => {
+        const server = app.listen(port, () => {
           console.log(
-            `🚀 Servidor ejecutándose en http://localhost:${PORT}`
+            `🚀 Servidor ejecutándose en http://localhost:${port}`
           );
-        }
-      );
+        });
+
+        server.on('error', (error) => {
+          if (error.code === 'EADDRINUSE') {
+            console.warn(`⚠️ Puerto ${port} ocupado, intentando ${port + 1}...`);
+            server.close(() => startServer(port + 1));
+            return;
+          }
+
+          console.error('Error al iniciar el servidor:', error);
+          process.exit(1);
+        });
+      };
+
+      startServer(PORT);
     })
     .catch((error) => {
       console.error(

@@ -1192,101 +1192,91 @@
     );
   }
 
+  let currentUserState = null;
+
+  function updateAuthUI(user) {
+    const loginBtn = document.getElementById('loginButton');
+    const userProfileBtn = document.getElementById('userProfileButton');
+    const badgeText = document.getElementById('userProfileBadgeText');
+
+    if (user) {
+      if (loginBtn) loginBtn.classList.add('hidden');
+      if (userProfileBtn) {
+        userProfileBtn.classList.remove('hidden');
+        if (badgeText) {
+          badgeText.textContent = `👤 ${user.name || user.phone}`;
+        }
+      }
+      const pName = document.getElementById('profileModalName');
+      const pPhone = document.getElementById('profileModalPhone');
+      const pCustomer = document.getElementById('profileModalCustomerId');
+
+      if (pName) pName.textContent = user.name || 'Usuario Mi Movistar';
+      if (pPhone) pPhone.textContent = user.phone || '-';
+      if (pCustomer) pCustomer.textContent = user.customerId || 'Sin DNI asociado';
+    } else {
+      if (loginBtn) loginBtn.classList.remove('hidden');
+      if (userProfileBtn) userProfileBtn.classList.add('hidden');
+    }
+  }
+
   async function associateAuthenticatedCustomer(
     sessionId
   ) {
     try {
-      const authResponse =
-        await fetch(
-          '/api/auth/me'
-        );
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        sessionStorage.removeItem('movistarDemoCustomerId');
+        currentUserState = null;
+        updateAuthUI(null);
+        return null;
+      }
 
-      if (
-        authResponse.status === 401
-      ) {
-        sessionStorage.removeItem(
-          'movistarDemoCustomerId'
-        );
-
-        const authContextBadge =
-          document.getElementById(
-            'authContextBadge'
-          );
-
-        if (authContextBadge) {
-          authContextBadge.hidden = true;
+      const resp = await fetch('/api/auth/me', {
+        headers: {
+          Authorization: `Bearer ${token}`
         }
+      });
 
+      if (resp.status === 401) {
+        localStorage.removeItem('authToken');
+        sessionStorage.removeItem('movistarDemoCustomerId');
+        currentUserState = null;
+        updateAuthUI(null);
         return null;
       }
 
-      if (!authResponse.ok) {
-        throw new Error(
-          'No se pudo validar la sesión de Mi Movistar'
-        );
-      }
-
-      const authData =
-        await authResponse.json();
-
-      const customerId =
-        authData.user &&
-        authData.user.customerId;
-
-      if (!customerId) {
+      const data = await resp.json();
+      if (!data || !data.user) {
+        currentUserState = null;
+        updateAuthUI(null);
         return null;
       }
 
-      const response =
-        await fetch(
-          `/api/session/${encodeURIComponent(
-            sessionId
-          )}/customer`,
-          {
+      currentUserState = data.user;
+      updateAuthUI(data.user);
+
+      const customerId = data.user.customerId || null;
+
+      // Notify server about the association for metrics/context
+      if (customerId) {
+        try {
+          await fetch(`/api/session/${encodeURIComponent(sessionId)}/customer`, {
             method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json'
-            },
-            body: JSON.stringify({
-              customerId
-            })
-          }
-        );
-
-      if (!response.ok) {
-        throw new Error(
-          'No se pudo asociar el cliente autenticado al chat'
-        );
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ customerId })
+          });
+        } catch (e) {
+          console.warn('[CHAT] error notifying session of customer:', e);
+        }
+        sessionStorage.setItem('movistarDemoCustomerId', customerId);
       }
-
-      sessionStorage.setItem(
-        'movistarDemoCustomerId',
-        customerId
-      );
-
-      const authContextBadge =
-        document.getElementById(
-          'authContextBadge'
-        );
-
-      if (authContextBadge) {
-        authContextBadge.textContent =
-          `${authData.user.name} · autenticado`;
-        authContextBadge.hidden = false;
-      }
-
-      console.log(
-        '[CHAT] Contexto autenticado:',
-        customerId
-      );
 
       return customerId;
     } catch (error) {
-      console.warn(
-        '[CHAT] No se pudo recuperar el contexto autenticado:',
-        error
-      );
+      console.warn('[CHAT] No se pudo recuperar el contexto autenticado:', error);
+      currentUserState = null;
+      updateAuthUI(null);
       return null;
     }
   }
@@ -1358,45 +1348,283 @@
     }
   }
 
+  // =========================================================
+  // AUTH MODAL — LOGIN & REGISTER
+  // =========================================================
+
+  function showLoginModal() {
+    const modal = document.getElementById('loginModal');
+    if (!modal) return;
+    clearLoginMessages();
+    showLoginView();
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+      const p = document.getElementById('loginPhone');
+      if (p) p.focus();
+    }, 120);
+  }
+
+  function hideLoginModal() {
+    const modal = document.getElementById('loginModal');
+    if (modal) modal.classList.add('hidden');
+    clearLoginMessages();
+  }
+
+  function showLoginView() {
+    document.getElementById('loginView')?.classList.remove('hidden');
+    document.getElementById('registerView')?.classList.add('hidden');
+  }
+
+  function showRegisterView() {
+    document.getElementById('loginView')?.classList.add('hidden');
+    document.getElementById('registerView')?.classList.remove('hidden');
+    setTimeout(() => {
+      const p = document.getElementById('regPhone');
+      if (p) p.focus();
+    }, 120);
+  }
+
+  function clearLoginMessages() {
+    ['loginMessage', 'registerMessage'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.textContent = ''; el.className = 'login-message'; el.removeAttribute('style'); }
+    });
+  }
+
+  function setMsg(id, text, isError) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'login-message' + (isError ? ' error' : '');
+    el.removeAttribute('style');
+  }
+
+  // LOGIN: phone + password
+  async function submitLogin(overridePhone, overridePassword) {
+    const phone    = overridePhone    || document.getElementById('loginPhone')?.value?.trim()    || '';
+    const password = overridePassword || document.getElementById('loginPassword')?.value || '';
+    const msgId    = 'loginMessage';
+
+    if (!phone || !/^9\d{8}$/.test(phone)) {
+      setMsg(msgId, 'Número inválido. Debe tener 9 dígitos y comenzar con 9.', true);
+      return;
+    }
+    if (!password || password.length < 4) {
+      setMsg(msgId, 'Ingresa tu contraseña (mínimo 4 caracteres).', true);
+      return;
+    }
+
+    const submitBtn  = document.getElementById('submitLogin');
+    const showRegBtn = document.getElementById('showRegister');
+    const closeBtn   = document.getElementById('closeLogin');
+
+    if (submitBtn)  { submitBtn.disabled  = true;  submitBtn.textContent  = 'Entrando...'; }
+    if (showRegBtn)   showRegBtn.disabled = true;
+    if (closeBtn)     closeBtn.disabled  = true;
+
+    try {
+      setMsg(msgId, 'Verificando...', false);
+
+      const resp = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, password })
+      });
+
+      let data = null;
+      try { data = await resp.json(); } catch (_) {}
+
+      if (!resp.ok) {
+        const errMsg = (data && data.error) ? data.error : 'Número o contraseña incorrectos';
+        setMsg(msgId, errMsg, true);
+        return;
+      }
+
+      localStorage.setItem('authToken', data.token);
+      hideLoginModal();
+      await associateAuthenticatedCustomer(currentSessionId);
+
+    } catch (e) {
+      console.error('[CHAT] login error', e);
+      setMsg(msgId, 'Error de conexion. Intenta nuevamente.', true);
+    } finally {
+      if (submitBtn)  { submitBtn.disabled  = false; submitBtn.textContent  = 'Entrar'; }
+      if (showRegBtn)   showRegBtn.disabled = false;
+      if (closeBtn)     closeBtn.disabled  = false;
+    }
+  }
+
+  // REGISTER: phone + DNI + password
+  async function submitRegister() {
+    const phone    = document.getElementById('regPhone')?.value?.trim()    || '';
+    const dni      = document.getElementById('regDni')?.value?.trim()      || '';
+    const password = document.getElementById('regPassword')?.value         || '';
+    const msgId    = 'registerMessage';
+
+    if (!phone || !/^9\d{7,8}$/.test(phone)) {
+      setMsg(msgId, 'Número inválido. Debe tener 9 dígitos y comenzar con 9.', true);
+      return;
+    }
+    if (!password || password.length < 4) {
+      setMsg(msgId, 'La contrasena debe tener al menos 4 caracteres.', true);
+      return;
+    }
+
+    const submitBtn = document.getElementById('submitRegister');
+    const cancelBtn = document.getElementById('cancelRegister');
+
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Creando...'; }
+    if (cancelBtn)   cancelBtn.disabled = true;
+
+    try {
+      setMsg(msgId, 'Registrando cuenta...', false);
+
+      const resp = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, password, dni })
+      });
+
+      let data = null;
+      try { data = await resp.json(); } catch (_) {}
+
+      if (!resp.ok) {
+        if (resp.status === 409) {
+          setMsg(msgId, 'Número ya registrado. Iniciando sesión...', false);
+          await new Promise(r => setTimeout(r, 800));
+          showLoginView();
+          const lp = document.getElementById('loginPhone');
+          const lpw = document.getElementById('loginPassword');
+          if (lp) lp.value = phone;
+          if (lpw) lpw.value = password;
+          await submitLogin(phone, password);
+          return;
+        }
+        const errMsg = (data && data.error) ? data.error : 'No se pudo registrar';
+        setMsg(msgId, errMsg, true);
+        return;
+      }
+
+      setMsg(msgId, 'Cuenta creada. Iniciando sesión...', false);
+      await new Promise(r => setTimeout(r, 600));
+      showLoginView();
+      const lp = document.getElementById('loginPhone');
+      const lpw = document.getElementById('loginPassword');
+      if (lp) lp.value = phone;
+      if (lpw) lpw.value = password;
+      await submitLogin(phone, password);
+
+    } catch (e) {
+      console.error('[CHAT] register error', e);
+      setMsg(msgId, 'Error de conexion. Intenta nuevamente.', true);
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Crear cuenta'; }
+      if (cancelBtn)   cancelBtn.disabled = false;
+    }
+  }
+
+  // LOGOUT
+  async function logout() {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => {});
+      }
+    } finally {
+      localStorage.removeItem('authToken');
+      sessionStorage.removeItem('movistarDemoCustomerId');
+      currentUserState = null;
+      updateAuthUI(null);
+      hideProfileModal();
+    }
+  }
+
+  function showProfileModal() {
+    const modal = document.getElementById('userProfileModal');
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  function hideProfileModal() {
+    const modal = document.getElementById('userProfileModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
 
   // =========================================================
   // INICIO
   // =========================================================
 
-  document.addEventListener(
-    'DOMContentLoaded',
-    async () => {
-      appendMessage(
-        '¡Hola! Soy tu asistente virtual Movistar. ¿En qué puedo ayudarte hoy?',
-        'bot'
-      );
+  document.addEventListener('DOMContentLoaded', async () => {
+    appendMessage('Hola! Soy tu asistente virtual Movistar. En que puedo ayudarte hoy?', 'bot');
+    console.log('[CHAT] Sesion activa:', currentSessionId);
 
-      console.log(
-        '[CHAT] Sesión activa:',
-        currentSessionId
-      );
+    enableChatComposer();
+    hideSatisfactionModal();
+    syncBackToAppLink();
 
-      enableChatComposer();
+    const authenticatedCustomerId = await associateAuthenticatedCustomer(currentSessionId);
 
-      hideSatisfactionModal();
+    // Login modal wiring
+    document.getElementById('loginButton')    ?.addEventListener('click', showLoginModal);
+    document.getElementById('closeLogin')     ?.addEventListener('click', hideLoginModal);
+    document.getElementById('submitLogin')    ?.addEventListener('click', () => submitLogin());
+    document.getElementById('showRegister')   ?.addEventListener('click', showRegisterView);
+    document.getElementById('backToLogin')    ?.addEventListener('click', showLoginView);
+    document.getElementById('cancelRegister') ?.addEventListener('click', showLoginView);
+    document.getElementById('submitRegister') ?.addEventListener('click', submitRegister);
 
-      syncBackToAppLink();
+    // Profile modal wiring
+    document.getElementById('userProfileButton') ?.addEventListener('click', showProfileModal);
+    document.getElementById('closeProfileModal') ?.addEventListener('click', hideProfileModal);
+    document.getElementById('logoutButton')      ?.addEventListener('click', logout);
 
-      const authenticatedCustomerId =
-        await associateAuthenticatedCustomer(
-          currentSessionId
-        );
+    // Close on backdrop click
+    document.getElementById('loginModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'loginModal') hideLoginModal();
+    });
+    document.getElementById('userProfileModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'userProfileModal') hideProfileModal();
+    });
 
-      startTimer();
+    // Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { hideLoginModal(); hideProfileModal(); }
+    });
 
-      if (finishChatButton) {
-        finishChatButton.disabled =
-          true;
-      }
+    // Enter key on inputs
+    ['loginPhone', 'loginPassword'].forEach(id => {
+      document.getElementById(id)?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submitLogin();
+      });
+    });
+    ['regPhone', 'regDni', 'regPassword'].forEach(id => {
+      document.getElementById(id)?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submitRegister();
+      });
+    });
 
-      await bootstrapFromApp(
-        authenticatedCustomerId
-      );
-    }
-  );
-})();
+    // Demo shortcuts — fill phone + password and auto-login
+    document.getElementById('demoUserCarlos')?.addEventListener('click', () => {
+      const lp = document.getElementById('loginPhone');
+      const lpw = document.getElementById('loginPassword');
+      if (lp) lp.value = '987654321';
+      if (lpw) lpw.value = 'Demo1234!';
+      submitLogin('987654321', 'Demo1234!');
+    });
+    document.getElementById('demoUserAna')?.addEventListener('click', () => {
+      const lp = document.getElementById('loginPhone');
+      const lpw = document.getElementById('loginPassword');
+      if (lp) lp.value = '912345678';
+      if (lpw) lpw.value = 'Demo1234!';
+      submitLogin('912345678', 'Demo1234!');
+    });
+
+    startTimer();
+    if (finishChatButton) finishChatButton.disabled = true;
+
+    await bootstrapFromApp(authenticatedCustomerId);
+  });
+})();

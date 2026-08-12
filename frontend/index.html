@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Asistente Virtual | Movistar Perú</title>
     <link rel="stylesheet" href="./chat.css">
-    <link rel="stylesheet" href="./demo-nav.css">
+    <!-- demo-nav.css removed; chat-only UI -->
 </head>
 <body>
 
@@ -64,13 +64,13 @@
                     <span class="status-dot"></span>
                     <span>En línea • Respuestas con IA</span>
                 </div>
-                <span id="authContextBadge" class="auth-context-badge" hidden></span>
             </div>
-            <div class="topbar-right demo-nav">
-                <a class="demo-nav-link home-link" href="/">Inicio demo</a>
-                <a class="demo-nav-link" id="backToAppLink" href="/app">Mi Movistar</a>
-                <a class="demo-nav-link" href="/advisor">Asesor</a>
-                <a class="demo-nav-link" href="/dashboard">Dashboard</a>
+            <div class="topbar-right">
+                <button id="userProfileButton" class="user-profile-badge hidden" title="Ver mi perfil">
+                    <span class="user-badge-dot"></span>
+                    <span id="userProfileBadgeText">Cargando...</span>
+                </button>
+                <button id="loginButton" class="btn-login-topbar">🔑 Iniciar sesión</button>
             </div>
         </header>
 
@@ -206,6 +206,124 @@
 
     </div>
 </div>
+        <!-- LOGIN / REGISTRO MODAL -->
+        <div id="loginModal" class="login-modal hidden">
+            <div class="login-card">
+
+                <!-- ── MODO LOGIN ── -->
+                <div id="loginView">
+                    <div class="login-card-header">
+                        <div class="login-brand-icon">🔑</div>
+                        <div>
+                            <h2>Iniciar sesión</h2>
+                            <p class="login-subtitle">Ingresa tu celular y contraseña</p>
+                        </div>
+                    </div>
+
+                    <!-- Demo shortcuts -->
+                    <div class="demo-quick-login">
+                        <span class="demo-label">Acceso rápido Demo:</span>
+                        <div class="demo-buttons">
+                            <button type="button" class="btn-demo-user" id="demoUserCarlos">
+                                👤 Carlos Mendoza
+                            </button>
+                            <button type="button" class="btn-demo-user" id="demoUserAna">
+                                👤 Ana Torres
+                            </button>
+                        </div>
+                    </div>
+
+                    <p id="loginMessage" class="login-message"></p>
+
+                    <div class="form-group">
+                        <label for="loginPhone">Número celular (9 dígitos)</label>
+                        <input id="loginPhone" type="tel" inputmode="numeric" maxlength="9"
+                            placeholder="Ej: 987654321" autocomplete="tel">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="loginPassword">Contraseña</label>
+                        <input id="loginPassword" type="password"
+                            placeholder="Ingresa tu contraseña" autocomplete="current-password">
+                    </div>
+
+                    <div class="login-actions">
+                        <button id="submitLogin" class="btn-primary-action">Entrar</button>
+                        <button id="showRegister" class="btn-secondary-action">Registrarse</button>
+                        <button id="closeLogin" class="btn-cancel-action">Cerrar</button>
+                    </div>
+                </div>
+
+                <!-- ── MODO REGISTRO ── -->
+                <div id="registerView" class="hidden">
+                    <div class="login-card-header">
+                        <button id="backToLogin" class="btn-back" title="Volver">←</button>
+                        <div class="login-brand-icon">📋</div>
+                        <div>
+                            <h2>Crear cuenta</h2>
+                            <p class="login-subtitle">Registra tu número para guardar tu historial</p>
+                        </div>
+                    </div>
+
+                    <p id="registerMessage" class="login-message"></p>
+
+                    <div class="form-group">
+                        <label for="regPhone">Número celular (9 dígitos)</label>
+                        <input id="regPhone" type="tel" inputmode="numeric" maxlength="9"
+                            placeholder="Ej: 987654321" autocomplete="tel">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="regDni">DNI / Documento de identidad</label>
+                        <input id="regDni" type="text" inputmode="numeric" maxlength="12"
+                            placeholder="Ej: 52115748" autocomplete="off">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="regPassword">Contraseña (mínimo 4 caracteres)</label>
+                        <input id="regPassword" type="password" placeholder="Crea una contraseña" autocomplete="new-password">
+                    </div>
+
+                    <div class="login-actions">
+                        <button id="submitRegister" class="btn-primary-action">Crear cuenta</button>
+                        <button id="cancelRegister" class="btn-cancel-action">Cancelar</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+        <!-- MODAL DE PERFIL DE USUARIO (CUANDO ESTÁ AUTENTICADO) -->
+        <div id="userProfileModal" class="login-modal hidden">
+            <div class="login-card">
+                <div class="login-card-header">
+                    <div class="login-brand-icon">👤</div>
+                    <div>
+                        <h2 id="profileModalName">Perfil de Usuario</h2>
+                        <p class="login-subtitle">Sesión activa en Mi Movistar</p>
+                    </div>
+                </div>
+
+                <div class="profile-details-grid">
+                    <div class="profile-detail-item">
+                        <span class="detail-label">Celular / Usuario</span>
+                        <span id="profileModalPhone" class="detail-value">-</span>
+                    </div>
+                    <div class="profile-detail-item">
+                        <span class="detail-label">Código de Cliente</span>
+                        <span id="profileModalCustomerId" class="detail-value">-</span>
+                    </div>
+                    <div class="profile-detail-item full-row">
+                        <span class="detail-label">Estado de la cuenta</span>
+                        <span class="detail-value status-active">✓ Autenticado y sincronizado</span>
+                    </div>
+                </div>
+
+                <div class="login-actions">
+                    <button id="logoutButton" class="btn-danger-action">🚪 Cerrar Sesión</button>
+                    <button id="closeProfileModal" class="btn-cancel-action">Volver al chat</button>
+                </div>
+            </div>
+        </div>
     <script src="./chat.js"></script>
 </body>
 </html>

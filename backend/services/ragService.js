@@ -18,6 +18,9 @@ const {
   getCustomerExperience
 } = require('./appExperienceService');
 
+const { getFichaCliente } = require('./dbService');
+const { buildDataContext, buildCustomerDataContext, buildCustomerBillingSummary } = require('./dataContextService');
+
 const {
   getOrCreateSession,
   addMessage,
@@ -26,10 +29,18 @@ const {
 } = require('./sessionService');
 
 
-const groq = new Groq({
-  apiKey:
-    process.env.GROQ_API_KEY
-});
+let groq = null;
+
+function getGroqClient() {
+  if (!groq) {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+      return null;
+    }
+    groq = new Groq({ apiKey });
+  }
+  return groq;
+}
 
 
 // =========================================================
@@ -133,7 +144,17 @@ console.log(
 // =========================================================
 
 let catalogoOfertasTexto = '';
+let catalogoOfertas = [];
+let dataContextTexto = '';
+let customerDataContextTexto = '';
 
+async function cargarContextoDatos() {
+  const rutaDatos = path.resolve(__dirname, '../data');
+  dataContextTexto = await buildDataContext(rutaDatos);
+  if (dataContextTexto) {
+    console.log('✅ Contexto de datos cargado desde la carpeta data.');
+  }
+}
 
 function cargarCatalogoOfertas() {
   const rutaCatalogo =
@@ -166,16 +187,20 @@ function cargarCatalogoOfertas() {
     .on(
       'data',
       (row) => {
-        ofertas.push(
-          [
-            `- ID: ${row.oferta_id}`,
-            `Plan: ${row.nombre_oferta}`,
-            `Tipo: ${row.tipo_oferta}`,
-            `Precio: S/ ${row.precio_mensual}`,
-            `GB: ${row.gb_incluidos || 'N/A'}`,
-            `Movistar Total: ${row.es_movistar_total}`
-          ].join(' | ')
-        );
+        const oferta = {
+          oferta_id: row.oferta_id,
+          nombre_oferta: row.nombre_oferta,
+          tipo_oferta: row.tipo_oferta,
+          precio_mensual: Number(row.precio_mensual || 0),
+          gb_incluidos: row.gb_incluidos,
+          es_movistar_total: row.es_movistar_total,
+          descripcion_corta: row.descripcion_corta,
+          descripcion_bundle: row.descripcion_bundle,
+          cluster_hogar: row.cluster_hogar
+        };
+
+        ofertas.push(oferta);
+        catalogoOfertas.push(oferta);
       }
     )
 
@@ -183,7 +208,14 @@ function cargarCatalogoOfertas() {
       'end',
       () => {
         catalogoOfertasTexto =
-          ofertas.join('\n');
+          ofertas.map((oferta) => [
+            `- ID: ${oferta.oferta_id}`,
+            `Plan: ${oferta.nombre_oferta}`,
+            `Tipo: ${oferta.tipo_oferta}`,
+            `Precio: S/ ${oferta.precio_mensual}`,
+            `GB: ${oferta.gb_incluidos || 'N/A'}`,
+            `Movistar Total: ${oferta.es_movistar_total}`
+          ].join(' | ')).join('\n');
 
         console.log(
           `✅ Catálogo cargado con éxito (${ofertas.length} ofertas disponibles).`
@@ -192,8 +224,53 @@ function cargarCatalogoOfertas() {
     );
 }
 
+function construirRespuestaCatalogoPlanes() {
+  const planesHogar = catalogoOfertas.filter((oferta) => {
+    if (oferta.tipo_oferta !== 'plan_hogar') {
+      return false;
+    }
+
+    const nombre = (oferta.nombre_oferta || '').toLowerCase();
+    return nombre.includes('internet hogar') || nombre.includes('tv hogar') || nombre.includes('fijo hogar');
+  });
+
+  const planesOrdenados = planesHogar
+    .filter((oferta) => oferta.nombre_oferta && oferta.precio_mensual)
+    .sort((a, b) => a.precio_mensual - b.precio_mensual)
+    .slice(0, 5);
+
+  if (planesOrdenados.length === 0) {
+    return null;
+  }
+
+  const lineas = planesOrdenados.map((plan) => `- ${plan.nombre_oferta}: S/ ${plan.precio_mensual.toFixed(1).replace(/\.0$/, '')}.`);
+
+  return [
+    'En Movistar Perú, los planes de fibra óptica disponibles son:',
+    ...lineas,
+    '',
+    'Estos planes corresponden a servicios de Internet Hogar y paquetes de fibra óptica con opciones de TV y telefonía fija según el plan.'
+  ].join('\n');
+}
+
+function responderPreguntaCatalogo(mensajeTexto) {
+  if (!mensajeTexto) {
+    return null;
+  }
+
+  const texto = mensajeTexto.toLowerCase();
+  const preguntaCatalogo = /(fibra óptica|fibra optica|plan(es)? de internet|plan(es)? de fibra|internet hogar|planes.*hogar|fibra.*hogar)/i.test(texto);
+
+  if (!preguntaCatalogo) {
+    return null;
+  }
+
+  return construirRespuestaCatalogoPlanes();
+}
+
 
 cargarCatalogoOfertas();
+cargarContextoDatos();
 
 
 // =========================================================
@@ -248,11 +325,23 @@ function obtenerInformacionCliente(
               error ||
               !cliente
             ) {
-              db.close();
+                db.close();
 
-              return resolve(
-                null
-              );
+                // Si no se encontró en la DB legacy, intentamos con el Diccionario de datos (SQLite separado)
+                return getFichaCliente(identificador)
+                  .then((ficha) => {
+                    if (!ficha || !ficha.cliente) {
+                      return resolve(null);
+                    }
+
+                    // Convertir formato de dbService a la estructura esperada
+                    const clienteDic = ficha.cliente;
+
+                    clienteDic.recibos_anteriores = ficha.recibos || [];
+
+                    return resolve({ tipo: 'facturacion', datos: clienteDic });
+                  })
+                  .catch(() => resolve(null));
             }
 
 
@@ -329,9 +418,23 @@ function obtenerInformacionCliente(
           ) {
             db.close();
 
-            return resolve(
-              null
-            );
+              // Intentamos con el Diccionario de datos externo (NBO/dataset)
+              return getFichaCliente(idNormalizado)
+                .then((fichaNBO) => {
+                  if (!fichaNBO) {
+                    return resolve(null);
+                  }
+
+                  // Si encontramos perfil NBO en dbService, mapearlo
+                  if (fichaNBO.perfil || fichaNBO.campanias) {
+                    const perfil = fichaNBO.perfil || null;
+                    perfil.historial_campanias = fichaNBO.campanias || [];
+                    return resolve({ tipo: 'nbo', datos: perfil });
+                  }
+
+                  return resolve(null);
+                })
+                .catch(() => resolve(null));
           }
 
 
@@ -411,22 +514,93 @@ function extraerIdentificadorCliente(
   }
 
 
-  // Compatibilidad temporal
-  // con los DNI de demostración.
-  const matchDNI =
+  // También aceptar IDs numéricos largos
+  // que suelen corresponder a COD_CLIENTE.
+  const matchNumericId =
     mensajeTexto.match(
-      /\b\d{8}\b/
+      /\b\d{5,}\b/
     );
 
 
-  if (matchDNI) {
-    return matchDNI[0];
+  if (matchNumericId) {
+    return matchNumericId[0];
   }
 
 
   return null;
 }
 
+
+function construirRespuestaFallback(
+  mensajeTexto,
+  customerId,
+  resumenFacturacion,
+  contextoClientePorId = ''
+) {
+  const texto = (mensajeTexto || '').toLowerCase();
+  const resumen = (resumenFacturacion || '').trim();
+
+  if (customerId) {
+    const experience = getCustomerExperience(customerId);
+    if (experience) {
+      const { customer, currentBill, comparison } = experience;
+      if (/deuda|debo|pagar|saldo|venc|recibo|factur/i.test(texto)) {
+        let reply = `Hola ${customer.name || 'cliente'}. Aquí tienes el resumen de tu cuenta:\n`;
+        reply += `• Plan: ${customer.plan}\n`;
+        reply += `• Recibo actual (${currentBill.period}): S/ ${currentBill.total}\n`;
+        reply += `• Estado: ${currentBill.status}\n`;
+        if (currentBill.dueDate) reply += `• Vencimiento: ${currentBill.dueDate}\n`;
+        if (currentBill.items && currentBill.items.length > 0) {
+          reply += `• Detalle: ${currentBill.items.map(i => `${i.label} (S/ ${i.amount})`).join(', ')}\n`;
+        }
+        if (comparison && comparison.difference !== 0) {
+          reply += `• Variación respecto al mes anterior: S/ ${comparison.difference} (${comparison.direction === 'UP' ? 'aumento' : 'disminución'}).\n`;
+        }
+        return reply.trim();
+      }
+    }
+  }
+
+  if (resumen) {
+    const estado = resumen.split('\n').find((line) => line.includes('Estado de deuda:')) || '';
+    const monto = resumen.split('\n').find((line) => line.includes('Monto neto estimado:')) || '';
+    const vencimiento = resumen.split('\n').find((line) => line.includes('Fecha de vencimiento:')) || '';
+    const cargos = resumen
+      .split('\n')
+      .filter((line) => line.trim().startsWith('•') || line.trim().startsWith('  •'))
+      .slice(0, 3)
+      .map((line) => line.replace(/^\s*•\s*/, '').trim())
+      .filter(Boolean);
+
+    const partes = [];
+    partes.push('Según tus datos de facturación:');
+
+    if (estado)      partes.push(`- ${estado.replace('- ', '')}`);
+    if (monto)       partes.push(`- ${monto.replace('- ', '')}`);
+    if (vencimiento) partes.push(`- ${vencimiento.replace('- ', '')}`);
+    if (cargos.length > 0) partes.push(`- Cargos principales: ${cargos.join(' | ')}`);
+    if (customerId)  partes.push(`- Cliente: ${customerId}`);
+
+    return partes.join('\n');
+  }
+
+  if (/fibra|plan|planes|oferta|ofertas|internet/i.test(texto)) {
+    return `Nuestros planes de Fibra Óptica (Internet Hogar) en Movistar Perú incluyen:\n` +
+           `• Plan Internet Hogar 100Mb (Fibra): S/ 89.90 / mes\n` +
+           `• Plan Internet Hogar 200Mb (Fibra): S/ 109.90 / mes\n` +
+           `• Dúo Internet + TV Hogar (Fibra): S/ 129.90 / mes\n` +
+           `• Dúo Internet + Fijo Hogar (Fibra): S/ 119.90 / mes\n` +
+           `• Trío Internet + TV + Fijo (Fibra): S/ 159.90 / mes\n` +
+           `• Movistar Total Básico (Móvil 30GB + Fibra): S/ 149.90 / mes\n\n` +
+           `¿Te gustaría contratar o migrar a alguno de estos planes?`;
+  }
+
+  if (/hola|buen|saludos/i.test(texto)) {
+    return `¡Hola! Soy tu asistente virtual de Movistar Perú. ¿En qué puedo ayudarte hoy? Puedes preguntarme sobre tu recibo, estado de cuenta, planes de Fibra Óptica o soporte técnico.`;
+  }
+
+  return 'No pude completar la consulta con la IA en este momento, pero puedes consultarme sobre tu recibo o planes.';
+}
 
 // =========================================================
 // PERSONA 4
@@ -707,8 +881,13 @@ async function procesarConsultaFactura(
   mensajeTexto,
   sessionId
 ) {
+  let session = null;
+  let contextoClientePorId = '';
+  let resumenFacturacion = '';
+  let customerIdentifier = null;
+
   try {
-    const session =
+    session =
       getOrCreateSession(
         sessionId
       );
@@ -716,6 +895,13 @@ async function procesarConsultaFactura(
 
     const activeSessionId =
       session.sessionId;
+
+    const respuestaCatalogo = responderPreguntaCatalogo(mensajeTexto);
+    if (respuestaCatalogo) {
+      addMessage(activeSessionId, 'user', mensajeTexto);
+      addMessage(activeSessionId, 'assistant', respuestaCatalogo);
+      return { reply: respuestaCatalogo, foundData: false, sessionId: activeSessionId };
+    }
 
 
     // -------------------------------------------------------
@@ -727,28 +913,32 @@ async function procesarConsultaFactura(
         mensajeTexto
       );
 
-
-    if (
-      identificadorEncontrado
-    ) {
-      updateContext(
-        activeSessionId,
-        {
-          customerIdentifier:
-            identificadorEncontrado
+      // If the user explicitly provides an identifier (DNI/etc.) we
+      // require that the session is already associated with an authenticated
+      // customer. Do NOT allow anonymous users to claim arbitrary identifiers.
+      if (identificadorEncontrado) {
+        const session = getOrCreateSession(activeSessionId);
+        const sessionCustomer = session.context && session.context.customerIdentifier;
+        if (!sessionCustomer) {
+          // Ask to authenticate first.
+          return {
+            reply: 'Para ver información personal de un cliente debes iniciar sesión primero. Usa el botón "Iniciar sesión" e ingresa tu número celular y contraseña.',
+            foundData: false
+          };
         }
-      );
-    }
+      }
 
 
     // -------------------------------------------------------
     // 2. Cliente activo de la conversación.
     // -------------------------------------------------------
 
-    const idBuscar =
+    customerIdentifier =
       identificadorEncontrado ||
       session.context
         .customerIdentifier;
+
+    const idBuscar = customerIdentifier;
 
 
     // -------------------------------------------------------
@@ -764,6 +954,13 @@ async function procesarConsultaFactura(
 
     let contextoCliente = '';
 
+    contextoClientePorId = idBuscar
+      ? await buildCustomerDataContext(path.resolve(__dirname, '../data'), idBuscar)
+      : '';
+
+    resumenFacturacion = idBuscar
+      ? buildCustomerBillingSummary(path.resolve(__dirname, '../data'), idBuscar)
+      : '';
 
     if (contextoApp) {
       // El usuario proviene de la app
@@ -797,7 +994,9 @@ async function procesarConsultaFactura(
           contextoLegacy;
 
       } else {
-        contextoCliente = `
+        contextoCliente = contextoClientePorId
+          ? `DATOS CRUZADOS DEL CLIENTE EN ARCHIVOS DE DATA\n${contextoClientePorId}`
+          : `
 No hay información suficiente de un cliente activo para responder consultas personales de facturación.
 
 REGLAS:
@@ -938,10 +1137,28 @@ No agregues información nueva que no esté disponible.
 - Prioriza explicar primero la razón principal de la consulta.
 - No hagas respuestas excesivamente largas.
 
+9. FIBRA ÓPTICA Y PLANES HOGAR:
+- Todos los planes de "Internet Hogar" (OF005 100Mb, OF006 200Mb, OF008 Dúo, OF009, OF010 Trío, Movistar Total, etc.) corresponden al servicio de Fibra Óptica de Movistar Perú. Cuando el usuario pregunte por "fibra óptica" o "planes de internet", presenta estos planes claramente indicando sus características y precios en soles.
+
 
 --- CATÁLOGO DE OFERTAS OFICIAL ---
 
-${catalogoOfertasTexto || 'Catálogo no disponible.'}
+${(catalogoOfertasTexto || 'Catálogo no disponible.').slice(0, 1500)}
+
+
+--- CONTEXTO DE ARCHIVOS DE DATA ---
+
+${(dataContextTexto || 'No hay archivos de datos disponibles para leer.').slice(0, 1500)}
+
+
+--- DATOS CRUZADOS DEL CLIENTE ---
+
+${contextoClientePorId || 'No hay coincidencias específicas para este identificador.'}
+
+
+--- RESUMEN ESTRUCTURADO DE FACTURACIÓN ---
+
+${resumenFacturacion || 'No hay resumen estructurado disponible.'}
 
 
 --- CONTEXTO DEL CLIENTE ---
@@ -957,44 +1174,73 @@ ${contextoCliente}
     const historialConversacion =
       getHistory(
         activeSessionId
-      );
+      ).slice(-6);
 
 
     // -------------------------------------------------------
     // 7. Consulta al modelo.
     // -------------------------------------------------------
 
-    const completion =
-      await groq.chat.completions.create({
+    const client = getGroqClient();
+
+    // Allow forcing fallback mode via env to avoid hitting rate limits
+    const forceFallback = String(process.env.GROQ_FALLBACK_MODE || '').toLowerCase();
+    if (forceFallback === '1' || forceFallback === 'true') {
+      console.warn('GROQ_FALLBACK_MODE enabled — skipping external model and using local fallback.');
+      const respuestaSegura = construirRespuestaFallback(
+        mensajeTexto,
+        customerIdentifier,
+        resumenFacturacion,
+        contextoClientePorId
+      );
+
+      // store fallback messages
+      addMessage(activeSessionId, 'user', mensajeTexto);
+      addMessage(activeSessionId, 'assistant', respuestaSegura);
+
+      return { reply: respuestaSegura, foundData: Boolean(customerIdentifier) };
+    }
+
+    if (!client) {
+      throw new Error('GROQ_API_KEY missing');
+    }
+
+    // Allow configuring model, temperature and max_tokens via env to save quota
+    const modelName = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+    const temperature = Number(process.env.GROQ_TEMPERATURE || '0.1');
+    const maxTokens = Number(process.env.GROQ_MAX_TOKENS || '500');
+
+    let completion;
+    try {
+      completion = await client.chat.completions.create({
         messages: [
-          {
-            role:
-              'system',
-
-            content:
-              promptSistema
-          },
-
+          { role: 'system', content: promptSistema },
           ...historialConversacion,
-
-          {
-            role:
-              'user',
-
-            content:
-              mensajeTexto
-          }
+          { role: 'user', content: mensajeTexto }
         ],
-
-        model:
-          'llama-3.3-70b-versatile',
-
-        temperature:
-          0.1,
-
-        max_tokens:
-          500
+        model: modelName,
+        temperature,
+        max_tokens: maxTokens
       });
+    } catch (err) {
+      // If rate-limited, immediately return a safe fallback reply
+      console.error('RAG model error while creating completion:', err && err.message ? err.message : err);
+      const respuestaSegura = construirRespuestaFallback(
+        mensajeTexto,
+        customerIdentifier,
+        resumenFacturacion,
+        contextoClientePorId
+      );
+
+      try {
+        addMessage(activeSessionId, 'user', mensajeTexto);
+        addMessage(activeSessionId, 'assistant', respuestaSegura);
+      } catch (sessionError) {
+        console.error('Error guardando fallback tras error de modelo:', sessionError);
+      }
+
+      return { reply: respuestaSegura, foundData: Boolean(customerIdentifier) };
+    }
 
 
     const respuesta =
@@ -1032,8 +1278,34 @@ ${contextoCliente}
     );
 
 
-    const respuestaSegura =
-      'Hubo un inconveniente al procesar tu consulta. Por favor, intenta más tarde.';
+    const respuestaSegura = construirRespuestaFallback(
+      mensajeTexto,
+      customerIdentifier,
+      resumenFacturacion,
+      contextoClientePorId
+    );
+
+    try {
+      addMessage(
+        session?.sessionId || sessionId,
+        'user',
+        mensajeTexto
+      );
+
+      addMessage(
+        session?.sessionId || sessionId,
+        'assistant',
+        respuestaSegura
+      );
+    } catch (sessionError) {
+      console.error('Error guardando fallback:', sessionError);
+    }
+
+    return {
+      reply: respuestaSegura,
+      foundData: Boolean(customerIdentifier),
+      sessionId: session?.sessionId || sessionId
+    };
 
 
     // Intentamos conservar también el turno fallido
@@ -1074,5 +1346,6 @@ ${contextoCliente}
 
 
 module.exports = {
-  procesarConsultaFactura
+  procesarConsultaFactura,
+  construirRespuestaFallback
 };
