@@ -196,6 +196,19 @@ test(
       invoice.items[0].sourceRows,
       [20, 21]
     );
+
+    assert.equal(
+      invoice.items[0].components.length,
+      2
+    );
+
+    assert.deepEqual(
+      invoice.items[0].components.map(
+        (component) =>
+          component.amount
+      ),
+      [5, 7]
+    );
   }
 );
 

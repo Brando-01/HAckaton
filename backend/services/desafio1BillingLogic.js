@@ -274,7 +274,8 @@ function aggregateInvoice({
         groups: [],
         subgroups: [],
         subscriberKeys: [],
-        sourceRows: []
+        sourceRows: [],
+        components: []
       });
     }
 
@@ -308,6 +309,55 @@ function aggregateInvoice({
     item.subscriberKeys.push(
       charge.subscriberKey
     );
+
+    item.components.push({
+      amount:
+        roundMoney(
+          charge.chargeTotalAmount
+        ),
+
+      netAmount:
+        roundMoney(
+          charge.chargeNetAmount
+        ),
+
+      description:
+        charge.description ||
+        null,
+
+      classification:
+        charge.classification ||
+        null,
+
+      group:
+        charge.group ||
+        null,
+
+      subgroup:
+        charge.subgroup ||
+        null,
+
+      subscriberKey:
+        charge.subscriberKey ||
+        null,
+
+      periodStartDate:
+        charge.periodStartDate ||
+        null,
+
+      periodEndDate:
+        charge.periodEndDate ||
+        null,
+
+      sourceRow:
+        Number.isInteger(
+          Number(charge.sourceRow)
+        )
+          ? Number(
+              charge.sourceRow
+            )
+          : null
+    });
 
     if (
       Number.isInteger(
@@ -415,6 +465,21 @@ function aggregateInvoice({
               .map(Number)
               .sort(
                 (a, b) => a - b
+              ),
+
+          components:
+            item.components
+              .slice()
+              .sort(
+                (a, b) =>
+                  (
+                    Number(a.sourceRow) ||
+                    0
+                  ) -
+                  (
+                    Number(b.sourceRow) ||
+                    0
+                  )
               ),
 
           ignoreForExplanation:
