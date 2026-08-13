@@ -21,3 +21,25 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Dataset oficial del Desafío 1 (confidencial / solo local)
+/backend/data/oficial/*
+!/backend/data/oficial/README.md
+/backend/data/desafio1.db*
+
+# Nombres de archivos entregados por Movistar: evitar commits accidentales
+PLANTA CLIENTES.csv
+FACTURACION-CLIENTES_.csv
+REGISTROS_CLIENTES_20MIL.csv
+Cargos_FacturadosV2.csv
+Ordenes.csv
+Ordenes(1).csv
+CATALOGO-OFERTAS.csv
+BRAINY_DESCUENTOS_CUOTAS.csv
+BRAINY_PRORRATEO_ALTASV3.csv
+BRAINY_RECONEXIONESV3.csv
+NOTAS_CREDITO.csv
+Diccionario de datos*.xlsx
+Alta y porta.mp4
+Explicación de recibo.mp4
+Planta.mp4
