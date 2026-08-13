@@ -202,10 +202,35 @@ function getAvailableCustomers() {
 }
 
 
+// DNI o CUSTOMER_KEY: solo dígitos.
+const PATRON_ID_REAL =
+  /^\d{6,15}$/;
+
+
+// Acepta los clientes del catálogo
+// mock y los identificadores con forma
+// de cliente real.
+//
+// OJO: para los identificadores reales
+// esto valida FORMATO, no existencia.
+// La verificación contra el dataset
+// queda pendiente hasta que exista el
+// índice de clientes.
 function customerExists(
   customerId
 ) {
-  return Boolean(customerId);
+  if (!customerId) {
+    return false;
+  }
+
+  const id =
+    String(customerId).trim();
+
+  if (customers.has(id)) {
+    return true;
+  }
+
+  return PATRON_ID_REAL.test(id);
 }
 
 
