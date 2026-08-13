@@ -15,7 +15,9 @@
     "demo:configure:desafio1": "node scripts/configurarDemoDesafio1.js",
     "demo:profiles:desafio1": "node scripts/listarPerfilesDemoDesafio1.js",
     "demo:preflight:desafio1": "node scripts/verificarRelease1Desafio1.js",
-    "demo:smoke:desafio1": "node scripts/smokeRelease1Desafio1.js"
+    "demo:smoke:desafio1": "node scripts/smokeRelease1Desafio1.js",
+    "demo:coverage:desafio1": "node scripts/generarCoberturaDesafio1.js",
+    "demo:coverage:summary:desafio1": "node scripts/resumirCoberturaDesafio1.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

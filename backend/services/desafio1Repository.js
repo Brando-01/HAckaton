@@ -974,6 +974,102 @@ class Desafio1Repository {
       .filter(Boolean);
   }
 
+  async countCoverageSubscribers() {
+    const row = await this.get(
+      `
+        SELECT COUNT(DISTINCT subscriber_key) AS total
+        FROM d1_clientes
+        WHERE subscriber_key IS NOT NULL
+          AND TRIM(subscriber_key) <> ''
+      `
+    );
+
+    return Number(
+      row?.total || 0
+    );
+  }
+
+  async listCoverageSubscriberSeeds({
+    limit = null
+  } = {}) {
+    const parsedLimit =
+      Number.parseInt(
+        limit,
+        10
+      );
+
+    const safeLimit =
+      Number.isInteger(parsedLimit) &&
+      parsedLimit > 0
+        ? parsedLimit
+        : null;
+
+    const limitClause =
+      safeLimit
+        ? 'LIMIT ?'
+        : '';
+
+    const params =
+      safeLimit
+        ? [safeLimit]
+        : [];
+
+    return this.all(
+      `
+        WITH invoice_headers AS (
+          SELECT
+            subscriber_key,
+            legal_invoice_number,
+            billing_arrangement_key,
+            customer_key,
+            financial_account_key,
+            billing_cycle_date,
+            due_date
+          FROM d1_facturacion
+          WHERE subscriber_key IS NOT NULL
+            AND TRIM(subscriber_key) <> ''
+            AND legal_invoice_number IS NOT NULL
+          GROUP BY
+            subscriber_key,
+            legal_invoice_number,
+            billing_arrangement_key,
+            customer_key,
+            financial_account_key,
+            billing_cycle_date,
+            due_date
+        ),
+        invoice_counts AS (
+          SELECT
+            subscriber_key,
+            COUNT(*) AS invoice_count,
+            MAX(billing_cycle_date) AS latest_cycle_date
+          FROM invoice_headers
+          GROUP BY subscriber_key
+        )
+        SELECT
+          client.subscriber_key AS subscriberKey,
+          MIN(client.customer_key) AS customerKey,
+          MIN(client.lob_type) AS lobType,
+          MIN(client.business_type) AS businessType,
+          COALESCE(
+            invoice.invoice_count,
+            0
+          ) AS invoiceCount,
+          invoice.latest_cycle_date AS latestCycleDate
+        FROM d1_clientes client
+        LEFT JOIN invoice_counts invoice
+          ON invoice.subscriber_key =
+             client.subscriber_key
+        WHERE client.subscriber_key IS NOT NULL
+          AND TRIM(client.subscriber_key) <> ''
+        GROUP BY client.subscriber_key
+        ORDER BY client.subscriber_key ASC
+        ${limitClause}
+      `,
+      params
+    );
+  }
+
   async getImportMetadata() {
     return this.all(
       `
