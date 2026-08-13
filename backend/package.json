@@ -8,7 +8,8 @@
     "dev": "nodemon server.js",
     "test": "node --test",
     "data:import:desafio1": "node scripts/importarDatosDesafio1.js",
-    "data:validate:desafio1": "node scripts/validarDatosDesafio1.js"
+    "data:validate:desafio1": "node scripts/validarDatosDesafio1.js",
+    "billing:inspect:desafio1": "node scripts/inspeccionarFacturacionDesafio1.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
