@@ -241,6 +241,17 @@ function createApp() {
     }
   });
 
+  // Cuentas sembradas desde la data real, para no tener que adivinar con
+  // qué credenciales entrar durante la demo. No expone contraseñas de
+  // cuentas registradas por usuarios: solo las de demostración.
+  app.get('/api/auth/cuentas-demo', (req, res) => {
+    return res.json({
+      ok: true,
+      password: 'Demo1234!',
+      cuentas: authService.listarCuentasDemo()
+    });
+  });
+
   app.post('/api/auth/login', (req, res) => {
     const body     = req.body || {};
     const phone    = (body.phone || body.phoneNumber || req.query.phone || '').toString().trim();

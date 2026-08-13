@@ -17,7 +17,16 @@ const readline = require('readline');
 const { construirBloqueDeHechos } = require('./motorDiff');
 
 const ARCHIVO_CARGOS = 'Cargos_FacturadosV2.csv';
+const ARCHIVO_PLANTA = 'PLANTA CLIENTES.csv';
 const DELIMITADOR = ';';
+
+/** Códigos de `lob_type` traducidos a algo que el cliente entienda. */
+const SERVICIOS = {
+  TV: 'TV',
+  BB: 'Internet fijo',
+  WRLS: 'Móvil',
+  FIJA: 'Telefonía fija'
+};
 
 /** Columnas que necesita el motor. El resto se descarta al indexar. */
 const COLUMNAS = [
@@ -156,6 +165,8 @@ function obtenerIndice(dataDir) {
 
 /** Fuerza la reconstrucción del índice (tests y recargas en caliente). */
 function limpiarIndice(dataDir) {
+  plantaCache = null;
+
   if (dataDir === undefined) {
     indices.clear();
     return;
@@ -203,7 +214,125 @@ async function existeCliente(dataDir, identificador) {
  */
 async function obtenerHechosDeCliente(dataDir, identificador, opciones = {}) {
   const cargos = await obtenerCargosDeCliente(dataDir, identificador);
-  return construirBloqueDeHechos(cargos, { ...opciones, cliente: identificador });
+  const bloque = construirBloqueDeHechos(cargos, { ...opciones, cliente: identificador });
+
+  // Contexto del servicio contratado: no cambia ningún monto, pero permite
+  // responder "qué tengo contratado" y "desde cuándo" con datos reales.
+  if (bloque.encontrado) {
+    bloque.servicio = await obtenerFichaDeServicio(dataDir, identificador);
+  }
+
+  return bloque;
+}
+
+/**
+ * Ficha de servicio del cliente, desde PLANTA CLIENTES.
+ *
+ * Aporta el contexto que la explicación del recibo por sí sola no da: qué
+ * servicios tiene contratados y desde cuándo. Se lee una sola vez, igual que
+ * los cargos.
+ *
+ * Ojo: el dataset está anonimizado. Solo hay `telefono_hash`, así que de acá
+ * no sale ningún nombre ni teléfono, únicamente datos del servicio.
+ */
+let plantaCache = null;
+
+function construirPlanta(dataDir) {
+  const ruta = path.join(dataDir, ARCHIVO_PLANTA);
+
+  if (!fs.existsSync(ruta)) {
+    return Promise.resolve(new Map());
+  }
+
+  return new Promise((resolve, reject) => {
+    const porCliente = new Map();
+    let posiciones = null;
+
+    const lector = readline.createInterface({
+      input: fs.createReadStream(ruta, 'utf8'),
+      crlfDelay: Infinity
+    });
+
+    lector.on('line', (linea) => {
+      if (posiciones === null) {
+        const cabeceras = linea.replace(/^﻿/, '').split(DELIMITADOR).map((c) => c.trim());
+        posiciones = {
+          cliente: cabeceras.indexOf('COD_CLIENTE'),
+          servicio: cabeceras.indexOf('lob_type'),
+          negocio: cabeceras.indexOf('negocio'),
+          alta: cabeceras.indexOf('fecha_activacion_original')
+        };
+        return;
+      }
+
+      if (!linea.trim()) return;
+
+      const celdas = linea.split(DELIMITADOR);
+      const cliente = normalizarClave(celdas[posiciones.cliente]);
+      if (!cliente) return;
+
+      if (!porCliente.has(cliente)) {
+        porCliente.set(cliente, { servicios: new Set(), negocio: '', alta: '' });
+      }
+
+      const ficha = porCliente.get(cliente);
+      const servicio = normalizarClave(celdas[posiciones.servicio]);
+      if (servicio) {
+        ficha.servicios.add(SERVICIOS[servicio] || servicio);
+      }
+      if (!ficha.negocio) ficha.negocio = normalizarClave(celdas[posiciones.negocio]);
+      if (!ficha.alta) ficha.alta = normalizarClave(celdas[posiciones.alta]);
+    });
+
+    lector.on('error', reject);
+    lector.on('close', () => resolve(porCliente));
+  });
+}
+
+function obtenerPlanta(dataDir) {
+  if (!plantaCache) {
+    plantaCache = construirPlanta(dataDir).catch((error) => {
+      plantaCache = null;
+      throw error;
+    });
+  }
+  return plantaCache;
+}
+
+/** Antigüedad en meses a partir de `fecha_activacion_original` (D/M/YYYY). */
+function antiguedadEnMeses(fechaAlta) {
+  const partes = String(fechaAlta || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!partes) {
+    return null;
+  }
+  const alta = new Date(Number(partes[3]), Number(partes[2]) - 1, Number(partes[1]));
+  const meses = Math.floor((Date.now() - alta.getTime()) / (1000 * 60 * 60 * 24 * 30.44));
+  return meses > 0 ? meses : null;
+}
+
+async function obtenerFichaDeServicio(dataDir, identificador) {
+  const clave = normalizarClave(identificador);
+  if (!clave) {
+    return null;
+  }
+
+  try {
+    const planta = await obtenerPlanta(dataDir);
+    const ficha = planta.get(clave);
+    if (!ficha) {
+      return null;
+    }
+
+    return {
+      servicios: [...ficha.servicios],
+      negocio: ficha.negocio || null,
+      fechaAlta: ficha.alta || null,
+      antiguedadMeses: antiguedadEnMeses(ficha.alta)
+    };
+  } catch (error) {
+    console.error('No se pudo leer la planta de clientes:', error);
+    return null;
+  }
 }
 
 /** Identificadores con al menos `minimo` ciclos: útil para elegir demos. */
@@ -231,5 +360,7 @@ module.exports = {
   precargarIndice,
   limpiarIndice,
   listarClientesConHistorial,
-  ARCHIVO_CARGOS
+  obtenerFichaDeServicio,
+  ARCHIVO_CARGOS,
+  ARCHIVO_PLANTA
 };

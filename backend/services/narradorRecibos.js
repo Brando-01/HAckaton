@@ -117,7 +117,39 @@ function narrarBloqueDeHechos(bloque) {
     partes.push(`Tus últimos ${bloque.historial.length} recibos fueron — ${serie}.`);
   }
 
+  const servicio = describirServicio(bloque.servicio);
+  if (servicio) {
+    partes.push(servicio);
+  }
+
   return partes.join('\n\n');
+}
+
+/**
+ * Frase con el servicio contratado y la antigüedad.
+ *
+ * Sale de PLANTA CLIENTES, no del recibo: da contexto sin tocar ningún monto.
+ * Devuelve cadena vacía si no hay ficha, para no afirmar nada sin respaldo.
+ */
+function describirServicio(servicio) {
+  if (!servicio || !Array.isArray(servicio.servicios) || servicio.servicios.length === 0) {
+    return '';
+  }
+
+  const lista = servicio.servicios.length === 1
+    ? servicio.servicios[0]
+    : `${servicio.servicios.slice(0, -1).join(', ')} y ${servicio.servicios[servicio.servicios.length - 1]}`;
+
+  const partes = [`En tu cuenta tienes ${lista}`];
+
+  if (servicio.antiguedadMeses && servicio.antiguedadMeses >= 12) {
+    const anios = Math.floor(servicio.antiguedadMeses / 12);
+    partes.push(`, con nosotros desde hace ${anios} ${anios === 1 ? 'año' : 'años'}`);
+  } else if (servicio.antiguedadMeses) {
+    partes.push(`, activo desde hace ${servicio.antiguedadMeses} meses`);
+  }
+
+  return `${partes.join('')}.`;
 }
 
 /** `FECHA-VENCIMIENTO` viene como YYYYMMDD. */
@@ -175,6 +207,11 @@ function construirBloqueParaPrompt(bloque) {
     });
   } else if (bloque.reciboAnterior) {
     lineas.push('', 'No hubo variación respecto al recibo anterior: no expliques causas.');
+  }
+
+  const servicio = describirServicio(bloque.servicio);
+  if (servicio) {
+    lineas.push('', `Servicio contratado: ${servicio}`);
   }
 
   if (bloque.advertencias.length > 0) {
@@ -252,6 +289,7 @@ module.exports = {
   extraerMontos,
   blindarRespuesta,
   limpiarDescripcion,
+  describirServicio,
   soles,
   formatearVencimiento
 };

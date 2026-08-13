@@ -276,6 +276,28 @@ test('data real: un ciclo que el cliente no tuvo no se inventa', { skip: !HAY_DA
   assert.ok(hechos.ciclosDisponibles.includes('20260331'));
 });
 
+test('data real: adjunta la ficha de servicio del cliente', { skip: !HAY_DATA_REAL && 'falta backend/data/' }, async () => {
+  const { obtenerFichaDeServicio } = require('../services/cargosRepository');
+
+  // 130857463 figura en PLANTA CLIENTES como TV.
+  const ficha = await obtenerFichaDeServicio(DATA_DIR, '130857463');
+
+  assert.ok(ficha, 'el cliente debería estar en la planta');
+  assert.deepEqual(ficha.servicios, ['TV']);
+  assert.ok(ficha.antiguedadMeses > 0, 'debería calcular la antigüedad');
+
+  // Y viaja dentro del bloque de hechos.
+  const hechos = await obtenerHechosDeCliente(DATA_DIR, '130857463');
+  assert.deepEqual(hechos.servicio.servicios, ['TV']);
+});
+
+test('data real: un cliente fuera de la planta no inventa servicios', { skip: !HAY_DATA_REAL && 'falta backend/data/' }, async () => {
+  const { obtenerFichaDeServicio } = require('../services/cargosRepository');
+
+  assert.equal(await obtenerFichaDeServicio(DATA_DIR, 'NO_EXISTE'), null);
+  assert.equal(await obtenerFichaDeServicio(DATA_DIR, ''), null);
+});
+
 test('data real: INVARIANTE de cuadre sobre una muestra amplia de clientes', { skip: !HAY_DATA_REAL && 'falta backend/data/' }, async () => {
   const clientes = await require('../services/cargosRepository')
     .listarClientesConHistorial(DATA_DIR, 6, 300);

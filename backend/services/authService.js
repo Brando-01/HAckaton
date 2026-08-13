@@ -1,4 +1,6 @@
 const { randomUUID } = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
 // ─────────────────────────────────────────────────────────
 // In-memory store  (prototype — resets on each server restart)
@@ -7,13 +9,63 @@ const usersByPhone   = new Map(); // phone  -> user object
 const sessionsByToken = new Map(); // token  -> session object
 
 // ─────────────────────────────────────────────────────────
-// Seeded demo accounts  (9-digit Peruvian numbers)
-// Login = phone + password
+// Cuentas sembradas
+//
+// Las dos primeras son la demo scriptada (clientes mock CLI000001/2).
+// El resto sale de `data/cuentas-demo.json`, generado desde la data real
+// por `scripts/generarCuentasDemo.js`: son CUSTOMER_KEY que existen de
+// verdad en Cargos_FacturadosV2, así que ejercitan el motor de recibos.
+//
+// El dataset está anonimizado (solo hay telefono_hash), de modo que el
+// celular es una credencial de acceso, no el teléfono del cliente.
 // ─────────────────────────────────────────────────────────
-[
+const CUENTAS_MOCK = [
   { phone: '987654321', password: 'Demo1234!', customerId: 'CLI000001', name: 'Carlos Mendoza' },
-  { phone: '912345678', password: 'Demo1234!', customerId: 'CLI000002', name: 'Ana Torres'    },
-].forEach(u => usersByPhone.set(u.phone, u));
+  { phone: '912345678', password: 'Demo1234!', customerId: 'CLI000002', name: 'Ana Torres'    }
+];
+
+function cargarCuentasDelDataset() {
+  const ruta = path.join(__dirname, '..', 'data', 'cuentas-demo.json');
+
+  if (!fs.existsSync(ruta)) {
+    console.warn('⚠️ No hay data/cuentas-demo.json. Ejecuta: node scripts/generarCuentasDemo.js');
+    return [];
+  }
+
+  try {
+    const contenido = JSON.parse(fs.readFileSync(ruta, 'utf8'));
+    return (contenido.cuentas || []).map((cuenta) => ({
+      phone: cuenta.phone,
+      password: cuenta.password,
+      customerId: cuenta.customerId,
+      name: cuenta.name,
+      caso: cuenta.caso || null,
+      servicio: cuenta.servicio || null
+    }));
+  } catch (error) {
+    console.warn('⚠️ No se pudo leer cuentas-demo.json:', error.message);
+    return [];
+  }
+}
+
+const CUENTAS_DATASET = cargarCuentasDelDataset();
+
+[...CUENTAS_MOCK, ...CUENTAS_DATASET].forEach((u) => usersByPhone.set(u.phone, u));
+
+if (CUENTAS_DATASET.length > 0) {
+  console.log(`🔑 ${CUENTAS_DATASET.length} cuentas del dataset disponibles para iniciar sesión.`);
+}
+
+/** Cuentas sembradas, para mostrarlas en la pantalla de acceso de la demo. */
+function listarCuentasDemo() {
+  return CUENTAS_DATASET.map((cuenta) => ({
+    phone: cuenta.phone,
+    customerId: cuenta.customerId,
+    name: cuenta.name,
+    caso: cuenta.caso,
+    servicio: cuenta.servicio
+  }));
+}
 
 // ─────────────────────────────────────────────────────────
 // Helpers
@@ -101,4 +153,4 @@ function logout(token) {
   sessionsByToken.delete(token);
 }
 
-module.exports = { registerUser, loginUser, getSession, logout, validatePhone };
+module.exports = { registerUser, loginUser, getSession, logout, validatePhone, listarCuentasDemo };
