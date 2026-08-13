@@ -10,7 +10,8 @@
     "data:import:desafio1": "node scripts/importarDatosDesafio1.js",
     "data:validate:desafio1": "node scripts/validarDatosDesafio1.js",
     "billing:inspect:desafio1": "node scripts/inspeccionarFacturacionDesafio1.js",
-    "billing:explain:desafio1": "node scripts/explicarFacturacionDesafio1.js"
+    "billing:explain:desafio1": "node scripts/explicarFacturacionDesafio1.js",
+    "demo:rank:desafio1": "node scripts/seleccionarCasosDemoDesafio1.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

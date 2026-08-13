@@ -707,6 +707,273 @@ class Desafio1Repository {
     );
   }
 
+  async listDemoScenarioCandidateKeys(
+    scenarioCode,
+    {
+      limit = 300
+    } = {}
+  ) {
+    const scenario = String(
+      scenarioCode ?? ''
+    )
+      .trim()
+      .toUpperCase()
+      .replace(/[ -]+/g, '_');
+
+    const safeLimit =
+      Math.min(
+        Math.max(
+          Number.parseInt(
+            limit,
+            10
+          ) || 300,
+          1
+        ),
+        2000
+      );
+
+    const commonCte = `
+      WITH headers AS (
+        SELECT
+          subscriber_key,
+          legal_invoice_number,
+          billing_arrangement_key,
+          billing_cycle_date
+        FROM d1_facturacion
+        WHERE subscriber_key IS NOT NULL
+          AND billing_cycle_date IS NOT NULL
+        GROUP BY
+          subscriber_key,
+          legal_invoice_number,
+          billing_arrangement_key,
+          billing_cycle_date
+      ),
+      ranked AS (
+        SELECT
+          subscriber_key,
+          legal_invoice_number,
+          billing_arrangement_key,
+          billing_cycle_date,
+          ROW_NUMBER() OVER (
+            PARTITION BY subscriber_key
+            ORDER BY
+              billing_cycle_date DESC,
+              legal_invoice_number DESC
+          ) AS rn
+        FROM headers
+      ),
+      current_bill AS (
+        SELECT *
+        FROM ranked
+        WHERE rn = 1
+      ),
+      previous_bill AS (
+        SELECT *
+        FROM ranked
+        WHERE rn = 2
+      )
+    `;
+
+    let sql = null;
+
+    if (scenario === 'RECONNECTION') {
+      sql = `
+        ${commonCte}
+        SELECT DISTINCT
+          current_bill.subscriber_key AS subscriberKey
+        FROM current_bill
+        INNER JOIN previous_bill
+          ON previous_bill.subscriber_key =
+             current_bill.subscriber_key
+        INNER JOIN d1_reconexiones reconnection
+          ON reconnection.invoice_number =
+             current_bill.legal_invoice_number
+         AND reconnection.billing_arrangement =
+             current_bill.billing_arrangement_key
+        INNER JOIN d1_facturacion charge
+          ON charge.legal_invoice_number =
+             current_bill.legal_invoice_number
+         AND charge.billing_arrangement_key =
+             current_bill.billing_arrangement_key
+         AND charge.charge_code_id =
+             reconnection.code
+         AND charge.charge_total_amount > 0
+        ORDER BY
+          current_bill.billing_cycle_date DESC,
+          current_bill.subscriber_key ASC
+        LIMIT ?
+      `;
+    } else if (
+      scenario === 'DISCOUNT_ENDED'
+    ) {
+      sql = `
+        ${commonCte}
+        SELECT DISTINCT
+          current_bill.subscriber_key AS subscriberKey
+        FROM current_bill
+        INNER JOIN previous_bill
+          ON previous_bill.subscriber_key =
+             current_bill.subscriber_key
+        INNER JOIN d1_descuentos_cuotas discount
+          ON discount.billing_arrangement =
+             previous_bill.billing_arrangement_key
+         AND discount.billing_cycle_date =
+             previous_bill.billing_cycle_date
+        INNER JOIN d1_facturacion previous_charge
+          ON previous_charge.legal_invoice_number =
+             previous_bill.legal_invoice_number
+         AND previous_charge.billing_arrangement_key =
+             previous_bill.billing_arrangement_key
+         AND previous_charge.charge_total_amount < 0
+         AND ABS(
+               ABS(previous_charge.charge_total_amount) -
+               COALESCE(discount.discount_amount, 0)
+             ) < 0.011
+        LEFT JOIN d1_facturacion current_same_charge
+          ON current_same_charge.legal_invoice_number =
+             current_bill.legal_invoice_number
+         AND current_same_charge.billing_arrangement_key =
+             current_bill.billing_arrangement_key
+         AND current_same_charge.charge_code_id =
+             previous_charge.charge_code_id
+        WHERE current_same_charge.id IS NULL
+          AND (
+            (
+              discount.current_installment IS NOT NULL
+              AND discount.promotion_duration IS NOT NULL
+              AND discount.promotion_duration > 0
+              AND discount.current_installment >=
+                  discount.promotion_duration
+            )
+            OR (
+              discount.end_date IS NOT NULL
+              AND DATE(discount.end_date) <=
+                  DATE(current_bill.billing_cycle_date)
+            )
+          )
+        ORDER BY
+          current_bill.billing_cycle_date DESC,
+          current_bill.subscriber_key ASC
+        LIMIT ?
+      `;
+    } else if (
+      scenario === 'PLAN_CHANGE'
+    ) {
+      sql = `
+        ${commonCte}
+        SELECT DISTINCT
+          current_bill.subscriber_key AS subscriberKey
+        FROM current_bill
+        INNER JOIN previous_bill
+          ON previous_bill.subscriber_key =
+             current_bill.subscriber_key
+        INNER JOIN d1_ordenes order_row
+          ON order_row.subscriber_key =
+             current_bill.subscriber_key
+        WHERE DATE(
+                COALESCE(
+                  order_row.completion_date,
+                  order_row.start_date
+                )
+              ) > DATE(previous_bill.billing_cycle_date)
+          AND DATE(
+                COALESCE(
+                  order_row.completion_date,
+                  order_row.start_date
+                )
+              ) <= DATE(current_bill.billing_cycle_date)
+          AND (
+            LOWER(COALESCE(order_row.reason_desc, ''))
+              LIKE '%cambio de plan%'
+            OR LOWER(COALESCE(order_row.reason_desc, ''))
+              LIKE '%hacia un plan menor%'
+            OR LOWER(COALESCE(order_row.reason_desc, ''))
+              LIKE '%hacia un plan mayor%'
+          )
+        ORDER BY
+          current_bill.billing_cycle_date DESC,
+          current_bill.subscriber_key ASC
+        LIMIT ?
+      `;
+    } else if (
+      scenario === 'PRORATION'
+    ) {
+      sql = `
+        ${commonCte}
+        SELECT DISTINCT
+          current_bill.subscriber_key AS subscriberKey
+        FROM current_bill
+        INNER JOIN d1_prorrateos proration
+          ON proration.invoice_number =
+             current_bill.legal_invoice_number
+         AND proration.billing_arrangement =
+             current_bill.billing_arrangement_key
+        INNER JOIN d1_facturacion proportional_charge
+          ON proportional_charge.legal_invoice_number =
+             current_bill.legal_invoice_number
+         AND proportional_charge.billing_arrangement_key =
+             current_bill.billing_arrangement_key
+        LEFT JOIN previous_bill
+          ON previous_bill.subscriber_key =
+             current_bill.subscriber_key
+        WHERE (
+            LOWER(
+              COALESCE(
+                proportional_charge.charge_group,
+                ''
+              )
+            ) LIKE '%proporcional%'
+            OR LOWER(
+              COALESCE(
+                proportional_charge.charge_subgroup,
+                ''
+              )
+            ) LIKE '%proporcional%'
+          )
+          AND ABS(
+                COALESCE(
+                  proportional_charge.charge_total_amount,
+                  0
+                ) -
+                COALESCE(
+                  proration.prorated_amount,
+                  0
+                )
+              ) < 0.011
+        ORDER BY
+          CASE
+            WHEN previous_bill.subscriber_key IS NULL
+              THEN 0
+            ELSE 1
+          END ASC,
+          current_bill.billing_cycle_date DESC,
+          current_bill.subscriber_key ASC
+        LIMIT ?
+      `;
+    } else {
+      const error = new Error(
+        `Escenario de preselección no soportado: ${scenarioCode}`
+      );
+      error.code =
+        'DEMO_SCENARIO_INVALID';
+      throw error;
+    }
+
+    const rows = await this.all(
+      sql,
+      [safeLimit]
+    );
+
+    return rows
+      .map(
+        (row) =>
+          normalizeKey(
+            row.subscriberKey
+          )
+      )
+      .filter(Boolean);
+  }
+
   async getImportMetadata() {
     return this.all(
       `
