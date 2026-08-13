@@ -5,6 +5,12 @@ const {
   timingSafeEqual
 } = require('crypto');
 
+const {
+  getDemoProfileDefinitions
+} = require(
+  '../config/demoProfiles'
+);
+
 const SESSION_TTL_MS =
   8 * 60 * 60 * 1000;
 
@@ -30,26 +36,20 @@ function createPasswordRecord(
   };
 }
 
-const users = [
-  {
-    userId: 'USR000001',
-    customerId: 'CLI000001',
-    name: 'Carlos Mendoza',
-    email: 'carlos.demo@movistar.pe',
-    ...createPasswordRecord(
-      DEMO_PASSWORD
-    )
-  },
-  {
-    userId: 'USR000002',
-    customerId: 'CLI000002',
-    name: 'Ana Torres',
-    email: 'ana.demo@movistar.pe',
-    ...createPasswordRecord(
-      DEMO_PASSWORD
-    )
-  }
-];
+const users =
+  getDemoProfileDefinitions()
+    .map(
+      (profile) => ({
+        ...profile,
+        email:
+          normalizeEmail(
+            profile.email
+          ),
+        ...createPasswordRecord(
+          DEMO_PASSWORD
+        )
+      })
+    );
 
 const authSessions = new Map();
 
@@ -133,8 +133,13 @@ function getDemoProfiles() {
       userId: user.userId,
       customerId:
         user.customerId,
+      alias: user.alias,
       name: user.name,
-      email: user.email
+      email: user.email,
+      release1Pitch:
+        user.release1Pitch === true,
+      group:
+        user.group || 'EXTENDED'
     })
   );
 }

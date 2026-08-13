@@ -419,8 +419,23 @@ class Release1ReadinessService {
     const mappingStatus =
       this.mappingStatusProvider();
 
-    const demoProfiles =
+    const allDemoProfiles =
       this.demoProfilesProvider();
+
+    const explicitPitchProfiles =
+      allDemoProfiles.filter(
+        (profile) =>
+          profile.release1Pitch === true
+      );
+
+    // Fase 8 permite N perfiles demo, pero el preflight de R1 debe
+    // seguir validando únicamente los casos congelados para el pitch.
+    // Los tests/consumidores antiguos que no conocen release1Pitch
+    // mantienen el comportamiento previo usando todos los perfiles.
+    const demoProfiles =
+      explicitPitchProfiles.length > 0
+        ? explicitPitchProfiles
+        : allDemoProfiles;
 
     let lineage = [];
     let lineageError = null;
@@ -434,6 +449,16 @@ class Release1ReadinessService {
 
     const mappedProfiles =
       mappingStatus?.profiles || [];
+
+    const mappedReleaseProfiles =
+      demoProfiles.filter(
+        (profile) =>
+          mappedProfiles.some(
+            (mapping) =>
+              mapping.customerId ===
+                profile.customerId
+          )
+      );
 
     const profileResults = [];
 
@@ -597,10 +622,10 @@ class Release1ReadinessService {
         'LOCAL_MAPPING',
         'Mapeo demo local',
         mappingStatus?.configured &&
-          mappedProfiles.length ===
+          mappedReleaseProfiles.length ===
             expectedProfiles,
         mappingStatus?.configured
-          ? `${mappedProfiles.length}/${expectedProfiles} perfiles demo vinculados a casos oficiales locales.`
+          ? `${mappedReleaseProfiles.length}/${expectedProfiles} perfiles del pitch vinculados a casos oficiales locales (${mappedProfiles.length} perfiles demo disponibles en el mapeo).`
           : 'Falta configurar backend/data/demo-users.local.json.'
       ),
       buildCheck(
@@ -679,6 +704,10 @@ class Release1ReadinessService {
       summary: {
         expectedProfiles,
         readyProfiles,
+        availableDemoProfiles:
+          allDemoProfiles.length,
+        mappedDemoProfiles:
+          mappedProfiles.length,
         distinctScenarios:
           scenarios.length,
         scenarios,

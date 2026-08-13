@@ -2,15 +2,16 @@ const fs = require('fs');
 const path = require('path');
 
 const {
-  rankDemoCases
-} = require(
-  '../services/demoCaseSelectionService'
-);
-
-const {
   DEFAULT_DEMO_PROFILE_CONFIG_PATH
 } = require(
   '../services/demoProfileBindingService'
+);
+
+const {
+  getDemoProfileDefinitions,
+  getConfiguredScenarioRequirements
+} = require(
+  '../config/demoProfiles'
 );
 
 const DEFAULT_SELECTION_REPORT =
@@ -19,6 +20,9 @@ const DEFAULT_SELECTION_REPORT =
     '../data/demo-case-selection.local.json'
   );
 
+const ALL_PROFILE_DEFINITIONS =
+  getDemoProfileDefinitions();
+
 function parseArgs(argv) {
   const options = {
     selectionPath:
@@ -26,6 +30,8 @@ function parseArgs(argv) {
     outputPath:
       DEFAULT_DEMO_PROFILE_CONFIG_PATH,
     pool: 2000,
+    profileCount:
+      ALL_PROFILE_DEFINITIONS.length,
     forceRank: false
   };
 
@@ -74,6 +80,32 @@ function parseArgs(argv) {
       continue;
     }
 
+    if (arg === '--profiles') {
+      const requested =
+        Number.parseInt(
+          argv[index + 1],
+          10
+        );
+
+      if (
+        !Number.isInteger(
+          requested
+        ) ||
+        requested < 2 ||
+        requested >
+          ALL_PROFILE_DEFINITIONS.length
+      ) {
+        throw new Error(
+          `--profiles debe estar entre 2 y ${ALL_PROFILE_DEFINITIONS.length}.`
+        );
+      }
+
+      options.profileCount =
+        requested;
+      index += 1;
+      continue;
+    }
+
     if (arg === '--force-rank') {
       options.forceRank = true;
       continue;
@@ -97,19 +129,36 @@ function parseArgs(argv) {
 
 function printHelp() {
   console.log(`
-FASE 5 · Configuración local de Carlos y Ana
+FASE 8 · Configuración local de perfiles demo 2 -> N
 
 Uso:
   npm run demo:configure:desafio1
-  npm run demo:configure:desafio1 -- --force-rank
+  npm run demo:configure:desafio1 -- --profiles 4
+  npm run demo:configure:desafio1 -- --profiles 6 --force-rank
 
-Comportamiento:
-  Carlos (CLI000001) -> mejor caso RECONNECTION
-  Ana    (CLI000002) -> mejor caso PRORATION
+Perfiles versionados disponibles: ${ALL_PROFILE_DEFINITIONS.length}
+Por defecto se configuran todos. Los dos primeros siguen reservados para
+el pitch del Release 1; el resto amplía la cobertura funcional.
 
 Los subscriberKey quedan únicamente en backend/data/demo-users.local.json,
-archivo ignorado por Git. El código versionado conserva solo los alias demo.
+archivo ignorado por Git. El código versionado conserva solo identidades
+ficticias, escenario deseado y posición dentro del ranking.
 `);
+}
+
+function getRequestedDefinitions(
+  profileCount
+) {
+  return ALL_PROFILE_DEFINITIONS
+    .slice(
+      0,
+      profileCount
+    )
+    .map(
+      (profile) => ({
+        ...profile
+      })
+    );
 }
 
 function readSelectionReport(
@@ -133,21 +182,58 @@ function readSelectionReport(
   }
 }
 
-function hasUsableScenarios(
-  report
+function getEligibleCandidates(
+  report,
+  scenario
 ) {
-  return Boolean(
+  return (
     report?.scenarios
-      ?.RECONNECTION
-      ?.top?.[0] &&
-    report?.scenarios
-      ?.PRORATION
-      ?.top?.[0]
+      ?.[scenario]
+      ?.top || []
+  ).filter(
+    (item) =>
+      item?.eligible !== false &&
+      item?.subscriberKey !== null &&
+      item?.subscriberKey !== undefined
   );
 }
 
+function hasUsableScenarios(
+  report,
+  definitions
+) {
+  if (!report) {
+    return false;
+  }
+
+  const requirements =
+    getConfiguredScenarioRequirements(
+      definitions
+    );
+
+  for (
+    const [
+      scenario,
+      minimumCandidates
+    ] of requirements
+  ) {
+    if (
+      getEligibleCandidates(
+        report,
+        scenario
+      ).length <
+        minimumCandidates
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 async function resolveSelectionReport(
-  options
+  options,
+  definitions
 ) {
   if (!options.forceRank) {
     const existing =
@@ -157,7 +243,8 @@ async function resolveSelectionReport(
 
     if (
       hasUsableScenarios(
-        existing
+        existing,
+        definitions
       )
     ) {
       return {
@@ -168,19 +255,40 @@ async function resolveSelectionReport(
     }
   }
 
+  const requirements =
+    getConfiguredScenarioRequirements(
+      definitions
+    );
+
+  const scenarios =
+    Array.from(
+      requirements.keys()
+    );
+
+  const rankingLimit =
+    Math.max(
+      5,
+      ...requirements.values()
+    );
+
   console.log(
-    '🔎 El reporte local no contiene ambos escenarios; recalculando RECONNECTION y PRORATION...'
+    `🔎 El reporte local no cubre los ${scenarios.length} escenarios requeridos; recalculando ranking...`
+  );
+
+  // Carga diferida: consultar un reporte local o probar la lógica de
+  // configuración no debería exigir sqlite3 ni abrir la base oficial.
+  const {
+    rankDemoCases
+  } = require(
+    '../services/demoCaseSelectionService'
   );
 
   const report =
     await rankDemoCases({
-      scenarios: [
-        'RECONNECTION',
-        'PRORATION'
-      ],
+      scenarios,
       prefilterLimit:
         options.pool,
-      limit: 5
+      limit: rankingLimit
     });
 
   return {
@@ -189,21 +297,50 @@ async function resolveSelectionReport(
   };
 }
 
-function selectTopCandidate(
+function selectCandidate(
   report,
-  scenario
+  definition,
+  usedSubscriberKeys =
+    new Set()
 ) {
+  const candidates =
+    getEligibleCandidates(
+      report,
+      definition.scenario
+    );
+
+  const desiredIndex =
+    Math.max(
+      0,
+      Number.parseInt(
+        definition.selectionRank,
+        10
+      ) - 1 || 0
+    );
+
+  const orderedCandidates = [
+    ...candidates.slice(
+      desiredIndex
+    ),
+    ...candidates.slice(
+      0,
+      desiredIndex
+    )
+  ];
+
   const candidate =
-    report?.scenarios
-      ?.[scenario]
-      ?.top?.find(
-        (item) =>
-          item?.eligible !== false
-      );
+    orderedCandidates.find(
+      (item) =>
+        !usedSubscriberKeys.has(
+          String(
+            item.subscriberKey
+          )
+        )
+    );
 
   if (!candidate) {
     throw new Error(
-      `No se encontró un caso elegible para ${scenario}.`
+      `No se encontró un caso elegible y único para ${definition.name} (${definition.scenario}, rank ${definition.selectionRank}).`
     );
   }
 
@@ -211,11 +348,12 @@ function selectTopCandidate(
 }
 
 function buildProfile(
-  customerId,
+  definition,
   candidate
 ) {
   return {
-    customerId,
+    customerId:
+      definition.customerId,
     subscriberKey:
       String(
         candidate.subscriberKey
@@ -233,6 +371,58 @@ function buildProfile(
   };
 }
 
+function buildDemoConfig({
+  report,
+  source,
+  definitions
+}) {
+  const usedSubscriberKeys =
+    new Set();
+
+  const profiles =
+    definitions.map(
+      (definition) => {
+        const candidate =
+          selectCandidate(
+            report,
+            definition,
+            usedSubscriberKeys
+          );
+
+        usedSubscriberKeys.add(
+          String(
+            candidate.subscriberKey
+          )
+        );
+
+        return buildProfile(
+          definition,
+          candidate
+        );
+      }
+    );
+
+  return {
+    schemaVersion:
+      'desafio1-demo-users-v2',
+    generatedAt:
+      new Date().toISOString(),
+    source,
+    sourceSelectionVersion:
+      report.selectionVersion ||
+      null,
+    sourceSelectionGeneratedAt:
+      report.generatedAt || null,
+    profiles,
+    dataLineage:
+      Array.isArray(
+        report.dataLineage
+      )
+        ? report.dataLineage
+        : []
+  };
+}
+
 async function main() {
   const options =
     parseArgs(
@@ -244,55 +434,26 @@ async function main() {
     return;
   }
 
+  const definitions =
+    getRequestedDefinitions(
+      options.profileCount
+    );
+
   const {
     report,
     source
   } =
     await resolveSelectionReport(
-      options
+      options,
+      definitions
     );
 
-  const carlos =
-    selectTopCandidate(
+  const config =
+    buildDemoConfig({
       report,
-      'RECONNECTION'
-    );
-
-  const ana =
-    selectTopCandidate(
-      report,
-      'PRORATION'
-    );
-
-  const config = {
-    schemaVersion:
-      'desafio1-demo-users-v1',
-    generatedAt:
-      new Date().toISOString(),
-    source:
       source,
-    sourceSelectionVersion:
-      report.selectionVersion ||
-      null,
-    sourceSelectionGeneratedAt:
-      report.generatedAt || null,
-    profiles: [
-      buildProfile(
-        'CLI000001',
-        carlos
-      ),
-      buildProfile(
-        'CLI000002',
-        ana
-      )
-    ],
-    dataLineage:
-      Array.isArray(
-        report.dataLineage
-      )
-        ? report.dataLineage
-        : []
-  };
+      definitions
+    });
 
   fs.mkdirSync(
     path.dirname(
@@ -314,17 +475,30 @@ async function main() {
   );
 
   console.log('\n===================================================');
-  console.log('  FASE 5 · PERFILES DEMO CONFIGURADOS');
+  console.log('  FASE 8 · PERFILES DEMO GENERALIZADOS');
   console.log('===================================================');
   console.log(
     `Fuente de selección: ${source}`
   );
   console.log(
-    `Carlos -> ${carlos.scenarioLabel} · score ${carlos.score}/100 · evidencia ${carlos.evidenceLevel}`
+    `Perfiles configurados: ${config.profiles.length}/${ALL_PROFILE_DEFINITIONS.length}`
   );
-  console.log(
-    `Ana    -> ${ana.scenarioLabel} · score ${ana.score}/100 · evidencia ${ana.evidenceLevel}`
+
+  definitions.forEach(
+    (definition, index) => {
+      const profile =
+        config.profiles[index];
+      const pitch =
+        definition.release1Pitch
+          ? ' · PITCH R1'
+          : '';
+
+      console.log(
+        `${definition.name.padEnd(16)} -> ${profile.scenarioLabel || profile.scenario} · score ${profile.score}/100 · evidencia ${profile.evidenceLevel}${pitch}`
+      );
+    }
   );
+
   console.log(
     `\n💾 Mapeo local guardado en: ${options.outputPath}`
   );
@@ -333,9 +507,25 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  console.error(
-    `❌ ${error.message}`
-  );
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(
+      `❌ ${error.message}`
+    );
+    process.exitCode = 1;
+  });
+}
+
+module.exports = {
+  ALL_PROFILE_DEFINITIONS,
+  parseArgs,
+  getRequestedDefinitions,
+  readSelectionReport,
+  getEligibleCandidates,
+  hasUsableScenarios,
+  resolveSelectionReport,
+  selectCandidate,
+  buildProfile,
+  buildDemoConfig,
+  main
+};

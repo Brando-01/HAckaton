@@ -30,8 +30,7 @@ const {
 
 const {
   getCustomerExperience,
-  getAvailableCustomers,
-  customerExists
+  getAvailableCustomers
 } = require('./services/appExperienceService');
 
 const {
@@ -285,6 +284,29 @@ function createApp(options = {}) {
   app.use(cors());
   app.use(express.json());
 
+  // Las respuestas API del prototipo pueden depender de una
+  // cookie de sesión, métricas en memoria o del perfil demo
+  // seleccionado. Evitamos que el navegador reutilice una
+  // respuesta 401/200 antigua después de cambiar de cuenta.
+  app.use(
+    '/api',
+    (req, res, next) => {
+      res.setHeader(
+        'Cache-Control',
+        'no-store, private, max-age=0'
+      );
+      res.setHeader(
+        'Pragma',
+        'no-cache'
+      );
+      res.setHeader(
+        'Expires',
+        '0'
+      );
+      next();
+    }
+  );
+
   const frontendPath = path.join(
     __dirname,
     '..',
@@ -380,9 +402,12 @@ function createApp(options = {}) {
       const mappingStatus =
         getDemoMappingStatus();
 
+      const demoProfiles =
+        getDemoProfiles();
+
       return res.json({
         profiles:
-          getDemoProfiles().map(
+          demoProfiles.map(
             (profile) => {
               const mapped =
                 mappingStatus.profiles
@@ -406,7 +431,11 @@ function createApp(options = {}) {
             }
           ),
         officialDataConfigured:
-          mappingStatus.configured
+          mappingStatus.configured,
+        configuredProfileCount:
+          mappingStatus.profileCount || 0,
+        availableProfileCount:
+          demoProfiles.length
       });
     }
   );
@@ -657,7 +686,7 @@ function createApp(options = {}) {
         });
       }
 
-      const activeSessionId =
+      let activeSessionId =
         sessionId ||
         `s_${randomUUID()}`;
 
@@ -675,13 +704,44 @@ function createApp(options = {}) {
         const requestAuth =
           getRequestAuth(req);
 
+        // La cookie autenticada es la autoridad de identidad.
+        // Si este sessionId conservaba contexto de otro cliente
+        // o de una autenticación que ya expiró, rotamos a una
+        // conversación nueva antes de procesar el mensaje. Así
+        // evitamos mezclar transcript, métricas o handoff entre
+        // identidades distintas.
+        const requestedSession =
+          getOrCreateSession(
+            activeSessionId
+          );
+
+        const previousCustomerId =
+          requestedSession.context
+            .customerIdentifier ||
+          null;
+
+        const authenticatedCustomerId =
+          requestAuth
+            ?.session
+            ?.user
+            ?.customerId ||
+          null;
+
+        if (
+          previousCustomerId &&
+          previousCustomerId !==
+            authenticatedCustomerId
+        ) {
+          activeSessionId =
+            `s_${randomUUID()}`;
+        }
+
         if (requestAuth) {
           updateContext(
             activeSessionId,
             {
               customerIdentifier:
-                requestAuth.session.user
-                  .customerId,
+                authenticatedCustomerId,
               identityLocked: true
             }
           );
@@ -1470,7 +1530,7 @@ function createApp(options = {}) {
 
   // En producción la identidad vendría de Mi Movistar.
   // En la demo solo una cookie autenticada puede asociar
-  // el alias Carlos/Ana a una conversación. Ya no se acepta
+  // el perfil demo autenticado a una conversación. Ya no se acepta
   // customerId libre enviado por un cliente sin autenticar.
   app.post(
     '/api/session/:sessionId/customer',
@@ -1508,9 +1568,17 @@ function createApp(options = {}) {
           });
       }
 
+      const knownDemoProfile =
+        getDemoProfiles()
+          .some(
+            (profile) =>
+              profile.customerId ===
+              customerId
+          );
+
       if (
         !customerId ||
-        !customerExists(customerId)
+        !knownDemoProfile
       ) {
         return res
           .status(400)
@@ -1520,20 +1588,53 @@ function createApp(options = {}) {
           });
       }
 
+      let targetSessionId =
+        req.params.sessionId;
+
+      const currentSession =
+        getOrCreateSession(
+          targetSessionId
+        );
+
+      const previousCustomerId =
+        currentSession.context
+          .customerIdentifier ||
+        null;
+
+      // Si el navegador cambia de perfil demo pero conserva el
+      // chatSessionId, no reutilizamos el transcript del cliente
+      // anterior. Entregamos un sessionId nuevo y el frontend lo
+      // adopta antes de enviar la siguiente consulta.
+      if (
+        previousCustomerId &&
+        previousCustomerId !==
+          customerId
+      ) {
+        targetSessionId =
+          `s_${randomUUID()}`;
+      }
+
       updateContext(
-        req.params.sessionId,
+        targetSessionId,
         {
           customerIdentifier:
             customerId,
-          identityLocked: true
+          identityLocked: true,
+          hasOfficialBillingContext:
+            false,
+          lastBillingIntent: null,
+          demoScenario: null
         }
       );
 
       return res.json({
         ok: true,
         sessionId:
-          req.params.sessionId,
-        customerId
+          targetSessionId,
+        customerId,
+        identitySessionRotated:
+          targetSessionId !==
+          req.params.sessionId
       });
     }
   );

@@ -165,6 +165,74 @@ async function demoLogin(
   return getCookie(response);
 }
 
+
+test(
+  'las respuestas API no se cachean entre cambios de sesión demo',
+  async () => {
+    clearAuthSessions();
+    const official =
+      createFakeOfficialService();
+    const server =
+      await startServer(official);
+    const { port } =
+      server.address();
+
+    try {
+      const anonymous =
+        await fetch(
+          `http://127.0.0.1:${port}/api/auth/me`
+        );
+
+      assert.equal(
+        anonymous.status,
+        401
+      );
+      assert.match(
+        anonymous.headers.get(
+          'cache-control'
+        ) || '',
+        /no-store/i
+      );
+
+      const cookie =
+        await demoLogin(
+          port,
+          'CLI000004'
+        );
+
+      const authenticated =
+        await fetch(
+          `http://127.0.0.1:${port}/api/auth/me`,
+          {
+            headers: {
+              Cookie: cookie
+            }
+          }
+        );
+
+      const data =
+        await authenticated.json();
+
+      assert.equal(
+        authenticated.status,
+        200
+      );
+      assert.equal(
+        data.user.customerId,
+        'CLI000004'
+      );
+      assert.match(
+        authenticated.headers.get(
+          'cache-control'
+        ) || '',
+        /no-store/i
+      );
+    } finally {
+      server.close();
+    }
+  }
+);
+
 test(
   'Lucía responde una definición general sin login ni datos oficiales',
   async () => {
@@ -532,6 +600,300 @@ test(
           'location'
         ),
         '/app'
+      );
+    } finally {
+      server.close();
+    }
+  }
+);
+
+test(
+  'si la autenticación desaparece el chat no reutiliza el cliente de una sesión anterior',
+  async () => {
+    clearAuthSessions();
+    const official =
+      createFakeOfficialService();
+    const server =
+      await startServer(official);
+    const { port } =
+      server.address();
+
+    try {
+      const cookie =
+        await demoLogin(
+          port,
+          'CLI000001'
+        );
+
+      const bindResponse =
+        await fetch(
+          `http://127.0.0.1:${port}/api/session/phase8-stale-auth/customer`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json',
+              Cookie: cookie
+            },
+            body: JSON.stringify({
+              customerId:
+                'CLI000001'
+            })
+          }
+        );
+
+      assert.equal(
+        bindResponse.status,
+        200
+      );
+
+      // Simula reinicio del backend o expiración de la
+      // sesión auth mientras el tab de Lucía sigue abierto.
+      clearAuthSessions();
+
+      const response =
+        await fetch(
+          `http://127.0.0.1:${port}/api/chat`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json',
+              Cookie: cookie
+            },
+            body: JSON.stringify({
+              message:
+                '¿Por qué subió mi recibo?',
+              sessionId:
+                'phase8-stale-auth'
+            })
+          }
+        );
+
+      const data =
+        await response.json();
+
+      assert.equal(
+        response.status,
+        200
+      );
+      assert.equal(
+        data.requiresAuth,
+        true
+      );
+      assert.equal(
+        data.foundData,
+        false
+      );
+      assert.notEqual(
+        data.sessionId,
+        'phase8-stale-auth'
+      );
+      assert.deepEqual(
+        official.calls,
+        []
+      );
+    } finally {
+      server.close();
+    }
+  }
+);
+
+test(
+  'cambiar de perfil autenticado rota el chatSessionId antes de asociar al nuevo cliente',
+  async () => {
+    clearAuthSessions();
+    const official =
+      createFakeOfficialService();
+    const server =
+      await startServer(official);
+    const { port } =
+      server.address();
+
+    try {
+      const carlosCookie =
+        await demoLogin(
+          port,
+          'CLI000001'
+        );
+
+      const firstBind =
+        await fetch(
+          `http://127.0.0.1:${port}/api/session/phase8-profile-switch/customer`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json',
+              Cookie: carlosCookie
+            },
+            body: JSON.stringify({
+              customerId:
+                'CLI000001'
+            })
+          }
+        );
+
+      assert.equal(
+        firstBind.status,
+        200
+      );
+
+      const anaCookie =
+        await demoLogin(
+          port,
+          'CLI000002'
+        );
+
+      const secondBind =
+        await fetch(
+          `http://127.0.0.1:${port}/api/session/phase8-profile-switch/customer`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json',
+              Cookie: anaCookie
+            },
+            body: JSON.stringify({
+              customerId:
+                'CLI000002'
+            })
+          }
+        );
+
+      const bindData =
+        await secondBind.json();
+
+      assert.equal(
+        secondBind.status,
+        200
+      );
+      assert.equal(
+        bindData.customerId,
+        'CLI000002'
+      );
+      assert.equal(
+        bindData.identitySessionRotated,
+        true
+      );
+      assert.notEqual(
+        bindData.sessionId,
+        'phase8-profile-switch'
+      );
+
+      const chatResponse =
+        await fetch(
+          `http://127.0.0.1:${port}/api/chat`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json',
+              Cookie: anaCookie
+            },
+            body: JSON.stringify({
+              message:
+                '¿Por qué subió mi recibo?',
+              sessionId:
+                bindData.sessionId
+            })
+          }
+        );
+
+      const chatData =
+        await chatResponse.json();
+
+      assert.equal(
+        chatData.source,
+        'DESAFIO1_DETERMINISTIC'
+      );
+      assert.deepEqual(
+        official.calls,
+        ['CLI000002']
+      );
+    } finally {
+      server.close();
+    }
+  }
+);
+
+test(
+  'un handoff sin autenticación no reutiliza la identidad personal que quedó en el chat',
+  async () => {
+    clearAuthSessions();
+    const official =
+      createFakeOfficialService();
+    const server =
+      await startServer(official);
+    const { port } =
+      server.address();
+
+    try {
+      const cookie =
+        await demoLogin(
+          port,
+          'CLI000001'
+        );
+
+      await fetch(
+        `http://127.0.0.1:${port}/api/session/phase8-stale-handoff/customer`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+            Cookie: cookie
+          },
+          body: JSON.stringify({
+            customerId:
+              'CLI000001'
+          })
+        }
+      );
+
+      clearAuthSessions();
+
+      const response =
+        await fetch(
+          `http://127.0.0.1:${port}/api/chat`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json',
+              Cookie: cookie
+            },
+            body: JSON.stringify({
+              message:
+                'Quiero hablar con un asesor',
+              sessionId:
+                'phase8-stale-handoff'
+            })
+          }
+        );
+
+      const data =
+        await response.json();
+
+      assert.equal(
+        response.status,
+        200
+      );
+      assert.ok(
+        data.handoff?.caseId
+      );
+      assert.equal(
+        data.foundData,
+        false
+      );
+      assert.notEqual(
+        data.sessionId,
+        'phase8-stale-handoff'
+      );
+      assert.deepEqual(
+        official.calls,
+        []
       );
     } finally {
       server.close();

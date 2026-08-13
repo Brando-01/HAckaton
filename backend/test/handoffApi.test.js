@@ -14,6 +14,10 @@ const {
 } = require('../services/handoffService');
 
 const {
+  getCustomerExperience
+} = require('../services/appExperienceService');
+
+const {
   resetSession,
   updateContext,
   addMessage
@@ -64,7 +68,19 @@ test(
       'Tu recibo actual es de S/ 125.'
     );
 
-    const app = createApp();
+    // Este test valida el contrato del handoff y no debe
+    // depender del dataset oficial local ni del mapping
+    // generado en cada maquina. Inyectamos la experiencia
+    // sintetica estable que este test siempre ha verificado.
+    const app = createApp({
+      officialDemoExperienceService: {
+        async getExperienceForUser(user) {
+          return getCustomerExperience(
+            user.customerId
+          );
+        }
+      }
+    });
 
     const server =
       app.listen(0);
@@ -93,6 +109,43 @@ test(
     const baseUrl =
       `http://127.0.0.1:${port}`;
 
+    // La cookie autenticada es la autoridad de identidad
+    // desde Fase 8; el contexto de sessionService por sí
+    // solo ya no representa una sesión Mi Movistar válida.
+    const loginResponse =
+      await fetch(
+        `${baseUrl}/api/auth/demo-login`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json'
+          },
+          body: JSON.stringify({
+            customerId:
+              'CLI000001'
+          })
+        }
+      );
+
+    assert.equal(
+      loginResponse.status,
+      200
+    );
+
+    const authCookie =
+      String(
+        loginResponse.headers.get(
+          'set-cookie'
+        ) || ''
+      )
+        .split(';')[0];
+
+    assert.match(
+      authCookie,
+      /^movistarAuth=/
+    );
+
     // 1. El cliente solicita asesor.
     const handoffResponse =
       await fetch(
@@ -102,7 +155,9 @@ test(
 
           headers: {
             'Content-Type':
-              'application/json'
+              'application/json',
+            Cookie:
+              authCookie
           },
 
           body: JSON.stringify({

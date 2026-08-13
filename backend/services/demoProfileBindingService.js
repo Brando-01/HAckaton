@@ -1,17 +1,44 @@
 const fs = require('fs');
 const path = require('path');
 
+const {
+  getDemoProfileDefinitions,
+  getRelease1PitchProfileIds
+} = require(
+  '../config/demoProfiles'
+);
+
 const DEFAULT_DEMO_PROFILE_CONFIG_PATH =
   path.resolve(
     __dirname,
     '../data/demo-users.local.json'
   );
 
-const EXPECTED_PROFILE_IDS =
+const SUPPORTED_SCHEMA_VERSIONS =
   new Set([
-    'CLI000001',
-    'CLI000002'
+    'desafio1-demo-users-v1',
+    'desafio1-demo-users-v2'
   ]);
+
+const SUPPORTED_PROFILE_IDS =
+  new Set(
+    getDemoProfileDefinitions()
+      .map(
+        (profile) =>
+          profile.customerId
+      )
+  );
+
+// Compatibilidad con código/tests previos que importaban este nombre.
+// Desde Fase 8 ya no significa "exactamente dos perfiles", sino todos
+// los perfiles demo versionados que la aplicación sabe autenticar.
+const EXPECTED_PROFILE_IDS =
+  SUPPORTED_PROFILE_IDS;
+
+const REQUIRED_PITCH_PROFILE_IDS =
+  new Set(
+    getRelease1PitchProfileIds()
+  );
 
 const ALLOWED_SCENARIOS =
   new Set([
@@ -69,8 +96,9 @@ function validateBindingConfig(
   }
 
   if (
-    rawConfig.schemaVersion !==
-      'desafio1-demo-users-v1'
+    !SUPPORTED_SCHEMA_VERSIONS.has(
+      rawConfig.schemaVersion
+    )
   ) {
     throw new DemoProfileBindingError(
       'DEMO_MAPPING_SCHEMA_INVALID',
@@ -113,7 +141,7 @@ function validateBindingConfig(
 
         if (
           !customerId ||
-          !EXPECTED_PROFILE_IDS.has(
+          !SUPPORTED_PROFILE_IDS.has(
             customerId
           )
         ) {
@@ -155,7 +183,7 @@ function validateBindingConfig(
         ) {
           throw new DemoProfileBindingError(
             'DEMO_MAPPING_SUBSCRIBER_DUPLICATED',
-            'Carlos y Ana no deben apuntar al mismo suscriptor oficial.'
+            'Dos perfiles demo no deben apuntar al mismo suscriptor oficial.'
           );
         }
 
@@ -191,17 +219,17 @@ function validateBindingConfig(
     );
 
   for (
-    const expectedId of
-      EXPECTED_PROFILE_IDS
+    const requiredId of
+      REQUIRED_PITCH_PROFILE_IDS
   ) {
     if (
       !profileIds.has(
-        expectedId
+        requiredId
       )
     ) {
       throw new DemoProfileBindingError(
         'DEMO_MAPPING_PROFILE_MISSING',
-        `Falta el perfil demo ${expectedId}.`
+        `Falta el perfil demo obligatorio ${requiredId}.`
       );
     }
   }
@@ -212,6 +240,10 @@ function validateBindingConfig(
     generatedAt:
       normalizeIdentifier(
         rawConfig.generatedAt
+      ),
+    source:
+      normalizeIdentifier(
+        rawConfig.source
       ),
     sourceSelectionVersion:
       normalizeIdentifier(
@@ -326,6 +358,9 @@ function getDemoProfileBinding(
 function getDemoMappingStatus(
   options = {}
 ) {
+  const availableProfileCount =
+    SUPPORTED_PROFILE_IDS.size;
+
   try {
     const config =
       loadDemoProfileConfig({
@@ -338,6 +373,9 @@ function getDemoMappingStatus(
         configured: false,
         code:
           'DEMO_MAPPING_NOT_CONFIGURED',
+        schemaVersion: null,
+        profileCount: 0,
+        availableProfileCount,
         profiles: []
       };
     }
@@ -345,8 +383,13 @@ function getDemoMappingStatus(
     return {
       configured: true,
       code: 'OK',
+      schemaVersion:
+        config.schemaVersion,
       generatedAt:
         config.generatedAt,
+      profileCount:
+        config.profiles.length,
+      availableProfileCount,
       profiles:
         config.profiles.map(
           (profile) => ({
@@ -372,6 +415,9 @@ function getDemoMappingStatus(
       error:
         error?.message ||
         String(error),
+      schemaVersion: null,
+      profileCount: 0,
+      availableProfileCount,
       profiles: []
     };
   }
@@ -379,7 +425,10 @@ function getDemoMappingStatus(
 
 module.exports = {
   DEFAULT_DEMO_PROFILE_CONFIG_PATH,
+  SUPPORTED_SCHEMA_VERSIONS,
+  SUPPORTED_PROFILE_IDS,
   EXPECTED_PROFILE_IDS,
+  REQUIRED_PITCH_PROFILE_IDS,
   ALLOWED_SCENARIOS,
   DemoProfileBindingError,
   validateBindingConfig,

@@ -333,3 +333,111 @@ test(
     }
   }
 );
+
+test(
+  'Fase 8 publica N perfiles demo y mantiene identificados los dos del pitch',
+  async () => {
+    clearAuthSessions();
+    const server =
+      await startServer();
+    const { port } =
+      server.address();
+
+    try {
+      const response =
+        await fetch(
+          `http://127.0.0.1:${port}/api/auth/demo-profiles`
+        );
+
+      assert.equal(
+        response.status,
+        200
+      );
+
+      const data =
+        await response.json();
+
+      assert.equal(
+        data.availableProfileCount,
+        6
+      );
+      assert.equal(
+        data.profiles.length,
+        6
+      );
+      assert.deepEqual(
+        data.profiles
+          .filter(
+            (profile) =>
+              profile.release1Pitch
+          )
+          .map(
+            (profile) =>
+              profile.customerId
+          ),
+        [
+          'CLI000001',
+          'CLI000002'
+        ]
+      );
+      assert.equal(
+        data.profiles[2].name,
+        'Luis Ramírez'
+      );
+    } finally {
+      server.close();
+    }
+  }
+);
+
+test(
+  'un perfil extendido puede iniciar sesión demo sin introducir contraseña',
+  async () => {
+    clearAuthSessions();
+    const server =
+      await startServer();
+    const { port } =
+      server.address();
+
+    try {
+      const response =
+        await fetch(
+          `http://127.0.0.1:${port}/api/auth/demo-login`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json'
+            },
+            body: JSON.stringify({
+              customerId:
+                'CLI000004'
+            })
+          }
+        );
+
+      assert.equal(
+        response.status,
+        200
+      );
+
+      const data =
+        await response.json();
+
+      assert.equal(
+        data.user.customerId,
+        'CLI000004'
+      );
+      assert.equal(
+        data.user.name,
+        'María López'
+      );
+      assert.equal(
+        data.user.mode,
+        'DEMO'
+      );
+    } finally {
+      server.close();
+    }
+  }
+);

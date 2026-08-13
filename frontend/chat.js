@@ -329,7 +329,7 @@
     sender
   ) {
     if (!chatMessages) {
-      return;
+      return null;
     }
 
     const div =
@@ -358,6 +358,38 @@
     );
 
     scrollToBottom();
+    return div;
+  }
+
+
+  function clearAuthSessionWarning() {
+    const warning =
+      document.getElementById(
+        'authSessionWarning'
+      );
+
+    if (warning) {
+      warning.remove();
+    }
+  }
+
+
+  function showAuthSessionWarning() {
+    clearAuthSessionWarning();
+
+    const warning =
+      appendMessage(
+        'Tu sesión de Mi Movistar ya no está activa. Puedes iniciar sesión nuevamente para continuar con tu información personal.',
+        'bot'
+      );
+
+    if (warning) {
+      warning.id =
+        'authSessionWarning';
+      warning.classList.add(
+        'auth-session-warning'
+      );
+    }
   }
 
 
@@ -915,6 +947,14 @@
 
 
     try {
+      // La cookie puede cambiar mientras esta pestaña permanece
+      // abierta (por ejemplo, al elegir otro perfil demo en otra
+      // vista). Revalidamos la identidad justo antes de enviar
+      // para mantener badge, sessionId y backend sincronizados.
+      await associateAuthenticatedCustomer(
+        currentSessionId
+      );
+
       const response =
         await fetch(
           '/api/chat',
@@ -1239,7 +1279,12 @@
     try {
       const authResponse =
         await fetch(
-          '/api/auth/me'
+          '/api/auth/me',
+          {
+            cache: 'no-store',
+            credentials:
+              'same-origin'
+          }
         );
 
       if (
@@ -1255,6 +1300,7 @@
           );
 
         if (authContextBadge) {
+          authContextBadge.textContent = '';
           authContextBadge.hidden = true;
         }
 
@@ -1295,9 +1341,27 @@
           }
         );
 
+      const associationData =
+        await response.json();
+
       if (!response.ok) {
         throw new Error(
+          associationData.error ||
           'No se pudo asociar el cliente autenticado al chat'
+        );
+      }
+
+      if (
+        associationData.sessionId &&
+        associationData.sessionId !==
+          currentSessionId
+      ) {
+        currentSessionId =
+          associationData.sessionId;
+
+        sessionStorage.setItem(
+          'chatSessionId',
+          currentSessionId
         );
       }
 
@@ -1305,6 +1369,11 @@
         'movistarDemoCustomerId',
         customerId
       );
+
+      // Si al cargar la página se mostró un aviso por una
+      // respuesta de autenticación antigua/transitoria, una
+      // validación exitosa debe retirarlo de inmediato.
+      clearAuthSessionWarning();
 
       const authContextBadge =
         document.getElementById(
@@ -1354,10 +1423,7 @@
       );
 
     if (!authenticatedCustomerId) {
-      appendMessage(
-        'Tu sesión de Mi Movistar ya no está activa. Puedes iniciar sesión nuevamente para continuar con tu información personal.',
-        'bot'
-      );
+      showAuthSessionWarning();
 
       history.replaceState(
         {},
@@ -1453,6 +1519,15 @@
   // =========================================================
   // INICIO
   // =========================================================
+
+  window.addEventListener(
+    'focus',
+    () => {
+      associateAuthenticatedCustomer(
+        currentSessionId
+      );
+    }
+  );
 
   document.addEventListener(
     'DOMContentLoaded',

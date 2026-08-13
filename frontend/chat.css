@@ -593,6 +593,10 @@ body {
     }
 }
 
+.auth-context-badge[hidden] {
+    display: none;
+}
+
 .auth-context-badge {
     display: inline-flex;
     align-items: center;

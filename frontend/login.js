@@ -179,7 +179,14 @@
 
           button.type = 'button';
           button.className =
-            'demo-profile-button';
+            `demo-profile-button ${profile.release1Pitch ? 'pitch' : 'extended'}`;
+
+          const nameRow =
+            document.createElement(
+              'span'
+            );
+          nameRow.className =
+            'demo-profile-name-row';
 
           const name =
             document.createElement(
@@ -188,29 +195,63 @@
           name.textContent =
             profile.name;
 
-          const id =
+          const badge =
+            document.createElement(
+              'em'
+            );
+          badge.className =
+            `demo-profile-badge ${profile.release1Pitch ? 'pitch' : 'extended'}`;
+          badge.textContent =
+            profile.release1Pitch
+              ? 'Pitch R1'
+              : 'Cobertura';
+
+          nameRow.appendChild(name);
+          nameRow.appendChild(badge);
+
+          const detail =
             document.createElement(
               'span'
             );
-          id.textContent =
+          const legacyPitchFallback =
+            data.officialDataConfigured ===
+              false &&
+            profile.release1Pitch === true;
+
+          detail.textContent =
             profile.demoScenarioLabel
               ? `Caso: ${profile.demoScenarioLabel}`
-              : profile.officialDataReady === false
-                ? 'Caso oficial local pendiente'
-                : profile.customerId;
+              : legacyPitchFallback
+                ? 'Caso sintético de respaldo'
+                : profile.officialDataReady === false
+                  ? 'Caso oficial local pendiente'
+                  : profile.customerId;
 
-          button.appendChild(name);
-          button.appendChild(id);
+          button.appendChild(nameRow);
+          button.appendChild(detail);
 
-          button.addEventListener(
-            'click',
-            () => {
-              demoLogin(
-                profile.customerId,
-                button
-              );
-            }
-          );
+          if (
+            profile.officialDataReady ===
+              false &&
+            !legacyPitchFallback
+          ) {
+            button.disabled = true;
+            button.classList.add(
+              'pending'
+            );
+            button.title =
+              'Ejecuta npm run demo:configure:desafio1 para vincular este perfil a datos oficiales.';
+          } else {
+            button.addEventListener(
+              'click',
+              () => {
+                demoLogin(
+                  profile.customerId,
+                  button
+                );
+              }
+            );
+          }
 
           demoProfiles.appendChild(
             button

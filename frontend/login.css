@@ -284,3 +284,47 @@ input {
     grid-template-columns: 1fr;
   }
 }
+
+/* Fase 8 · perfiles demo 2 -> N */
+.demo-profile-button.pitch {
+  border-color: #9ad8ee;
+  background: #f7fcfe;
+}
+
+.demo-profile-button.extended {
+  border-color: #d7dbe8;
+}
+
+.demo-profile-button.pending {
+  opacity: .58;
+  cursor: not-allowed;
+  background: #f7f8f9;
+}
+
+.demo-profile-name-row {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.demo-profile-badge {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+
+.demo-profile-badge.pitch {
+  background: #daf3fb;
+  color: #0077a8;
+}
+
+.demo-profile-badge.extended {
+  background: #efedf8;
+  color: #5b4d8a;
+}

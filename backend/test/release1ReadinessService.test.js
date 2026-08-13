@@ -687,3 +687,141 @@ test('cachea el preflight para no recalcular los dos casos en cada refresco del 
     2
   );
 });
+
+test(
+  'Fase 8 mantiene el preflight R1 congelado en Carlos y Ana aunque existan perfiles extendidos',
+  async () => {
+    const calls = [];
+
+    const profiles = [
+      {
+        customerId: 'CLI000001',
+        name: 'Carlos Mendoza',
+        release1Pitch: true
+      },
+      {
+        customerId: 'CLI000002',
+        name: 'Ana Torres',
+        release1Pitch: true
+      },
+      {
+        customerId: 'CLI000003',
+        name: 'Luis Ramírez',
+        release1Pitch: false
+      },
+      {
+        customerId: 'CLI000004',
+        name: 'María López',
+        release1Pitch: false
+      }
+    ];
+
+    const mappings = [
+      {
+        customerId: 'CLI000001',
+        scenario: 'RECONNECTION',
+        scenarioLabel: 'Reconexión',
+        evidenceLevel: 'HIGH',
+        rentType: 'RV'
+      },
+      {
+        customerId: 'CLI000002',
+        scenario: 'PRORATION',
+        scenarioLabel: 'Prorrateo',
+        evidenceLevel: 'HIGH',
+        rentType: 'RA'
+      },
+      {
+        customerId: 'CLI000003',
+        scenario: 'DISCOUNT_ENDED',
+        scenarioLabel: 'Fin de descuento',
+        evidenceLevel: 'HIGH',
+        rentType: 'RA'
+      },
+      {
+        customerId: 'CLI000004',
+        scenario: 'PLAN_CHANGE',
+        scenarioLabel: 'Cambio de plan',
+        evidenceLevel: 'HIGH',
+        rentType: 'RA'
+      }
+    ];
+
+    const experiences = {
+      CLI000001:
+        buildExperience(),
+      CLI000002:
+        buildExperience({
+          customerId: 'CLI000002',
+          name: 'Ana Torres',
+          scenario: 'PRORATION',
+          rentType: 'RA',
+          hasPreviousBill: false
+        })
+    };
+
+    const service =
+      createRelease1ReadinessService({
+        officialDemoExperienceService: {
+          async getExperienceForUser(
+            user
+          ) {
+            calls.push(
+              user.customerId
+            );
+            return experiences[
+              user.customerId
+            ];
+          }
+        },
+        mappingStatusProvider:
+          () => ({
+            configured: true,
+            code: 'OK',
+            profiles: mappings
+          }),
+        lineageProvider:
+          async () =>
+            buildConfig()
+              .dataLineage,
+        demoProfilesProvider:
+          () => profiles,
+        now: () =>
+          new Date(
+            '2026-08-13T02:00:00.000Z'
+          ),
+        cacheTtlMs: 0
+      });
+
+    const report =
+      await service.buildReport();
+
+    assert.equal(
+      report.ready,
+      true
+    );
+    assert.equal(
+      report.summary.expectedProfiles,
+      2
+    );
+    assert.equal(
+      report.summary.availableDemoProfiles,
+      4
+    );
+    assert.equal(
+      report.summary.mappedDemoProfiles,
+      4
+    );
+    assert.deepEqual(
+      calls,
+      [
+        'CLI000001',
+        'CLI000002'
+      ]
+    );
+    assert.equal(
+      report.profiles.length,
+      2
+    );
+  }
+);
