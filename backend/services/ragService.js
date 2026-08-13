@@ -21,6 +21,14 @@ const {
 const { getFichaCliente } = require('./dbService');
 const { buildDataContext, buildCustomerDataContext, buildCustomerBillingSummary } = require('./dataContextService');
 
+const { obtenerHechosDeCliente } = require('./cargosRepository');
+
+const {
+  narrarBloqueDeHechos,
+  construirBloqueParaPrompt,
+  blindarRespuesta
+} = require('./narradorRecibos');
+
 const {
   getOrCreateSession,
   addMessage,
@@ -531,6 +539,43 @@ function extraerIdentificadorCliente(
 }
 
 
+const MESES = {
+  enero: '01', febrero: '02', marzo: '03', abril: '04',
+  mayo: '05', junio: '06', julio: '07', agosto: '08',
+  septiembre: '09', setiembre: '09', octubre: '10',
+  noviembre: '11', diciembre: '12'
+};
+
+/**
+ * Resuelve a qué ciclo se refiere el cliente cuando nombra un mes.
+ *
+ * Devuelve `null` salvo que el mes exista de verdad en su historial: así
+ * "el recibo de marzo" apunta al ciclo real y nunca a uno inventado. Si el
+ * mes nombrado ya es el del recibo actual, tampoco hace falta recalcular.
+ */
+function resolverCicloPedido(mensajeTexto, bloque) {
+  if (!bloque || !bloque.encontrado || !Array.isArray(bloque.historial)) {
+    return null;
+  }
+
+  const texto = (mensajeTexto || '').toLowerCase();
+  const mesNombrado = Object.keys(MESES).find((mes) => texto.includes(mes));
+  if (!mesNombrado) {
+    return null;
+  }
+
+  const numeroMes = MESES[mesNombrado];
+  const coincidencia = bloque.historial.find(
+    (ciclo) => String(ciclo.ciclo).slice(4, 6) === numeroMes
+  );
+
+  if (!coincidencia || coincidencia.ciclo === bloque.reciboActual.ciclo) {
+    return null;
+  }
+
+  return coincidencia.ciclo;
+}
+
 function construirRespuestaFallback(
   mensajeTexto,
   customerId,
@@ -585,14 +630,16 @@ function construirRespuestaFallback(
   }
 
   if (/fibra|plan|planes|oferta|ofertas|internet/i.test(texto)) {
-    return `Nuestros planes de Fibra Óptica (Internet Hogar) en Movistar Perú incluyen:\n` +
-           `• Plan Internet Hogar 100Mb (Fibra): S/ 89.90 / mes\n` +
-           `• Plan Internet Hogar 200Mb (Fibra): S/ 109.90 / mes\n` +
-           `• Dúo Internet + TV Hogar (Fibra): S/ 129.90 / mes\n` +
-           `• Dúo Internet + Fijo Hogar (Fibra): S/ 119.90 / mes\n` +
-           `• Trío Internet + TV + Fijo (Fibra): S/ 159.90 / mes\n` +
-           `• Movistar Total Básico (Móvil 30GB + Fibra): S/ 149.90 / mes\n\n` +
-           `¿Te gustaría contratar o migrar a alguno de estos planes?`;
+    // Los precios salen del catálogo real. Antes estaban escritos a mano acá
+    // (S/ 89.90, S/ 109.90...) y no correspondían a ningún dataset: era
+    // exactamente la alucinación financiera que el reto penaliza, y saltaba
+    // justo cuando fallaba el modelo.
+    const desdeCatalogo = construirRespuestaCatalogoPlanes();
+    if (desdeCatalogo) {
+      return `${desdeCatalogo}\n\n¿Te gustaría contratar o migrar a alguno de estos planes?`;
+    }
+
+    return 'Ahora mismo no puedo consultar el catálogo de planes. Prefiero no darte precios que no pueda confirmar: puedo derivarte con un asesor para que te dé las tarifas vigentes.';
   }
 
   if (/hola|buen|saludos/i.test(texto)) {
@@ -600,6 +647,33 @@ function construirRespuestaFallback(
   }
 
   return 'No pude completar la consulta con la IA en este momento, pero puedes consultarme sobre tu recibo o planes.';
+}
+
+/**
+ * Respuesta a usar cuando el modelo no está disponible (sin API key, cuota
+ * agotada, GROQ_FALLBACK_MODE o cualquier excepción).
+ *
+ * Si hay bloque de hechos, narra ese bloque: montos reales del cliente, cero
+ * invención. Solo cae al fallback genérico cuando no hay cliente identificado,
+ * que es el único caso en que no hay nada que explicar.
+ */
+function construirRespuestaSinModelo(
+  bloqueDeHechos,
+  mensajeTexto,
+  customerId,
+  resumenFacturacion,
+  contextoClientePorId
+) {
+  if (bloqueDeHechos && bloqueDeHechos.encontrado) {
+    return narrarBloqueDeHechos(bloqueDeHechos);
+  }
+
+  return construirRespuestaFallback(
+    mensajeTexto,
+    customerId,
+    resumenFacturacion,
+    contextoClientePorId
+  );
 }
 
 // =========================================================
@@ -885,6 +959,7 @@ async function procesarConsultaFactura(
   let contextoClientePorId = '';
   let resumenFacturacion = '';
   let customerIdentifier = null;
+  let bloqueDeHechos = null;
 
   try {
     session =
@@ -923,7 +998,8 @@ async function procesarConsultaFactura(
           // Ask to authenticate first.
           return {
             reply: 'Para ver información personal de un cliente debes iniciar sesión primero. Usa el botón "Iniciar sesión" e ingresa tu número celular y contraseña.',
-            foundData: false
+            foundData: false,
+            sessionId: activeSessionId
           };
         }
       }
@@ -952,13 +1028,46 @@ async function procesarConsultaFactura(
       );
 
 
+    // -------------------------------------------------------
+    // 3.b Bloque de hechos del motor determinista.
+    //     Es la fuente de verdad de todo monto que salga en la
+    //     respuesta: el modelo lo narra, no lo recalcula.
+    // -------------------------------------------------------
+
+    if (idBuscar) {
+      try {
+        const rutaDatos = path.resolve(__dirname, '../data');
+        bloqueDeHechos = await obtenerHechosDeCliente(rutaDatos, idBuscar);
+
+        // Si el cliente nombró un mes ("¿por qué el recibo de marzo salió
+        // tan alto?"), se recalcula sobre ese ciclo. El mes se resuelve
+        // contra los ciclos que el cliente realmente tuvo, no se adivina.
+        const cicloPedido = resolverCicloPedido(mensajeTexto, bloqueDeHechos);
+        if (cicloPedido) {
+          bloqueDeHechos = await obtenerHechosDeCliente(rutaDatos, idBuscar, {
+            cicloObjetivo: cicloPedido
+          });
+        }
+      } catch (errorMotor) {
+        console.error('No se pudo construir el bloque de hechos:', errorMotor);
+        bloqueDeHechos = null;
+      }
+    }
+
+
     let contextoCliente = '';
 
-    contextoClientePorId = idBuscar
+    // Estos dos recorren TODOS los archivos de data/ (~139 MB) de forma
+    // síncrona y bloquean el event loop en cada mensaje. Cuando el motor ya
+    // resolvió el recibo son redundantes: solo se usan como red de seguridad
+    // para clientes que no están en Cargos_FacturadosV2.
+    const motorResolvio = Boolean(bloqueDeHechos && bloqueDeHechos.encontrado);
+
+    contextoClientePorId = idBuscar && !motorResolvio
       ? await buildCustomerDataContext(path.resolve(__dirname, '../data'), idBuscar)
       : '';
 
-    resumenFacturacion = idBuscar
+    resumenFacturacion = idBuscar && !motorResolvio
       ? buildCustomerBillingSummary(path.resolve(__dirname, '../data'), idBuscar)
       : '';
 
@@ -1141,6 +1250,20 @@ No agregues información nueva que no esté disponible.
 - Todos los planes de "Internet Hogar" (OF005 100Mb, OF006 200Mb, OF008 Dúo, OF009, OF010 Trío, Movistar Total, etc.) corresponden al servicio de Fibra Óptica de Movistar Perú. Cuando el usuario pregunte por "fibra óptica" o "planes de internet", presenta estos planes claramente indicando sus características y precios en soles.
 
 
+=========================================================
+BLOQUE DE HECHOS — FUENTE DE VERDAD DE TODO MONTO
+=========================================================
+
+Este bloque lo calculó el sistema de forma determinista a partir de los
+recibos reales del cliente. Tiene prioridad sobre cualquier otra sección.
+
+- NO recalcules, NO sumes, NO restes, NO estimes.
+- Si un monto no aparece acá, no existe: no lo escribas.
+- Si el bloque dice que no hubo variación, no expliques causas.
+
+${bloqueDeHechos ? construirBloqueParaPrompt(bloqueDeHechos) : 'No hay cliente identificado en esta conversación, así que no hay recibos que explicar.'}
+
+
 --- CATÁLOGO DE OFERTAS OFICIAL ---
 
 ${(catalogoOfertasTexto || 'Catálogo no disponible.').slice(0, 1500)}
@@ -1187,7 +1310,8 @@ ${contextoCliente}
     const forceFallback = String(process.env.GROQ_FALLBACK_MODE || '').toLowerCase();
     if (forceFallback === '1' || forceFallback === 'true') {
       console.warn('GROQ_FALLBACK_MODE enabled — skipping external model and using local fallback.');
-      const respuestaSegura = construirRespuestaFallback(
+      const respuestaSegura = construirRespuestaSinModelo(
+        bloqueDeHechos,
         mensajeTexto,
         customerIdentifier,
         resumenFacturacion,
@@ -1198,7 +1322,11 @@ ${contextoCliente}
       addMessage(activeSessionId, 'user', mensajeTexto);
       addMessage(activeSessionId, 'assistant', respuestaSegura);
 
-      return { reply: respuestaSegura, foundData: Boolean(customerIdentifier) };
+      return {
+        reply: respuestaSegura,
+        foundData: Boolean(customerIdentifier),
+        sessionId: activeSessionId
+      };
     }
 
     if (!client) {
@@ -1225,7 +1353,8 @@ ${contextoCliente}
     } catch (err) {
       // If rate-limited, immediately return a safe fallback reply
       console.error('RAG model error while creating completion:', err && err.message ? err.message : err);
-      const respuestaSegura = construirRespuestaFallback(
+      const respuestaSegura = construirRespuestaSinModelo(
+        bloqueDeHechos,
         mensajeTexto,
         customerIdentifier,
         resumenFacturacion,
@@ -1239,11 +1368,15 @@ ${contextoCliente}
         console.error('Error guardando fallback tras error de modelo:', sessionError);
       }
 
-      return { reply: respuestaSegura, foundData: Boolean(customerIdentifier) };
+      return {
+        reply: respuestaSegura,
+        foundData: Boolean(customerIdentifier),
+        sessionId: activeSessionId
+      };
     }
 
 
-    const respuesta =
+    const respuestaModelo =
       completion
         .choices[0]
         ?.message
@@ -1252,7 +1385,24 @@ ${contextoCliente}
 
 
     // -------------------------------------------------------
-    // 8. Guardar conversación.
+    // 8. Blindaje anti-alucinación.
+    //    Todo monto de la respuesta tiene que existir en el
+    //    bloque de hechos; si no, se descarta lo que dijo el
+    //    modelo y se usa la narración determinista.
+    // -------------------------------------------------------
+
+    let respuesta = respuestaModelo;
+
+    if (bloqueDeHechos && bloqueDeHechos.encontrado) {
+      const blindaje = blindarRespuesta(respuestaModelo, bloqueDeHechos, {
+        sessionId: activeSessionId
+      });
+      respuesta = blindaje.texto;
+    }
+
+
+    // -------------------------------------------------------
+    // 9. Guardar conversación.
     // -------------------------------------------------------
 
     addMessage(
@@ -1269,7 +1419,13 @@ ${contextoCliente}
     );
 
 
-    return respuesta;
+    // Mismo contrato que los caminos de fallback: antes el camino feliz
+    // devolvía un string suelto y se perdían foundData y sessionId.
+    return {
+      reply: respuesta,
+      foundData: Boolean(bloqueDeHechos && bloqueDeHechos.encontrado),
+      sessionId: activeSessionId
+    };
 
   } catch (error) {
     console.error(
@@ -1278,7 +1434,8 @@ ${contextoCliente}
     );
 
 
-    const respuestaSegura = construirRespuestaFallback(
+    const respuestaSegura = construirRespuestaSinModelo(
+      bloqueDeHechos,
       mensajeTexto,
       customerIdentifier,
       resumenFacturacion,
@@ -1306,41 +1463,6 @@ ${contextoCliente}
       foundData: Boolean(customerIdentifier),
       sessionId: session?.sessionId || sessionId
     };
-
-
-    // Intentamos conservar también el turno fallido
-    // dentro del historial de la sesión.
-    try {
-      const session =
-        getOrCreateSession(
-          sessionId
-        );
-
-
-      addMessage(
-        session.sessionId,
-        'user',
-        mensajeTexto
-      );
-
-
-      addMessage(
-        session.sessionId,
-        'assistant',
-        respuestaSegura
-      );
-
-    } catch (
-      sessionError
-    ) {
-      console.error(
-        'Error guardando el turno fallido:',
-        sessionError
-      );
-    }
-
-
-    return respuestaSegura;
   }
 }
 
