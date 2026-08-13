@@ -1258,17 +1258,40 @@
 
       const customerId = data.user.customerId || null;
 
-      // Notify server about the association for metrics/context
+      // Asociar el cliente a la sesión de chat.
+      //
+      // Antes se ignoraba el resultado: si el servidor rechazaba la
+      // asociación, el usuario quedaba "logueado" pero sin cuenta activa, y
+      // el chat le seguía pidiendo iniciar sesión sin explicar por qué.
       if (customerId) {
         try {
-          await fetch(`/api/session/${encodeURIComponent(sessionId)}/customer`, {
+          const asociacion = await fetch(`/api/session/${encodeURIComponent(sessionId)}/customer`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             body: JSON.stringify({ customerId })
           });
+
+          if (!asociacion.ok) {
+            const detalle = await asociacion.json().catch(() => ({}));
+            console.warn('[CHAT] no se pudo asociar el cliente:', asociacion.status, detalle);
+
+            appendMessage(
+              detalle.error || 'No pude asociar tu cuenta a esta conversación. Puedo derivarte con un asesor.',
+              'bot'
+            );
+
+            sessionStorage.removeItem('movistarDemoCustomerId');
+            return null;
+          }
         } catch (e) {
           console.warn('[CHAT] error notifying session of customer:', e);
+          appendMessage(
+            'No pude conectar con el servidor para cargar tu cuenta. Revisa tu conexión e intenta de nuevo.',
+            'bot'
+          );
+          return null;
         }
+
         sessionStorage.setItem('movistarDemoCustomerId', customerId);
       }
 

@@ -208,7 +208,7 @@ function createApp() {
   // =========================================================
   // AUTH (minimal prototype)
   // =========================================================
-  app.post('/api/auth/register', (req, res) => {
+  app.post('/api/auth/register', async (req, res) => {
     const body = req.body || {};
     console.log('[API] /api/auth/register body=', body);
 
@@ -219,6 +219,17 @@ function createApp() {
     try {
       if (!phone)    return res.status(400).json({ error: 'Número de celular requerido' });
       if (!password) return res.status(400).json({ error: 'Contraseña requerida' });
+
+      // Si declara un documento, tiene que existir en la base de facturación.
+      // Antes se aceptaba cualquiera y el problema recién aparecía al intentar
+      // asociar el cliente: el usuario quedaba registrado y "logueado", pero
+      // sin cuenta que consultar, y el chat le pedía iniciar sesión otra vez.
+      if (dni && !(await customerExists(dni))) {
+        return res.status(400).json({
+          error: `El documento ${dni} no figura en nuestra base de facturación. Verifícalo, o regístrate sin documento y luego te ayudo a asociarlo.`,
+          code: 'CLIENTE_NO_ENCONTRADO'
+        });
+      }
 
       const user = authService.registerUser({ phone, password, dni });
       return res.status(201).json({ ok: true, user: { phone: user.phone, customerId: user.customerId } });
@@ -1005,15 +1016,25 @@ function createApp() {
           });
       }
 
-      if (
-        !customerId ||
-        !(await customerExists(customerId))
-      ) {
+      // Sin documento asociado la cuenta es válida, pero no hay recibos que
+      // mostrar: se dice explícitamente en vez de devolver "cliente inválido".
+      if (!customerId) {
         return res
-          .status(400)
+          .status(409)
           .json({
             error:
-              'Cliente inválido'
+              'Tu cuenta no tiene un documento asociado, así que todavía no puedo mostrarte recibos.',
+            code: 'SIN_CLIENTE_ASOCIADO'
+          });
+      }
+
+      if (!(await customerExists(customerId))) {
+        return res
+          .status(409)
+          .json({
+            error:
+              `El documento ${customerId} no figura en nuestra base de facturación, así que no puedo asociarlo a la conversación.`,
+            code: 'CLIENTE_NO_ENCONTRADO'
           });
       }
 

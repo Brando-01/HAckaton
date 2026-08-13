@@ -26,7 +26,7 @@ const { obtenerHechosDeCliente } = require('./cargosRepository');
 const {
   narrarBloqueDeHechos,
   construirBloqueParaPrompt,
-  blindarRespuesta
+  verificarMontos
 } = require('./narradorRecibos');
 
 const {
@@ -650,6 +650,71 @@ function construirRespuestaFallback(
 }
 
 /**
+ * Lista blanca de montos que la respuesta puede mencionar.
+ *
+ * Se arma con las tres únicas fuentes legítimas de cifras: el bloque de
+ * hechos del motor, la experiencia mock de la demo scriptada y los precios
+ * del catálogo. Cualquier otro número es una invención.
+ */
+function construirFuenteDeMontos(bloqueDeHechos, customerId) {
+  const fuentes = {};
+
+  if (bloqueDeHechos && bloqueDeHechos.encontrado) {
+    fuentes.bloque = bloqueDeHechos;
+  }
+
+  if (customerId) {
+    const experiencia = getCustomerExperience(customerId);
+    if (experiencia) {
+      fuentes.experiencia = experiencia;
+    }
+  }
+
+  // Precios de planes: el cliente puede preguntar por ellos en la misma
+  // conversación y son públicos.
+  fuentes.catalogo = (catalogoOfertas || []).map((oferta) => oferta.precio_mensual);
+
+  return fuentes;
+}
+
+/**
+ * Verifica la respuesta contra las fuentes legítimas y la reemplaza si
+ * menciona cifras que ninguna respalda.
+ *
+ * Antes esto solo corría cuando el motor encontraba datos. Para un cliente
+ * sin recibos en la base, el modelo quedaba libre de inventar montos: es lo
+ * que producía respuestas como "el recibo anterior fue de S/ 95" sobre una
+ * cuenta de la que no sabemos nada.
+ */
+function blindarConFuentes(respuesta, bloqueDeHechos, customerId, contexto = {}) {
+  if (!customerId) {
+    return respuesta;
+  }
+
+  const fuentes = construirFuenteDeMontos(bloqueDeHechos, customerId);
+  const verificacion = verificarMontos(respuesta, fuentes);
+
+  if (verificacion.valido) {
+    return respuesta;
+  }
+
+  console.warn(
+    '[ANTI-ALUCINACION] montos sin respaldo %j (cliente %s, sesión %s). Respuesta reemplazada.',
+    verificacion.inventados, customerId, contexto.sessionId || 'sin sesión'
+  );
+
+  if (bloqueDeHechos && bloqueDeHechos.encontrado) {
+    return narrarBloqueDeHechos(bloqueDeHechos);
+  }
+
+  return [
+    'No tengo a la mano el detalle de facturación de esta cuenta, y prefiero no darte cifras que no pueda confirmar.',
+    '',
+    'Puedo derivarte con un asesor para que lo revise contigo con los datos a la vista. ¿Te ayudo con eso?'
+  ].join('\n');
+}
+
+/**
  * Respuesta a usar cuando el modelo no está disponible (sin API key, cuota
  * agotada, GROQ_FALLBACK_MODE o cualquier excepción).
  *
@@ -988,16 +1053,32 @@ async function procesarConsultaFactura(
         mensajeTexto
       );
 
-      // If the user explicitly provides an identifier (DNI/etc.) we
-      // require that the session is already associated with an authenticated
-      // customer. Do NOT allow anonymous users to claim arbitrary identifiers.
+    const clienteDeLaSesion =
+      (session.context && session.context.customerIdentifier) || null;
+
+      // Un identificador escrito en el chat NUNCA otorga acceso.
+      //
+      // Antes bastaba con que la sesión tuviera algún cliente para que el
+      // número tecleado pasara a mandar sobre él: un usuario autenticado
+      // escribía "mi código es 115358834" y se le devolvían los recibos de
+      // esa otra persona. La identidad autenticada es la única válida.
       if (identificadorEncontrado) {
-        const session = getOrCreateSession(activeSessionId);
-        const sessionCustomer = session.context && session.context.customerIdentifier;
-        if (!sessionCustomer) {
-          // Ask to authenticate first.
+        if (!clienteDeLaSesion) {
           return {
             reply: 'Para ver información personal de un cliente debes iniciar sesión primero. Usa el botón "Iniciar sesión" e ingresa tu número celular y contraseña.',
+            foundData: false,
+            sessionId: activeSessionId
+          };
+        }
+
+        if (String(identificadorEncontrado) !== String(clienteDeLaSesion)) {
+          const aviso = 'Solo puedo mostrarte información de la cuenta con la que iniciaste sesión. Si necesitas consultar otra cuenta, inicia sesión con ella o te derivo con un asesor.';
+
+          addMessage(activeSessionId, 'user', mensajeTexto);
+          addMessage(activeSessionId, 'assistant', aviso);
+
+          return {
+            reply: aviso,
             foundData: false,
             sessionId: activeSessionId
           };
@@ -1007,12 +1088,10 @@ async function procesarConsultaFactura(
 
     // -------------------------------------------------------
     // 2. Cliente activo de la conversación.
+    //    Siempre el de la sesión autenticada.
     // -------------------------------------------------------
 
-    customerIdentifier =
-      identificadorEncontrado ||
-      session.context
-        .customerIdentifier;
+    customerIdentifier = clienteDeLaSesion;
 
     const idBuscar = customerIdentifier;
 
@@ -1391,14 +1470,12 @@ ${contextoCliente}
     //    modelo y se usa la narración determinista.
     // -------------------------------------------------------
 
-    let respuesta = respuestaModelo;
-
-    if (bloqueDeHechos && bloqueDeHechos.encontrado) {
-      const blindaje = blindarRespuesta(respuestaModelo, bloqueDeHechos, {
-        sessionId: activeSessionId
-      });
-      respuesta = blindaje.texto;
-    }
+    const respuesta = blindarConFuentes(
+      respuestaModelo,
+      bloqueDeHechos,
+      customerIdentifier,
+      { sessionId: activeSessionId }
+    );
 
 
     // -------------------------------------------------------
