@@ -11,6 +11,16 @@ const {
   './billingExplanationService'
 );
 
+const {
+  buildCustomerCauseDescription,
+  buildCustomerFindingDescription,
+  getImpactPresentation,
+  buildVerification,
+  buildCustomerFacing
+} = require(
+  './desafio1CustomerPresentation'
+);
+
 function clone(value) {
   return JSON.parse(
     JSON.stringify(value)
@@ -159,14 +169,24 @@ function transformCause(cause) {
       cause.title ||
       cause.code,
     description:
-      cause.explanation,
+      buildCustomerCauseDescription(
+        cause
+      ),
     impact:
       Number(
         cause.impactAmount
       ) || 0,
+    impactPresentation:
+      getImpactPresentation(
+        cause
+      ),
     evidenceLevel:
       cause.evidenceLevel ||
-      null
+      null,
+    verification:
+      buildVerification(
+        cause
+      )
   };
 }
 
@@ -181,15 +201,26 @@ function transformFinding(
       finding.title ||
       finding.code,
     description:
-      finding.explanation,
+      buildCustomerFindingDescription(
+        finding
+      ),
     impact:
       Number(
         finding.amount ??
-        finding.impactAmount
+        finding.impactAmount ??
+        finding.impactOnBill
       ) || 0,
+    impactPresentation:
+      getImpactPresentation(
+        finding
+      ),
     evidenceLevel:
       finding.evidenceLevel ||
       null,
+    verification:
+      buildVerification(
+        finding
+      ),
     finding: true
   };
 }
@@ -347,9 +378,11 @@ function buildOfficialDemoExperience({
             .rentContext || {}
         ),
       customerFacing:
-        clone(
-          explanation.customerFacing || {}
-        ),
+        buildCustomerFacing({
+          explanation,
+          causes,
+          findings
+        }),
       safeguards:
         clone(
           explanation.safeguards || {}

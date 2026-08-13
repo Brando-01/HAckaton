@@ -220,6 +220,30 @@ function normalizarContextoFacturacion(
                           cause.impact
                         )
                           ? cause.impact
+                          : null,
+                      impactPresentation:
+                        cause.impactPresentation ||
+                        'VARIATION',
+                      evidenceLevel:
+                        cause.evidenceLevel ||
+                        cause.verification
+                          ?.evidenceLevel ||
+                        null,
+                      verification:
+                        cause.verification
+                          ? {
+                              label:
+                                cause.verification.label ||
+                                null,
+                              sources:
+                                Array.isArray(
+                                  cause.verification.sources
+                                )
+                                  ? [
+                                      ...cause.verification.sources
+                                    ]
+                                  : []
+                            }
                           : null
                     })
                   )
@@ -249,7 +273,28 @@ function normalizarContextoFacturacion(
                   : null,
               evidenceLevel:
                 finding.evidenceLevel ||
-                null
+                finding.verification
+                  ?.evidenceLevel ||
+                null,
+              impactPresentation:
+                finding.impactPresentation ||
+                'INCLUDED_IN_TOTAL',
+              verification:
+                finding.verification
+                  ? {
+                      label:
+                        finding.verification.label ||
+                        null,
+                      sources:
+                        Array.isArray(
+                          finding.verification.sources
+                        )
+                          ? [
+                              ...finding.verification.sources
+                            ]
+                          : []
+                    }
+                  : null
             })
           )
         : []
@@ -298,7 +343,14 @@ function crearResumenAsesor({
           title: cause.title,
           detail:
             cause.description || null,
-          impact
+          impact,
+          impactPresentation:
+            cause.impactPresentation ||
+            'VARIATION',
+          evidenceLevel:
+            cause.evidenceLevel || null,
+          verification:
+            cause.verification || null
         });
       });
   }
@@ -323,7 +375,14 @@ function crearResumenAsesor({
               finding.impact
             )
               ? finding.impact
-              : null
+              : null,
+          impactPresentation:
+            finding.impactPresentation ||
+            'INCLUDED_IN_TOTAL',
+          evidenceLevel:
+            finding.evidenceLevel || null,
+          verification:
+            finding.verification || null
         });
       });
   }

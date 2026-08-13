@@ -237,13 +237,37 @@
         const causeImpact =
           Number(cause.impact) || 0;
 
+        let impactText =
+          causeImpact > 0
+            ? `+${formatMoney(causeImpact)}`
+            : formatMoney(causeImpact);
+
+        let impactClass =
+          'cause-impact';
+
+        if (
+          cause.impactPresentation ===
+            'INCLUDED_IN_TOTAL'
+        ) {
+          impactText =
+            `Incluido: ${formatMoney(Math.abs(causeImpact))}`;
+          impactClass +=
+            ' included-in-total';
+        } else if (
+          cause.impactPresentation ===
+            'APPLIED_TO_TOTAL'
+        ) {
+          impactText =
+            `Aplicado: ${formatMoney(causeImpact)}`;
+          impactClass +=
+            ' applied-to-total';
+        }
+
         const impact =
           createElement(
             'strong',
-            'cause-impact',
-            causeImpact > 0
-              ? `+${formatMoney(causeImpact)}`
-              : formatMoney(causeImpact)
+            impactClass,
+            impactText
           );
 
         card.appendChild(content);

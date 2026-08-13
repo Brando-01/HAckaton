@@ -32,7 +32,7 @@ function reconnectionExperience() {
           code:
             'RECONNECTION',
           description:
-            'Se agregó S/ 4.58 por reconexión.',
+            'Brainy Reconexiones confirma S/ 4.58 por reconexión.',
           impact: 4.58
         }
       ]
@@ -281,6 +281,14 @@ test(
     assert.match(
       result.reply,
       /reconexión/i
+    );
+    assert.doesNotMatch(
+      result.reply,
+      /Brainy/i
+    );
+    assert.doesNotMatch(
+      result.reply,
+      /fecha de emisión/i
     );
   }
 );

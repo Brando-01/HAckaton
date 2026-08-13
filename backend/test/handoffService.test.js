@@ -138,13 +138,32 @@ test('crea un caso con el contexto de la conversación', () => {
             code: 'DISCOUNT_ENDED',
             title: 'Finalizó tu descuento',
             description: 'El descuento terminó.',
-            impact: 20
+            impact: 20,
+            impactPresentation: 'VARIATION',
+            evidenceLevel: 'HIGH',
+            verification: {
+              label: 'Evidencia alta',
+              sources: [
+                'Facturación',
+                'Registro de promociones'
+              ]
+            }
           },
           {
             code: 'RECONNECTION',
             title: 'Cargo por reconexión',
             description: 'Se aplicó reconexión.',
-            impact: 10
+            impact: 10,
+            impactPresentation: 'VARIATION',
+            evidenceLevel: 'HIGH',
+            verification: {
+              label: 'Evidencia alta',
+              sources: [
+                'Facturación',
+                'Registro de reconexión',
+                'Órdenes del servicio'
+              ]
+            }
           }
         ]
       }
@@ -236,6 +255,25 @@ test('crea un caso con el contexto de la conversación', () => {
   assert.equal(
     caso.billing.comparison.causes.length,
     2
+  );
+  assert.equal(
+    caso.billing.comparison.causes[1]
+      .evidenceLevel,
+    'HIGH'
+  );
+  assert.deepEqual(
+    caso.billing.comparison.causes[1]
+      .verification.sources,
+    [
+      'Facturación',
+      'Registro de reconexión',
+      'Órdenes del servicio'
+    ]
+  );
+  assert.equal(
+    caso.advisorSummary.findings[1]
+      .evidenceLevel,
+    'HIGH'
   );
 
   assert.equal(
@@ -341,7 +379,16 @@ test('transfiere un prorrateo de primer recibo como hallazgo al asesor', () => {
           title: 'Prorrateo',
           description: 'El recibo incluye S/ 21.92 de prorrateo.',
           impact: 21.92,
-          evidenceLevel: 'HIGH'
+          impactPresentation:
+            'INCLUDED_IN_TOTAL',
+          evidenceLevel: 'HIGH',
+          verification: {
+            label: 'Evidencia alta',
+            sources: [
+              'Facturación',
+              'Registro de prorrateo'
+            ]
+          }
         }
       ]
     },
@@ -372,6 +419,24 @@ test('transfiere un prorrateo de primer recibo como hallazgo al asesor', () => {
   assert.equal(
     caso.billing.findings[0].code,
     'PRORATION'
+  );
+  assert.equal(
+    caso.billing.findings[0]
+      .impactPresentation,
+    'INCLUDED_IN_TOTAL'
+  );
+  assert.equal(
+    caso.advisorSummary.findings[0]
+      .impactPresentation,
+    'INCLUDED_IN_TOTAL'
+  );
+  assert.deepEqual(
+    caso.billing.findings[0]
+      .verification.sources,
+    [
+      'Facturación',
+      'Registro de prorrateo'
+    ]
   );
   assert.equal(
     caso.advisorSummary.headline,

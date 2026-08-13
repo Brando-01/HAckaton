@@ -103,6 +103,96 @@
     return `${sign}S/ ${Math.abs(value)}`;
   }
 
+
+  function formatearImpacto(item) {
+    if (!Number.isFinite(item?.impact)) {
+      return '—';
+    }
+
+    if (
+      item.impactPresentation ===
+        'INCLUDED_IN_TOTAL'
+    ) {
+      return (
+        `Incluido: ${formatearMonto(Math.abs(item.impact))}`
+      );
+    }
+
+    if (
+      item.impactPresentation ===
+        'APPLIED_TO_TOTAL'
+    ) {
+      return (
+        `Aplicado: ${formatearMonto(item.impact)}`
+      );
+    }
+
+    return formatearMonto(
+      item.impact,
+      { signed: true }
+    );
+  }
+
+  function crearVerificacion(item) {
+    const verification =
+      item?.verification;
+
+    const evidenceLevel =
+      item?.evidenceLevel ||
+      verification?.evidenceLevel ||
+      null;
+
+    if (!verification && !evidenceLevel) {
+      return null;
+    }
+
+    const row =
+      crearElemento(
+        'div',
+        'evidence-row'
+      );
+
+    const level =
+      String(evidenceLevel || '')
+        .toLowerCase();
+
+    row.appendChild(
+      crearElemento(
+        'span',
+        `evidence-badge ${level}`,
+        verification?.label ||
+          (
+            evidenceLevel === 'HIGH'
+              ? 'Evidencia alta'
+              : evidenceLevel === 'MEDIUM'
+                ? 'Evidencia media'
+                : evidenceLevel === 'LOW'
+                  ? 'Evidencia baja'
+                  : 'Evidencia disponible'
+          )
+      )
+    );
+
+    if (
+      Array.isArray(
+        verification?.sources
+      ) &&
+      verification.sources.length
+    ) {
+      row.appendChild(
+        crearElemento(
+          'span',
+          'evidence-sources',
+          verification.sources.join(
+            ' · '
+          )
+        )
+      );
+    }
+
+    return row;
+  }
+
   async function cargarCasos() {
     try {
       const response =
@@ -491,6 +581,17 @@
             );
           }
 
+          const verification =
+            crearVerificacion(
+              finding
+            );
+
+          if (verification) {
+            text.appendChild(
+              verification
+            );
+          }
+
           item.appendChild(text);
 
           if (
@@ -502,9 +603,8 @@
               crearElemento(
                 'strong',
                 'summary-impact',
-                formatearMonto(
-                  finding.impact,
-                  { signed: true }
+                formatearImpacto(
+                  finding
                 )
               )
             );
@@ -739,6 +839,17 @@
             );
           }
 
+          const verification =
+            crearVerificacion(
+              cause
+            );
+
+          if (verification) {
+            copy.appendChild(
+              verification
+            );
+          }
+
           item.appendChild(copy);
 
           if (
@@ -750,9 +861,8 @@
               crearElemento(
                 'strong',
                 'billing-cause-impact',
-                formatearMonto(
-                  cause.impact,
-                  { signed: true }
+                formatearImpacto(
+                  cause
                 )
               )
             );

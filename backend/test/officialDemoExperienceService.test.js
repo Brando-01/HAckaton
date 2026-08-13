@@ -150,7 +150,7 @@ function reconnectionExplanation() {
           label:
             'Cargo por reconexión',
           explanation:
-            'Se agregó S/ 4.58 por reconexión.',
+            'Se agregó S/ 4.58 por reconexión. Brainy Reconexiones confirma el monto.',
           impactAmount: 4.58,
           evidenceLevel: 'HIGH'
         }
@@ -171,9 +171,9 @@ function reconnectionExplanation() {
       headline:
         'Tu recibo aumentó S/ 4.58',
       summary:
-        'Se agregó S/ 4.58 por reconexión.',
+        'Brainy Reconexiones confirma S/ 4.58.',
       details: [
-        'Se agregó S/ 4.58 por reconexión.'
+        'Brainy Reconexiones confirma S/ 4.58.'
       ],
       limitations: [
         'El ciclo no se interpreta como fecha de emisión.'
@@ -219,8 +219,12 @@ function prorationExplanation() {
           label:
             'Prorrateo',
           explanation:
-            'El recibo incluye S/ 21.92 de prorrateo.',
+            'El recibo incluye S/ 21.92 de prorrateo. Brainy Prorrateo confirma el monto.',
           amount: 21.92,
+          periodStartDate:
+            '2026-06-09',
+          periodEndDate:
+            '2026-06-30',
           evidenceLevel: 'HIGH'
         }
       ],
@@ -239,7 +243,7 @@ function prorationExplanation() {
       headline:
         'Tu recibo incluye un prorrateo de S/ 21.92',
       summary:
-        'El recibo incluye S/ 21.92 de prorrateo.',
+        'Brainy Prorrateo confirma S/ 21.92.',
       details: [],
       limitations: []
     },
@@ -344,6 +348,10 @@ test(
       serialized,
       /SECRET_CUSTOMER_A/
     );
+    assert.doesNotMatch(
+      serialized,
+      /Brainy/i
+    );
   }
 );
 
@@ -420,6 +428,20 @@ test(
     assert.equal(
       experience.findings[0].code,
       'PRORATION'
+    );
+    assert.equal(
+      experience.findings[0]
+        .impactPresentation,
+      'INCLUDED_IN_TOTAL'
+    );
+    assert.match(
+      experience.findings[0]
+        .description,
+      /ya está incluido en el total/i
+    );
+    assert.doesNotMatch(
+      JSON.stringify(experience),
+      /Brainy/i
     );
   }
 );

@@ -218,6 +218,15 @@ body {
     font-size: 18px;
 }
 
+.cause-impact.included-in-total,
+.cause-impact.applied-to-total {
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: #eef8fd;
+    color: #087cae;
+    font-size: 13px;
+}
+
 .actions-grid {
     display: flex;
     flex-wrap: wrap;

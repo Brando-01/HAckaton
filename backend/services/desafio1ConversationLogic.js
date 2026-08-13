@@ -1,3 +1,9 @@
+const {
+  sanitizeInternalTerms
+} = require(
+  './desafio1CustomerPresentation'
+);
+
 function normalizeText(value) {
   return String(value ?? '')
     .normalize('NFD')
@@ -367,10 +373,19 @@ function buildVariationReply(
   const lines = [
     customerFacing.headline,
     customerFacing.summary
-  ].filter(Boolean);
+  ]
+    .map(sanitizeInternalTerms)
+    .filter(Boolean);
 
   const limitations =
-    customerFacing.limitations || [];
+    (customerFacing.limitations || [])
+      .filter(
+        (item) =>
+          !/ciclo.*fecha de emisi[oó]n/i.test(
+            String(item)
+          )
+      )
+      .map(sanitizeInternalTerms);
 
   if (limitations.length) {
     lines.push(
@@ -472,7 +487,9 @@ function buildProrationReply(
     );
   }
 
-  return item.description;
+  return sanitizeInternalTerms(
+    item.description
+  );
 }
 
 function buildDiscountReply(
@@ -485,7 +502,9 @@ function buildDiscountReply(
     );
 
   if (ended) {
-    return ended.description;
+    return sanitizeInternalTerms(
+      ended.description
+    );
   }
 
   const active =
@@ -495,7 +514,9 @@ function buildDiscountReply(
     );
 
   if (active) {
-    return active.description;
+    return sanitizeInternalTerms(
+      active.description
+    );
   }
 
   return (
@@ -535,7 +556,9 @@ function buildSummaryReply(
       ?.customerFacing;
 
   if (facing?.summary) {
-    return facing.summary;
+    return sanitizeInternalTerms(
+      facing.summary
+    );
   }
 
   return buildCurrentTotalReply(

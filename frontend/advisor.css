@@ -554,3 +554,41 @@ a {
     flex-direction: column;
   }
 }
+
+.evidence-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 5px;
+}
+
+.evidence-badge {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.evidence-badge.high {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.evidence-badge.medium {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.evidence-badge.low {
+  color: var(--red);
+  background: #fff1ed;
+}
+
+.evidence-sources {
+  color: var(--muted);
+  font-size: 11px;
+}
