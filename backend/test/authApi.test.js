@@ -19,7 +19,7 @@ test('permite registrar, iniciar sesión y obtener los datos del usuario autenti
   );
 
   const port = server.address().port;
-  const testPhone = '99988877';
+  const testPhone = '999888777';
   const testPassword = 'Password123!';
 
   // 1. Registro exitoso
@@ -69,7 +69,7 @@ test('permite registrar, iniciar sesión y obtener los datos del usuario autenti
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      phone: '98765432',
+      phone: '987654321',
       password: 'Demo1234!'
     })
   });
