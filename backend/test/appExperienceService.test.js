@@ -107,7 +107,7 @@ test(
 
 test(
   'rechaza cliente inexistente',
-  () => {
+  async () => {
     assert.equal(
       getCustomerExperience(
         'NO_EXISTE'
@@ -116,11 +116,29 @@ test(
     );
 
     assert.equal(
-      customerExists(
+      await customerExists(
         'NO_EXISTE'
       ),
       false
     );
+  }
+);
+
+
+test(
+  'customerExists valida existencia real, no solo el formato',
+  async () => {
+    // Los clientes de la demo scriptada siguen valiendo.
+    assert.equal(await customerExists('CLI000001'), true);
+
+    // Antes bastaba con tener forma de DNI para pasar el filtro: cualquier
+    // cadena de dígitos abría la puerta a los datos de "ese" cliente.
+    assert.equal(await customerExists('999999999999'), false);
+    assert.equal(await customerExists('123456'), false);
+
+    assert.equal(await customerExists(''), false);
+    assert.equal(await customerExists(null), false);
+    assert.equal(await customerExists('DROP TABLE clientes'), false);
   }
 );
 

@@ -206,89 +206,113 @@ test(
 );
 
 
+// ── Asociación de cliente a sesión ──────────────────────────────────────
+//
+// Estos tests cubren la brecha de suplantación: antes bastaba con enviar un
+// customerId en el cuerpo, sin credenciales, para quedar asociado a esa
+// persona y ver sus recibos en el chat.
+
+/** Levanta el servidor y devuelve el puerto, cerrándolo al terminar el test. */
+async function levantarServidor(t) {
+  const server = createApp().listen(0);
+
+  await new Promise((resolve) => server.once('listening', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+
+  return server.address().port;
+}
+
+/** Inicia sesión con una cuenta demo y devuelve su token. */
+async function iniciarSesion(port, phone = '987654321', password = 'Demo1234!') {
+  const response = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone, password })
+  });
+
+  assert.equal(response.status, 200, 'la cuenta demo debería poder iniciar sesión');
+  return (await response.json()).token;
+}
+
+function asociarCliente(port, sessionId, customerId, token) {
+  return fetch(`http://127.0.0.1:${port}/api/session/${sessionId}/customer`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify({ customerId })
+  });
+}
+
+
 test(
-  'asocia un cliente autenticado a una sesión',
+  'asocia un cliente a la sesión cuando hay login',
   async (t) => {
-    const sessionId =
-      'app-api-session';
+    const sessionId = 'app-api-session';
+    resetSession(sessionId);
 
-    resetSession(
-      sessionId
-    );
+    const port = await levantarServidor(t);
+    const token = await iniciarSesion(port);
 
-    const app =
-      createApp();
+    const response = await asociarCliente(port, sessionId, 'CLI000001', token);
 
-    const server =
-      app.listen(0);
+    assert.equal(response.status, 200);
 
-    await new Promise(
-      (resolve) => {
-        server.once(
-          'listening',
-          resolve
-        );
-      }
-    );
+    const data = await response.json();
+    assert.equal(data.ok, true);
+    assert.equal(data.customerId, 'CLI000001');
 
-    t.after(
-      () =>
-        new Promise(
-          (resolve) => {
-            server.close(resolve);
-          }
-        )
-    );
-
-    const port =
-      server.address().port;
-
-    const response =
-      await fetch(
-        `http://127.0.0.1:${port}/api/session/${sessionId}/customer`,
-        {
-          method: 'POST',
-
-          headers: {
-            'Content-Type':
-              'application/json'
-          },
-
-          body: JSON.stringify({
-            customerId:
-              'CLI000001'
-          })
-        }
-      );
-
-    assert.equal(
-      response.status,
-      200
-    );
-
-    const data =
-      await response.json();
-
-    assert.equal(
-      data.ok,
-      true
-    );
-
-    assert.equal(
-      data.customerId,
-      'CLI000001'
-    );
-
-    const session =
-      getSessionSnapshot(
-        sessionId
-      );
-
+    const session = getSessionSnapshot(sessionId);
     assert.ok(session);
+    assert.equal(session.context.customerIdentifier, 'CLI000001');
+  }
+);
 
-    assert.equal(
-      session.context.customerIdentifier,
-      'CLI000001'
+
+test(
+  'SUPLANTACIÓN: sin iniciar sesión no se puede asociar ningún cliente',
+  async (t) => {
+    const sessionId = 'anon-app-session';
+    resetSession(sessionId);
+
+    const port = await levantarServidor(t);
+
+    // Exactamente el ataque que antes funcionaba: un anónimo reclama un
+    // CUSTOMER_KEY real y queda ligado a los recibos de esa persona.
+    const response = await asociarCliente(port, sessionId, '125420001', null);
+
+    assert.equal(response.status, 401);
+
+    const session = getSessionSnapshot(sessionId);
+    assert.ok(
+      !session || !session.context.customerIdentifier,
+      'la sesión anónima no debe quedar asociada a ningún cliente'
+    );
+  }
+);
+
+
+test(
+  'SUPLANTACIÓN: un usuario autenticado no puede reclamar otro cliente',
+  async (t) => {
+    const sessionId = 'otro-cliente-session';
+    resetSession(sessionId);
+
+    const port = await levantarServidor(t);
+    const token = await iniciarSesion(port); // sesión de CLI000001
+
+    const response = await asociarCliente(port, sessionId, 'CLI000002', token);
+
+    assert.equal(response.status, 403);
+
+    const data = await response.json();
+    assert.match(data.error, /no coincide con la sesión autenticada/);
+
+    const session = getSessionSnapshot(sessionId);
+    assert.ok(
+      !session || !session.context.customerIdentifier,
+      'no debe quedar asociado al cliente ajeno'
     );
   }
 );
@@ -297,69 +321,13 @@ test(
 test(
   'rechaza asociar un cliente inválido a una sesión',
   async (t) => {
-    const sessionId =
-      'invalid-app-session';
+    const sessionId = 'invalid-app-session';
+    resetSession(sessionId);
 
-    resetSession(
-      sessionId
-    );
+    const port = await levantarServidor(t);
 
-    const app =
-      createApp();
-
-    const server =
-      app.listen(0);
-
-    await new Promise(
-      (resolve) => {
-        server.once(
-          'listening',
-          resolve
-        );
-      }
-    );
-
-    t.after(
-      () =>
-        new Promise(
-          (resolve) => {
-            server.close(resolve);
-          }
-        )
-    );
-
-    const port =
-      server.address().port;
-
-    const response =
-      await fetch(
-        `http://127.0.0.1:${port}/api/session/${sessionId}/customer`,
-        {
-          method: 'POST',
-
-          headers: {
-            'Content-Type':
-              'application/json'
-          },
-
-          body: JSON.stringify({
-            customerId:
-              'NO_EXISTE'
-          })
-        }
-      );
-
-    assert.equal(
-      response.status,
-      400
-    );
-
-    const data =
-      await response.json();
-
-    assert.equal(
-      data.error,
-      'Cliente inválido'
-    );
+    // Sin credenciales el corte es 401, antes incluso de mirar el cliente.
+    const anonima = await asociarCliente(port, sessionId, 'NO_EXISTE', null);
+    assert.equal(anonima.status, 401);
   }
 );

@@ -1,3 +1,7 @@
+const path = require('path');
+
+const { existeCliente } = require('./cargosRepository');
+
 const customers = new Map([
   [
     'CLI000001',
@@ -206,17 +210,24 @@ function getAvailableCustomers() {
 const PATRON_ID_REAL =
   /^\d{6,15}$/;
 
+const RUTA_DATOS =
+  path.resolve(__dirname, '../data');
 
-// Acepta los clientes del catálogo
-// mock y los identificadores con forma
-// de cliente real.
-//
-// OJO: para los identificadores reales
-// esto valida FORMATO, no existencia.
-// La verificación contra el dataset
-// queda pendiente hasta que exista el
-// índice de clientes.
-function customerExists(
+
+/**
+ * Comprueba que el cliente exista de verdad.
+ *
+ * Antes esto validaba solo el FORMATO del identificador, así que cualquier
+ * cadena de dígitos pasaba el filtro. Ahora se consulta el índice real de
+ * cargos; el chequeo de formato se conserva únicamente para descartar basura
+ * sin tocar el índice.
+ *
+ * Es asíncrona porque el índice se construye una vez de forma perezosa.
+ *
+ * @param {string} customerId DNI, CUSTOMER_KEY o id del catálogo mock.
+ * @returns {Promise<boolean>}
+ */
+async function customerExists(
   customerId
 ) {
   if (!customerId) {
@@ -226,11 +237,24 @@ function customerExists(
   const id =
     String(customerId).trim();
 
+  // Clientes de la demo scriptada (CLI000001 / CLI000002).
   if (customers.has(id)) {
     return true;
   }
 
-  return PATRON_ID_REAL.test(id);
+  // Corta cadenas arbitrarias antes de pagar la construcción del índice.
+  if (!PATRON_ID_REAL.test(id)) {
+    return false;
+  }
+
+  try {
+    return await existeCliente(RUTA_DATOS, id);
+  } catch (error) {
+    // Si el índice no se puede leer, se niega el acceso. Un fallo de
+    // infraestructura no debe convertirse en un permiso concedido.
+    console.error('No se pudo verificar el cliente contra el índice:', error);
+    return false;
+  }
 }
 
 

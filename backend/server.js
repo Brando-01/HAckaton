@@ -35,6 +35,8 @@ const {
 
 const { getFichaCliente } = require('./services/dbService');
 
+const { esConsultaSensible } = require('./services/consultaSensible');
+
 const {
   esSolicitudAsesor,
   determinarMotivoDerivacion,
@@ -624,7 +626,7 @@ function createApp() {
             // prompt to login first. procesarConsultaFactura also performs a
             // server-side check, but deny early to avoid unnecessary processing.
             const session = getOrCreateSession(activeSessionId);
-            const isSensitive = /\b(deuda|debo pagar|cuánto debo|cuanto debo|tengo deuda|mi recibo|recibo)\b/i.test(cleanMessage);
+            const isSensitive = esConsultaSensible(cleanMessage);
             const hasCustomer = Boolean(session.context && session.context.customerIdentifier);
 
             if (isSensitive && !hasCustomer) {
@@ -965,7 +967,7 @@ function createApp() {
   // Para el hackathon simulamos ese contexto.
   app.post(
     '/api/session/:sessionId/customer',
-    (req, res) => {
+    async (req, res) => {
       const auth =
         getRequestAuth(req);
 
@@ -973,17 +975,24 @@ function createApp() {
         req.body &&
         req.body.customerId;
 
-      const customerId =
-        auth
-          ? auth.session.user
-              .customerId
-          : requestedCustomerId;
+      // Zero Trust: sin sesión autenticada no se asocia ningún cliente.
+      // Antes, un anónimo podía mandar cualquier customerId en el cuerpo y
+      // quedaba ligado a esa persona, viendo sus recibos en el chat.
+      if (!auth) {
+        return res
+          .status(401)
+          .json({
+            error:
+              'Debes iniciar sesión para asociar un cliente a la conversación'
+          });
+      }
 
-      // Si existe una sesión autenticada,
-      // la identidad de la cookie manda sobre
+      const customerId =
+        auth.session.user.customerId;
+
+      // La identidad de la sesión manda sobre
       // cualquier customerId enviado por el cliente.
       if (
-        auth &&
         requestedCustomerId &&
         requestedCustomerId !==
           customerId
@@ -998,7 +1007,7 @@ function createApp() {
 
       if (
         !customerId ||
-        !customerExists(customerId)
+        !(await customerExists(customerId))
       ) {
         return res
           .status(400)
