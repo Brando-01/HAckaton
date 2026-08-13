@@ -1281,7 +1281,9 @@
             );
 
             sessionStorage.removeItem('movistarDemoCustomerId');
-            return null;
+            // `false` distingue "el servidor lo rechazó" de `null`, que es
+            // simplemente no tener documento asociado.
+            return false;
           }
         } catch (e) {
           console.warn('[CHAT] error notifying session of customer:', e);
@@ -1289,7 +1291,7 @@
             'No pude conectar con el servidor para cargar tu cuenta. Revisa tu conexión e intenta de nuevo.',
             'bot'
           );
-          return null;
+          return false;
         }
 
         sessionStorage.setItem('movistarDemoCustomerId', customerId);
@@ -1464,8 +1466,20 @@
       }
 
       localStorage.setItem('authToken', data.token);
+
+      // El modal se cierra solo si la cuenta quedó realmente asociada.
+      // Antes se cerraba antes de intentarlo, así que un fallo de asociación
+      // dejaba al usuario en el chat aparentemente logueado pero sin cuenta,
+      // y el asistente le seguía pidiendo iniciar sesión.
+      const asociado = await associateAuthenticatedCustomer(currentSessionId);
+
+      if (asociado === false) {
+        localStorage.removeItem('authToken');
+        setMsg(msgId, 'Entraste, pero no pude cargar tu cuenta de facturación. Revisa el motivo en el chat o prueba con otra cuenta.', true);
+        return;
+      }
+
       hideLoginModal();
-      await associateAuthenticatedCustomer(currentSessionId);
 
     } catch (e) {
       console.error('[CHAT] login error', e);
@@ -1484,7 +1498,10 @@
     const password = document.getElementById('regPassword')?.value         || '';
     const msgId    = 'registerMessage';
 
-    if (!phone || !/^9\d{7,8}$/.test(phone)) {
+    // Exactamente 9 dígitos, igual que validatePhone en el backend. El patrón
+    // anterior aceptaba 8, así que el formulario dejaba pasar números que el
+    // servidor luego rechazaba con un mensaje que no cuadraba con el aviso.
+    if (!phone || !/^9\d{8}$/.test(phone)) {
       setMsg(msgId, 'Número inválido. Debe tener 9 dígitos y comenzar con 9.', true);
       return;
     }
@@ -1513,14 +1530,20 @@
 
       if (!resp.ok) {
         if (resp.status === 409) {
-          setMsg(msgId, 'Número ya registrado. Iniciando sesión...', false);
-          await new Promise(r => setTimeout(r, 800));
+          // El número ya tiene cuenta, y su contraseña no tiene por qué ser
+          // la que se acaba de escribir. Antes se intentaba entrar con ella
+          // igualmente y el usuario recibía un "contraseña incorrecta" que no
+          // explicaba nada. Se le lleva al login con el campo en blanco.
+          setMsg(msgId, 'Este número ya tiene una cuenta. Ingresa su contraseña para entrar.', true);
+          await new Promise(r => setTimeout(r, 1200));
           showLoginView();
+
           const lp = document.getElementById('loginPhone');
           const lpw = document.getElementById('loginPassword');
           if (lp) lp.value = phone;
-          if (lpw) lpw.value = password;
-          await submitLogin(phone, password);
+          if (lpw) { lpw.value = ''; lpw.focus(); }
+
+          setMsg('loginMessage', 'Este número ya estaba registrado. Escribe su contraseña.', false);
           return;
         }
         const errMsg = (data && data.error) ? data.error : 'No se pudo registrar';

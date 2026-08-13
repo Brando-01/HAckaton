@@ -1,153 +1,75 @@
 {
   "generadoEl": "2026-08-13",
   "password": "Demo1234!",
-  "nota": "Generado por scripts/generarCuentasDemo.js desde la data real. El celular es una credencial de acceso, no el teléfono del cliente: el dataset está anonimizado.",
+  "nota": "Generado por scripts/generarCuentasDemo.js. Los clientes se eligen automáticamente: se busca el ejemplo más claro de cada causa que clasifica el motor. El celular es una credencial de acceso, no el teléfono del cliente: el dataset está anonimizado.",
   "cuentas": [
     {
-      "phone": "925420001",
+      "phone": "961430502",
       "password": "Demo1234!",
-      "customerId": "125420001",
-      "name": "Cliente 125420001",
-      "caso": "Reconexión",
-      "resumen": "Serie plana de S/ 79.90 y un cargo de reconexión de S/ 4.58 en el último ciclo.",
-      "servicio": "BB",
-      "negocio": "FIJA",
-      "fechaAlta": "3/02/2024 11:51",
-      "antiguedadMeses": 30,
-      "cuentaFinanciera": "744520546",
+      "customerId": "61430502",
+      "name": "Cliente 61430502",
+      "caso": "Ajuste de tarifa",
+      "codigoCaso": "AJUSTE_TARIFA",
+      "resumen": "Baja S/ 99.26 por ajuste de tarifa.",
+      "servicios": [
+        "Internet fijo"
+      ],
+      "antiguedadMeses": 56,
+      "cuentaFinanciera": "606527064",
+      "deuda": "SIN DEUDA",
       "ultimosTotales": [
-        84.48,
-        79.9,
-        79.9,
-        79.9,
-        79.9,
-        79.9
+        109.89,
+        209.15,
+        89.9,
+        69.9,
+        69.9,
+        161.48
       ]
     },
     {
-      "phone": "923165012",
+      "phone": "926549642",
       "password": "Demo1234!",
-      "customerId": "123165012",
-      "name": "Cliente 123165012",
-      "caso": "Fin de descuento + cambio de plan",
-      "resumen": "Sube S/ 14.94: se acaba una campaña de S/ 34.95 y a la vez baja el plan S/ 20.01.",
-      "servicio": "WRLS",
-      "negocio": "MOVIL",
-      "fechaAlta": "4/07/2023 02:04",
-      "antiguedadMeses": 37,
-      "cuentaFinanciera": "740164515",
+      "customerId": "126549642",
+      "name": "Cliente 126549642",
+      "caso": "Cambio de plan",
+      "codigoCaso": "CAMBIO_PLAN",
+      "resumen": "Sube S/ 75.00 por cambio de plan.",
+      "servicios": [
+        "Móvil"
+      ],
+      "antiguedadMeses": 27,
+      "cuentaFinanciera": "746508586",
+      "deuda": "SIN DEUDA",
       "ultimosTotales": [
-        49.89,
-        34.95,
-        34.95,
-        34.95,
-        34.95,
-        34.95
+        114.9,
+        39.9,
+        39.9,
+        39.9,
+        39.9,
+        39.9
       ]
     },
     {
-      "phone": "948799623",
+      "phone": "931372509",
       "password": "Demo1234!",
-      "customerId": "48799623",
-      "name": "Cliente 48799623",
-      "caso": "Pico por servicios de terceros",
-      "resumen": "S/ 429.89 en marzo por llamadas de AMERICATEL; útil para preguntar por un recibo anterior.",
-      "servicio": "WRLS",
-      "negocio": "MOVIL",
-      "fechaAlta": "1/12/1996 00:00",
-      "antiguedadMeses": 356,
-      "cuentaFinanciera": "301131345",
+      "customerId": "131372509",
+      "name": "Cliente 131372509",
+      "caso": "Servicios de terceros",
+      "codigoCaso": "CARGO_TERCEROS",
+      "resumen": "Sube S/ 21.86 por servicios de terceros. Junto con Ajuste de tarifa (S/ 0.01).",
+      "servicios": [
+        "TV"
+      ],
+      "antiguedadMeses": 15,
+      "cuentaFinanciera": "754054337",
+      "deuda": "CON DEUDA",
       "ultimosTotales": [
-        74.89,
-        74.89,
-        74.89,
-        429.89,
-        85.9,
-        68.72
-      ]
-    },
-    {
-      "phone": "958364152",
-      "password": "Demo1234!",
-      "customerId": "58364152",
-      "name": "Cliente 58364152",
-      "caso": "Alta con prorrateo",
-      "resumen": "Primer ciclo de S/ 149.90 y luego estable en S/ 89.91. Recibo actual con deuda.",
-      "servicio": "BB",
-      "negocio": "FIJA",
-      "fechaAlta": "12/11/2020 00:00",
-      "antiguedadMeses": 68,
-      "cuentaFinanciera": "603366988",
-      "ultimosTotales": [
-        89.91,
-        89.91,
-        89.91,
-        89.91,
-        89.91,
-        149.9
-      ]
-    },
-    {
-      "phone": "930857463",
-      "password": "Demo1234!",
-      "customerId": "130857463",
-      "name": "Cliente 130857463",
-      "caso": "Baja a la mitad",
-      "resumen": "De S/ 120.00 a S/ 60.01 tras el primer ciclo.",
-      "servicio": "TV",
-      "negocio": "FIJA",
-      "fechaAlta": "1/04/2025 12:34",
-      "antiguedadMeses": 16,
-      "cuentaFinanciera": "753342380",
-      "ultimosTotales": [
-        60.01,
-        60.01,
-        60.01,
-        60.01,
-        60.01,
-        120
-      ]
-    },
-    {
-      "phone": "958013061",
-      "password": "Demo1234!",
-      "customerId": "58013061",
-      "name": "Cliente 58013061",
-      "caso": "Reconexión y cambio de plan",
-      "resumen": "Varios movimientos: reconexión, prorrateos y migración de plan.",
-      "servicio": "WRLS",
-      "negocio": "MOVIL",
-      "fechaAlta": "31/01/2023 12:23",
-      "antiguedadMeses": 42,
-      "cuentaFinanciera": "738306118",
-      "ultimosTotales": [
-        39.99,
-        39.99,
-        54.53,
-        74.94,
-        77.89,
-        77.89
-      ]
-    },
-    {
-      "phone": "915358834",
-      "password": "Demo1234!",
-      "customerId": "115358834",
-      "name": "Cliente 115358834",
-      "caso": "Estable con deuda",
-      "resumen": "Seis ciclos de S/ 83.99 sin variación, recibo actual pendiente de pago.",
-      "servicio": "TV",
-      "negocio": "MT/CONVERGENTE",
-      "fechaAlta": "18/02/2022 00:00",
-      "antiguedadMeses": 53,
-      "cuentaFinanciera": "725529500",
-      "ultimosTotales": [
-        83.99,
-        83.99,
-        83.99,
-        83.99,
-        83.99,
-        83.99
+        101.86,
+        80,
+        80,
+        80,
+        80,
+        80
       ]
     },
     {
@@ -155,13 +77,15 @@
       "password": "Demo1234!",
       "customerId": "103352291",
       "name": "Cliente 103352291",
-      "caso": "Consumo adicional",
-      "resumen": "Sube S/ 81.57 por tráfico fuera del plan.",
-      "servicio": "WRLS",
-      "negocio": "MOVIL",
-      "fechaAlta": "21/05/2022 00:43",
+      "caso": "Consumo fuera del plan",
+      "codigoCaso": "CONSUMO_ADICIONAL",
+      "resumen": "Sube S/ 81.57 por consumo fuera del plan.",
+      "servicios": [
+        "Móvil"
+      ],
       "antiguedadMeses": 50,
       "cuentaFinanciera": "703435739",
+      "deuda": "SIN DEUDA",
       "ultimosTotales": [
         257.75,
         176.18,
@@ -172,24 +96,164 @@
       ]
     },
     {
-      "phone": "951805212",
+      "phone": "920764227",
       "password": "Demo1234!",
-      "customerId": "51805212",
-      "name": "Cliente 51805212",
-      "caso": "Descuento vigente",
-      "resumen": "Baja de S/ 39.90 a S/ 29.90 por un descuento recurrente.",
-      "servicio": "WRLS",
-      "negocio": "MOVIL",
-      "fechaAlta": "7/10/2011 00:00",
-      "antiguedadMeses": 178,
-      "cuentaFinanciera": "375132410",
+      "customerId": "120764227",
+      "name": "Cliente 120764227",
+      "caso": "Fin de descuento",
+      "codigoCaso": "FIN_DESCUENTO",
+      "resumen": "Sube S/ 42.95 por fin de descuento.",
+      "servicios": [
+        "Móvil"
+      ],
+      "antiguedadMeses": 45,
+      "cuentaFinanciera": "735079917",
+      "deuda": "SIN DEUDA",
       "ultimosTotales": [
-        23.92,
-        29.9,
-        29.9,
-        29.9,
-        39.9,
-        39.9
+        85.9,
+        42.95,
+        42.95,
+        42.95,
+        42.95,
+        40.05
+      ]
+    },
+    {
+      "phone": "934897036",
+      "password": "Demo1234!",
+      "customerId": "134897036",
+      "name": "Cliente 134897036",
+      "caso": "Descuento aplicado",
+      "codigoCaso": "NUEVO_DESCUENTO",
+      "resumen": "Baja S/ 50.00 por descuento aplicado.",
+      "servicios": [
+        "Internet fijo"
+      ],
+      "antiguedadMeses": 6,
+      "cuentaFinanciera": "759721300",
+      "deuda": "CON DEUDA",
+      "ultimosTotales": [
+        39.91,
+        89.91,
+        54.48,
+        49.91,
+        89.91,
+        89.91
+      ]
+    },
+    {
+      "phone": "924497231",
+      "password": "Demo1234!",
+      "customerId": "124497231",
+      "name": "Cliente 124497231",
+      "caso": "Paquetes contratados",
+      "codigoCaso": "PAQUETE",
+      "resumen": "Sube S/ 79.99 por paquetes contratados.",
+      "servicios": [
+        "Móvil"
+      ],
+      "antiguedadMeses": 266,
+      "cuentaFinanciera": "742850050",
+      "deuda": "SIN DEUDA",
+      "ultimosTotales": [
+        139.89,
+        59.9,
+        59.9,
+        59.9,
+        59.9,
+        59.9
+      ]
+    },
+    {
+      "phone": "948799623",
+      "password": "Demo1234!",
+      "customerId": "48799623",
+      "name": "Cliente 48799623",
+      "caso": "Pico en un recibo anterior",
+      "codigoCaso": "PICO_HISTORICO",
+      "resumen": "Pico de S/ 429.89 en un ciclo anterior; sirve para preguntar por un recibo pasado.",
+      "servicios": [
+        "Móvil"
+      ],
+      "antiguedadMeses": 356,
+      "cuentaFinanciera": "301131345",
+      "deuda": "CON DEUDA",
+      "ultimosTotales": [
+        74.89,
+        74.89,
+        74.89,
+        429.89,
+        85.9,
+        68.72
+      ]
+    },
+    {
+      "phone": "961253998",
+      "password": "Demo1234!",
+      "customerId": "61253998",
+      "name": "Cliente 61253998",
+      "caso": "Cobro proporcional por días",
+      "codigoCaso": "PRORRATEO",
+      "resumen": "Sube S/ 126.35 por cobro proporcional por días.",
+      "servicios": [
+        "TV"
+      ],
+      "antiguedadMeses": 61,
+      "cuentaFinanciera": "606264879",
+      "deuda": "CON DEUDA",
+      "ultimosTotales": [
+        153.35,
+        27,
+        27,
+        27,
+        99.28,
+        91.5
+      ]
+    },
+    {
+      "phone": "900548096",
+      "password": "Demo1234!",
+      "customerId": "100548096",
+      "name": "Cliente 100548096",
+      "caso": "Reconexión tras suspensión",
+      "codigoCaso": "RECONEXION",
+      "resumen": "Sube S/ 4.58 por reconexión tras suspensión.",
+      "servicios": [
+        "Móvil"
+      ],
+      "antiguedadMeses": 103,
+      "cuentaFinanciera": "720740174",
+      "deuda": "CON DEUDA",
+      "ultimosTotales": [
+        84.48,
+        79.9,
+        79.9,
+        84.48,
+        84.48,
+        79.9
+      ]
+    },
+    {
+      "phone": "959505991",
+      "password": "Demo1234!",
+      "customerId": "59505991",
+      "name": "Cliente 59505991",
+      "caso": "Recibo estable",
+      "codigoCaso": "SIN_VARIACION",
+      "resumen": "Seis ciclos de S/ 228.49 sin variación. Comprueba que no se inventen causas.",
+      "servicios": [
+        "Internet fijo"
+      ],
+      "antiguedadMeses": 44,
+      "cuentaFinanciera": "735467680",
+      "deuda": "CON DEUDA",
+      "ultimosTotales": [
+        228.49,
+        228.49,
+        228.49,
+        228.49,
+        228.49,
+        228.49
       ]
     }
   ]
