@@ -546,19 +546,78 @@ const MESES = {
   noviembre: '11', diciembre: '12'
 };
 
+/** Cantidades escritas con letras, para "hace tres meses". */
+const NUMEROS_EN_LETRA = {
+  un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4,
+  cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10
+};
+
 /**
- * Resuelve a qué ciclo se refiere el cliente cuando nombra un mes.
+ * Interpreta referencias relativas al recibo: "hace 3 meses", "el mes
+ * pasado", "el anterior".
  *
- * Devuelve `null` salvo que el mes exista de verdad en su historial: así
- * "el recibo de marzo" apunta al ciclo real y nunca a uno inventado. Si el
- * mes nombrado ya es el del recibo actual, tampoco hace falta recalcular.
+ * Devuelve cuántos recibos hay que retroceder desde el actual, o `null` si
+ * el mensaje no habla en relativo. Los ciclos son mensuales, así que
+ * retroceder N posiciones en el historial equivale a N meses.
  */
+function mesesHaciaAtras(texto) {
+  const conDigito = texto.match(/hace\s+(\d+)\s+mes/);
+  if (conDigito) {
+    return Number(conDigito[1]);
+  }
+
+  const conLetra = texto.match(/hace\s+([a-zá-ú]+)\s+mes/);
+  if (conLetra && NUMEROS_EN_LETRA[conLetra[1]]) {
+    return NUMEROS_EN_LETRA[conLetra[1]];
+  }
+
+  if (/\b(mes|recibo|factura)\s+(pasado|anterior)\b/.test(texto)
+    || /\bel\s+(pasado|anterior)\b/.test(texto)) {
+    return 1;
+  }
+
+  if (/\bantepasado\b/.test(texto)) {
+    return 2;
+  }
+
+  return null;
+}
+
+/**
+ * Resuelve a qué ciclo se refiere el cliente.
+ *
+ * Entiende dos formas: nombrar el mes ("el recibo de marzo") o hablar en
+ * relativo ("hace 3 meses", "el mes pasado"). En ambos casos el ciclo se
+ * busca en el historial real del cliente, nunca se construye una fecha.
+ *
+ * Devuelve `null` si el mensaje no pide un recibo distinto al actual, y el
+ * centinela `SIN_HISTORIAL` si pide uno que el cliente no llegó a tener: el
+ * motor responderá CICLO_NO_ENCONTRADO en vez de contestar por otro mes.
+ */
+const CICLO_FUERA_DE_RANGO = 'SIN_HISTORIAL';
+
 function resolverCicloPedido(mensajeTexto, bloque) {
   if (!bloque || !bloque.encontrado || !Array.isArray(bloque.historial)) {
     return null;
   }
 
   const texto = (mensajeTexto || '').toLowerCase();
+
+  // 1. Referencia relativa: "hace 3 meses", "el mes pasado".
+  const retroceso = mesesHaciaAtras(texto);
+  if (retroceso !== null) {
+    if (retroceso <= 0) {
+      return null;
+    }
+    // historial[0] es el recibo actual, así que retroceder N es historial[N].
+    const objetivo = bloque.historial[retroceso];
+    if (!objetivo) {
+      return CICLO_FUERA_DE_RANGO;
+    }
+    return objetivo.ciclo;
+  }
+
+  // 2. Mes nombrado: "el recibo de marzo".
   const mesNombrado = Object.keys(MESES).find((mes) => texto.includes(mes));
   if (!mesNombrado) {
     return null;
@@ -729,7 +788,11 @@ function construirRespuestaSinModelo(
   resumenFacturacion,
   contextoClientePorId
 ) {
-  if (bloqueDeHechos && bloqueDeHechos.encontrado) {
+  // "No tengo ese periodo" también es un hecho del motor y hay que decirlo.
+  // Antes este caso caía al resumen legacy, que suma todos los ciclos y las
+  // líneas NO CONSIDERAR: devolvía un total sin sentido (S/ 1371.52) como si
+  // fuera el recibo del cliente.
+  if (bloqueDeHechos && (bloqueDeHechos.encontrado || bloqueDeHechos.motivo === 'CICLO_NO_ENCONTRADO')) {
     return narrarBloqueDeHechos(bloqueDeHechos);
   }
 
@@ -1140,7 +1203,13 @@ async function procesarConsultaFactura(
     // síncrona y bloquean el event loop en cada mensaje. Cuando el motor ya
     // resolvió el recibo son redundantes: solo se usan como red de seguridad
     // para clientes que no están en Cargos_FacturadosV2.
-    const motorResolvio = Boolean(bloqueDeHechos && bloqueDeHechos.encontrado);
+    // Basta con que el motor conozca al cliente. Si lo conoce pero el ciclo
+    // pedido no existe, el resumen legacy tampoco ayuda: suma todos los
+    // ciclos y las líneas NO CONSIDERAR, y devuelve un total inventado.
+    const motorResolvio = Boolean(
+      bloqueDeHechos
+      && (bloqueDeHechos.encontrado || bloqueDeHechos.motivo === 'CICLO_NO_ENCONTRADO')
+    );
 
     contextoClientePorId = idBuscar && !motorResolvio
       ? await buildCustomerDataContext(path.resolve(__dirname, '../data'), idBuscar)
@@ -1546,5 +1615,7 @@ ${contextoCliente}
 
 module.exports = {
   procesarConsultaFactura,
-  construirRespuestaFallback
+  construirRespuestaFallback,
+  resolverCicloPedido,
+  CICLO_FUERA_DE_RANGO
 };
