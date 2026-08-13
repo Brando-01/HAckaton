@@ -361,6 +361,32 @@
   }
 
 
+  function appendAuthAction(authUrl) {
+    if (!chatMessages || !authUrl) {
+      return;
+    }
+
+    const wrapper =
+      document.createElement('div');
+
+    wrapper.className =
+      'message bot auth-required-message';
+
+    const link =
+      document.createElement('a');
+
+    link.className =
+      'auth-required-button';
+    link.href = authUrl;
+    link.textContent =
+      'Iniciar sesión para revisar mi recibo';
+
+    wrapper.appendChild(link);
+    chatMessages.appendChild(wrapper);
+    scrollToBottom();
+  }
+
+
   function showTyping() {
     if (!chatMessages) {
       return;
@@ -749,6 +775,10 @@
       currentSessionId
     );
 
+    sessionStorage.removeItem(
+      'pendingAuthBillingPrompt'
+    );
+
     // Si el cliente inició sesión en Mi Movistar,
     // una nueva consulta conserva su identidad.
     await associateAuthenticatedCustomer(
@@ -957,6 +987,17 @@
         appendMessage(
           'No se recibió respuesta del servidor.',
           'bot'
+        );
+      }
+
+      if (data.requiresAuth) {
+        sessionStorage.setItem(
+          'pendingAuthBillingPrompt',
+          text
+        );
+
+        appendAuthAction(
+          data.authUrl
         );
       }
 
@@ -1346,6 +1387,56 @@
   }
 
 
+  async function resumeAfterAuthentication(
+    authenticatedCustomerId
+  ) {
+    const params =
+      new URLSearchParams(
+        window.location.search
+      );
+
+    if (params.get('resume') !== '1') {
+      return;
+    }
+
+    if (!authenticatedCustomerId) {
+      return;
+    }
+
+    const pendingPrompt =
+      sessionStorage.getItem(
+        'pendingAuthBillingPrompt'
+      );
+
+    history.replaceState(
+      {},
+      '',
+      '/chat'
+    );
+
+    if (
+      !pendingPrompt ||
+      !userInput
+    ) {
+      return;
+    }
+
+    sessionStorage.removeItem(
+      'pendingAuthBillingPrompt'
+    );
+
+    appendMessage(
+      'Sesión iniciada correctamente. Retomo tu consulta anterior con tus datos de facturación.',
+      'bot'
+    );
+
+    userInput.value =
+      pendingPrompt;
+
+    await sendMessage();
+  }
+
+
   function syncBackToAppLink() {
     const backToAppLink =
       document.getElementById(
@@ -1395,6 +1486,10 @@
       }
 
       await bootstrapFromApp(
+        authenticatedCustomerId
+      );
+
+      await resumeAfterAuthentication(
         authenticatedCustomerId
       );
     }

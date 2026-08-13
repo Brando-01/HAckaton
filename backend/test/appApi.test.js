@@ -15,6 +15,33 @@ const {
 } = require('../services/sessionService');
 
 
+
+async function loginDemo(port, customerId = 'CLI000001') {
+  const response =
+    await fetch(
+      `http://127.0.0.1:${port}/api/auth/demo-login`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':
+            'application/json'
+        },
+        body: JSON.stringify({
+          customerId
+        })
+      }
+    );
+
+  const setCookie =
+    response.headers.get(
+      'set-cookie'
+    );
+
+  return setCookie
+    ? setCookie.split(';')[0]
+    : null;
+}
+
 test(
   'lista los perfiles disponibles de Mi Movistar',
   async (t) => {
@@ -243,6 +270,12 @@ test(
     const port =
       server.address().port;
 
+    const cookie =
+      await loginDemo(
+        port,
+        'CLI000001'
+      );
+
     const response =
       await fetch(
         `http://127.0.0.1:${port}/api/session/${sessionId}/customer`,
@@ -251,7 +284,8 @@ test(
 
           headers: {
             'Content-Type':
-              'application/json'
+              'application/json',
+            Cookie: cookie
           },
 
           body: JSON.stringify({
@@ -295,7 +329,7 @@ test(
 
 
 test(
-  'rechaza asociar un cliente inválido a una sesión',
+  'rechaza asociar un cliente a una sesión sin autenticación',
   async (t) => {
     const sessionId =
       'invalid-app-session';
@@ -351,15 +385,15 @@ test(
 
     assert.equal(
       response.status,
-      400
+      401
     );
 
     const data =
       await response.json();
 
-    assert.equal(
+    assert.match(
       data.error,
-      'Cliente inválido'
+      /iniciar sesión/i
     );
   }
 );

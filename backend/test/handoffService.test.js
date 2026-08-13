@@ -311,3 +311,74 @@ test('permite marcar un caso como atendido', () => {
     'ATTENDED'
   );
 });
+test('transfiere un prorrateo de primer recibo como hallazgo al asesor', () => {
+  resetHandoffCases();
+
+  const caso = crearCaso({
+    sessionId: 'session-proration-handoff',
+    customerIdentifier: 'CLI000002',
+    originalQuery: 'Explícame mi prorrateo',
+    customerContext: {
+      customerId: 'CLI000002',
+      name: 'Ana Torres',
+      plan: 'Plan demo oficial'
+    },
+    billingContext: {
+      previousBill: null,
+      currentBill: {
+        period: 'Ciclo 30/06/2026',
+        total: 51.83
+      },
+      comparison: {
+        difference: null,
+        percentage: null,
+        direction: null,
+        causes: []
+      },
+      findings: [
+        {
+          code: 'PRORATION',
+          title: 'Prorrateo',
+          description: 'El recibo incluye S/ 21.92 de prorrateo.',
+          impact: 21.92,
+          evidenceLevel: 'HIGH'
+        }
+      ]
+    },
+    conversation: [
+      {
+        role: 'user',
+        content: 'Explícame mi prorrateo'
+      },
+      {
+        role: 'assistant',
+        content: 'El recibo incluye S/ 21.92 de prorrateo.'
+      },
+      {
+        role: 'user',
+        content: 'Quiero hablar con un asesor'
+      }
+    ]
+  });
+
+  assert.equal(
+    caso.billing.previousBill,
+    null
+  );
+  assert.equal(
+    caso.billing.findings.length,
+    1
+  );
+  assert.equal(
+    caso.billing.findings[0].code,
+    'PRORATION'
+  );
+  assert.equal(
+    caso.advisorSummary.headline,
+    'Prorrateo identificado en el recibo'
+  );
+  assert.match(
+    caso.advisorSummary.findings[0].detail,
+    /S\/ 21\.92/
+  );
+});

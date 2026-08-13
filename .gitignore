@@ -27,6 +27,7 @@ Thumbs.db
 !/backend/data/oficial/README.md
 /backend/data/desafio1.db*
 /backend/data/demo-case-selection.local.json
+/backend/data/demo-users.local.json
 
 # Nombres de archivos entregados por Movistar: evitar commits accidentales
 PLANTA CLIENTES.csv

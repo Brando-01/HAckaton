@@ -605,3 +605,27 @@ body {
     font-size: 12px;
     font-weight: 700;
 }
+
+/* Fase 5 · autenticación progresiva para datos personales */
+.auth-required-message {
+  display: flex;
+  align-items: center;
+}
+
+.auth-required-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: #0b9be8;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.auth-required-button:hover,
+.auth-required-button:focus-visible {
+  filter: brightness(0.95);
+}

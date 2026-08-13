@@ -40,8 +40,38 @@
     loginError.hidden = true;
   }
 
-  function goToApp() {
+  function getSafeReturnTo() {
+    const params =
+      new URLSearchParams(
+        window.location.search
+      );
+
+    const returnTo =
+      params.get('returnTo');
+
+    if (
+      !returnTo ||
+      !returnTo.startsWith('/') ||
+      returnTo.startsWith('//')
+    ) {
+      return null;
+    }
+
+    if (
+      returnTo === '/app' ||
+      returnTo.startsWith('/app?') ||
+      returnTo === '/chat' ||
+      returnTo.startsWith('/chat?')
+    ) {
+      return returnTo;
+    }
+
+    return null;
+  }
+
+  function goAfterLogin() {
     window.location.href =
+      getSafeReturnTo() ||
       '/app';
   }
 
@@ -114,7 +144,7 @@
         );
       }
 
-      goToApp();
+      goAfterLogin();
     } catch (error) {
       showError(error.message);
 
@@ -163,7 +193,11 @@
               'span'
             );
           id.textContent =
-            profile.customerId;
+            profile.demoScenarioLabel
+              ? `Caso: ${profile.demoScenarioLabel}`
+              : profile.officialDataReady === false
+                ? 'Caso oficial local pendiente'
+                : profile.customerId;
 
           button.appendChild(name);
           button.appendChild(id);
@@ -215,7 +249,7 @@
           email,
           password
         );
-        goToApp();
+        goAfterLogin();
       } catch (error) {
         showError(error.message);
         loginButton.disabled = false;

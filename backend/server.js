@@ -35,6 +35,20 @@ const {
 } = require('./services/appExperienceService');
 
 const {
+  createOfficialDemoExperienceService
+} = require('./services/officialDemoExperienceService');
+
+const {
+  getDemoMappingStatus
+} = require('./services/demoProfileBindingService');
+
+const {
+  requiresPersonalBillingAccess,
+  buildGeneralBillingEducationReply,
+  buildPersonalBillingReply
+} = require('./services/desafio1ConversationLogic');
+
+const {
   esSolicitudAsesor,
   determinarMotivoDerivacion,
   obtenerConsultaOriginal,
@@ -177,8 +191,86 @@ function requireApiAuth(
 }
 
 
-function createApp() {
+function sanitizeReturnTo(value) {
+  const candidate =
+    String(value || '').trim();
+
+  if (
+    !candidate ||
+    !candidate.startsWith('/') ||
+    candidate.startsWith('//')
+  ) {
+    return null;
+  }
+
+  if (
+    candidate === '/app' ||
+    candidate.startsWith('/app?') ||
+    candidate === '/chat' ||
+    candidate.startsWith('/chat?')
+  ) {
+    return candidate;
+  }
+
+  return null;
+}
+
+function isDemoMappingError(error) {
+  return [
+    'DEMO_MAPPING_NOT_CONFIGURED',
+    'DEMO_MAPPING_READ_ERROR',
+    'DEMO_MAPPING_INVALID',
+    'DEMO_MAPPING_SCHEMA_INVALID',
+    'DEMO_MAPPING_PROFILES_REQUIRED',
+    'DEMO_MAPPING_PROFILE_MISSING',
+    'DEMO_PROFILE_NOT_BOUND'
+  ].includes(error?.code);
+}
+
+function createApp(options = {}) {
   const app = express();
+
+  const officialDemoExperienceService =
+    options.officialDemoExperienceService ||
+    createOfficialDemoExperienceService();
+
+  async function getOfficialExperience(user) {
+    return officialDemoExperienceService
+      .getExperienceForUser(user);
+  }
+
+  async function getAppExperience(user) {
+    try {
+      return await getOfficialExperience(
+        user
+      );
+    } catch (error) {
+      if (!isDemoMappingError(error)) {
+        throw error;
+      }
+
+      const legacy =
+        getCustomerExperience(
+          user?.customerId
+        );
+
+      if (!legacy) {
+        throw error;
+      }
+
+      return {
+        ...legacy,
+        dataSource:
+          'SYNTHETIC_FALLBACK',
+        integrationStatus: {
+          officialDataConfigured:
+            false,
+          code:
+            error.code
+        }
+      };
+    }
+  }
 
   app.use(cors());
   app.use(express.json());
@@ -212,7 +304,9 @@ function createApp() {
     if (getRequestAuth(req)) {
       return res.redirect(
         302,
-        '/app'
+        sanitizeReturnTo(
+          req.query.returnTo
+        ) || '/app'
       );
     }
 
@@ -273,9 +367,36 @@ function createApp() {
   app.get(
     '/api/auth/demo-profiles',
     (req, res) => {
+      const mappingStatus =
+        getDemoMappingStatus();
+
       return res.json({
         profiles:
-          getDemoProfiles()
+          getDemoProfiles().map(
+            (profile) => {
+              const mapped =
+                mappingStatus.profiles
+                  ?.find(
+                    (item) =>
+                      item.customerId ===
+                      profile.customerId
+                  );
+
+              return {
+                ...profile,
+                officialDataReady:
+                  Boolean(mapped),
+                demoScenario:
+                  mapped?.scenario ||
+                  null,
+                demoScenarioLabel:
+                  mapped?.scenarioLabel ||
+                  null
+              };
+            }
+          ),
+        officialDataConfigured:
+          mappingStatus.configured
       });
     }
   );
@@ -386,27 +507,40 @@ function createApp() {
   app.get(
     '/api/app/me',
     requireApiAuth,
-    (req, res) => {
-      const customerId =
-        req.auth.session.user
-          .customerId;
+    async (req, res) => {
+      try {
+        const experience =
+          await getAppExperience(
+            req.auth.session.user
+          );
 
-      const experience =
-        getCustomerExperience(
-          customerId
+        return res.json(
+          experience
+        );
+      } catch (error) {
+        console.error(
+          '[APP] No se pudo cargar el caso demo oficial:',
+          error
         );
 
-      if (!experience) {
         return res
-          .status(404)
+          .status(503)
           .json({
             error:
-              'Cliente autenticado no encontrado'
+              'No se pudo cargar la información de facturación del perfil demo',
+            code:
+              error?.code ||
+              'OFFICIAL_DEMO_EXPERIENCE_ERROR'
           });
       }
+    }
+  );
 
+  app.get(
+    '/api/demo/config/status',
+    (req, res) => {
       return res.json(
-        experience
+        getDemoMappingStatus()
       );
     }
   );
@@ -497,6 +631,21 @@ function createApp() {
         const cleanMessage =
           message.trim();
 
+        const requestAuth =
+          getRequestAuth(req);
+
+        if (requestAuth) {
+          updateContext(
+            activeSessionId,
+            {
+              customerIdentifier:
+                requestAuth.session.user
+                  .customerId,
+              identityLocked: true
+            }
+          );
+        }
+
         const existingInteraction =
             getInteraction(
               activeSessionId
@@ -562,10 +711,16 @@ function createApp() {
                 metricsCustomerId,
 
               customerName:
-                metricsExperience &&
-                metricsExperience.customer
-                  ? metricsExperience.customer.name
-                  : null
+                requestAuth
+                  ?.session
+                  ?.user
+                  ?.name ||
+                (
+                  metricsExperience &&
+                  metricsExperience.customer
+                    ? metricsExperience.customer.name
+                    : null
+                )
             }
           );
         }
@@ -617,12 +772,29 @@ function createApp() {
             session.context
               .customerIdentifier;
 
-          const customerExperience =
+          let customerExperience =
+            null;
+
+          if (requestAuth) {
+            try {
+              customerExperience =
+                await getAppExperience(
+                  requestAuth.session.user
+                );
+            } catch (error) {
+              console.warn(
+                '[HANDOFF] No se pudo cargar el contexto oficial; se conserva el transcript:',
+                error?.message || error
+              );
+            }
+          } else if (
             customerIdentifier
-              ? getCustomerExperience(
-                  customerIdentifier
-                )
-              : null;
+          ) {
+            customerExperience =
+              getCustomerExperience(
+                customerIdentifier
+              );
+          }
 
           const caso =
             crearCaso({
@@ -659,7 +831,9 @@ function createApp() {
                       currentBill:
                         customerExperience.currentBill,
                       comparison:
-                        customerExperience.comparison
+                        customerExperience.comparison,
+                      findings:
+                        customerExperience.findings || []
                     }
                   : null
             });
@@ -738,13 +912,221 @@ function createApp() {
 
 
         // =====================================================
-        // CONSULTA NORMAL AL RAG
+        // FACTURACIÓN PERSONAL · FASE 5
+        // =====================================================
+
+        const billingSession =
+          getOrCreateSession(
+            activeSessionId
+          );
+
+        const needsPersonalBilling =
+          requiresPersonalBillingAccess(
+            cleanMessage,
+            {
+              hasPersonalBillingContext:
+                Boolean(
+                  billingSession.context
+                    .hasOfficialBillingContext
+                )
+            }
+          );
+
+        if (needsPersonalBilling) {
+          if (!requestAuth) {
+            const reply =
+              'Puedo revisar tu recibo y explicarte los montos, pero primero debes iniciar sesión en Mi Movistar para proteger tu información personal.';
+
+            addMessage(
+              activeSessionId,
+              'user',
+              cleanMessage
+            );
+            addMessage(
+              activeSessionId,
+              'assistant',
+              reply
+            );
+            registerMessage(
+              activeSessionId,
+              'assistant'
+            );
+
+            return res.json({
+              reply,
+              foundData: false,
+              sessionId:
+                activeSessionId,
+              requiresAuth: true,
+              authUrl:
+                '/login?returnTo=' +
+                encodeURIComponent(
+                  '/chat?resume=1'
+                ),
+              requestedCapability:
+                'PERSONAL_BILLING'
+            });
+          }
+
+          try {
+            const officialExperience =
+              await getOfficialExperience(
+                requestAuth.session.user
+              );
+
+            const personalReply =
+              buildPersonalBillingReply(
+                officialExperience,
+                cleanMessage,
+                {
+                  hasPersonalBillingContext:
+                    Boolean(
+                      billingSession.context
+                        .hasOfficialBillingContext
+                    )
+                }
+              );
+
+            updateContext(
+              activeSessionId,
+              {
+                customerIdentifier:
+                  requestAuth.session.user
+                    .customerId,
+                identityLocked: true,
+                hasOfficialBillingContext:
+                  true,
+                lastBillingIntent:
+                  personalReply.intent,
+                demoScenario:
+                  officialExperience.customer
+                    .demoScenario
+              }
+            );
+
+            registerInteractionContext(
+              activeSessionId,
+              {
+                customerIdentifier:
+                  requestAuth.session.user
+                    .customerId,
+                customerName:
+                  requestAuth.session.user
+                    .name
+              }
+            );
+
+            addMessage(
+              activeSessionId,
+              'user',
+              cleanMessage
+            );
+            addMessage(
+              activeSessionId,
+              'assistant',
+              personalReply.reply
+            );
+            registerMessage(
+              activeSessionId,
+              'assistant'
+            );
+
+            return res.json({
+              ...personalReply,
+              foundData: true,
+              sessionId:
+                activeSessionId,
+              authenticated: true,
+              demoScenario:
+                officialExperience.customer
+                  .demoScenario
+            });
+          } catch (error) {
+            if (isDemoMappingError(error)) {
+              const reply =
+                'La autenticación funciona, pero los casos demo oficiales todavía no están configurados en este equipo. Ejecuta npm run demo:configure:desafio1 en el backend y vuelve a intentarlo.';
+
+              addMessage(
+                activeSessionId,
+                'user',
+                cleanMessage
+              );
+              addMessage(
+                activeSessionId,
+                'assistant',
+                reply
+              );
+              registerMessage(
+                activeSessionId,
+                'assistant'
+              );
+
+              return res.json({
+                reply,
+                foundData: false,
+                sessionId:
+                  activeSessionId,
+                configurationRequired:
+                  true,
+                code:
+                  error.code
+              });
+            }
+
+            throw error;
+          }
+        }
+
+
+        const generalEducationReply =
+          buildGeneralBillingEducationReply(
+            cleanMessage
+          );
+
+        if (generalEducationReply) {
+          addMessage(
+            activeSessionId,
+            'user',
+            cleanMessage
+          );
+          addMessage(
+            activeSessionId,
+            'assistant',
+            generalEducationReply
+          );
+          registerMessage(
+            activeSessionId,
+            'assistant'
+          );
+
+          return res.json({
+            reply:
+              generalEducationReply,
+            foundData: false,
+            sessionId:
+              activeSessionId,
+            source:
+              'DESAFIO1_EDUCATION_DETERMINISTIC'
+          });
+        }
+
+
+        // =====================================================
+        // CONSULTA GENERAL AL RAG
         // =====================================================
 
         const result =
           await procesarConsultaFactura(
             cleanMessage,
-            activeSessionId
+            activeSessionId,
+            {
+              allowExplicitIdentifier:
+                false,
+              disablePersonalContext:
+                true,
+              identityLocked:
+                Boolean(requestAuth)
+            }
           );
 
 
@@ -1045,30 +1427,34 @@ function createApp() {
   );
 
 
-  // En producción esto vendría de la
-  // autenticación real del usuario.
-  // Para el hackathon simulamos ese contexto.
+  // En producción la identidad vendría de Mi Movistar.
+  // En la demo solo una cookie autenticada puede asociar
+  // el alias Carlos/Ana a una conversación. Ya no se acepta
+  // customerId libre enviado por un cliente sin autenticar.
   app.post(
     '/api/session/:sessionId/customer',
     (req, res) => {
       const auth =
         getRequestAuth(req);
 
+      if (!auth) {
+        return res
+          .status(401)
+          .json({
+            error:
+              'Debes iniciar sesión para asociar información personal al chat'
+          });
+      }
+
       const requestedCustomerId =
         req.body &&
         req.body.customerId;
 
       const customerId =
-        auth
-          ? auth.session.user
-              .customerId
-          : requestedCustomerId;
+        auth.session.user
+          .customerId;
 
-      // Si existe una sesión autenticada,
-      // la identidad de la cookie manda sobre
-      // cualquier customerId enviado por el cliente.
       if (
-        auth &&
         requestedCustomerId &&
         requestedCustomerId !==
           customerId
@@ -1097,16 +1483,15 @@ function createApp() {
         req.params.sessionId,
         {
           customerIdentifier:
-            customerId
+            customerId,
+          identityLocked: true
         }
       );
 
       return res.json({
         ok: true,
-
         sessionId:
           req.params.sessionId,
-
         customerId
       });
     }

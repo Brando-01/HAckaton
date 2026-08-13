@@ -705,7 +705,8 @@ ${JSON.stringify(
 
 async function procesarConsultaFactura(
   mensajeTexto,
-  sessionId
+  sessionId,
+  options = {}
 ) {
   try {
     const session =
@@ -719,13 +720,29 @@ async function procesarConsultaFactura(
 
 
     // -------------------------------------------------------
-    // 1. Detectar identificador explícito.
+    // 1. Identidad.
     // -------------------------------------------------------
 
-    const identificadorEncontrado =
-      extraerIdentificadorCliente(
-        mensajeTexto
+    const identityLocked =
+      Boolean(
+        options.identityLocked ||
+        session.context
+          .identityLocked
       );
+
+    const allowExplicitIdentifier =
+      options.allowExplicitIdentifier !==
+        false &&
+      !identityLocked;
+
+    // Una sesión autenticada nunca puede ser reemplazada
+    // por un DNI/número escrito dentro del mensaje.
+    const identificadorEncontrado =
+      allowExplicitIdentifier
+        ? extraerIdentificadorCliente(
+            mensajeTexto
+          )
+        : null;
 
 
     if (
@@ -756,10 +773,17 @@ async function procesarConsultaFactura(
     //    Mi Movistar / Persona 4.
     // -------------------------------------------------------
 
-    const contextoApp =
-      construirContextoApp(
-        idBuscar
+    const disablePersonalContext =
+      Boolean(
+        options.disablePersonalContext
       );
+
+    const contextoApp =
+      disablePersonalContext
+        ? null
+        : construirContextoApp(
+            idBuscar
+          );
 
 
     let contextoCliente = '';
@@ -779,6 +803,7 @@ async function procesarConsultaFactura(
       // -----------------------------------------------------
 
       const infoCliente =
+        !disablePersonalContext &&
         idBuscar
           ? await obtenerInformacionCliente(
               idBuscar

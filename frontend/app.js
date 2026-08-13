@@ -193,7 +193,21 @@
   function renderCauses(causes) {
     causesList.innerHTML = '';
 
-    (causes || []).forEach(
+    const safeCauses =
+      causes || [];
+
+    if (!safeCauses.length) {
+      causesList.appendChild(
+        createElement(
+          'p',
+          'empty-state',
+          'No hay una causa adicional que mostrar para este recibo.'
+        )
+      );
+      return;
+    }
+
+    safeCauses.forEach(
       (cause) => {
         const card =
           createElement(
@@ -220,13 +234,16 @@
           )
         );
 
+        const causeImpact =
+          Number(cause.impact) || 0;
+
         const impact =
           createElement(
             'strong',
             'cause-impact',
-            `+${formatMoney(
-              cause.impact
-            )}`
+            causeImpact > 0
+              ? `+${formatMoney(causeImpact)}`
+              : formatMoney(causeImpact)
           );
 
         card.appendChild(content);
@@ -314,27 +331,59 @@
         : '';
 
     const difference =
-      data.comparison.difference;
+      data.comparison
+        ? data.comparison.difference
+        : null;
 
-    variationAmount.textContent =
-      difference > 0
-        ? `+${formatMoney(difference)}`
-        : formatMoney(difference);
+    if (
+      difference === null ||
+      difference === undefined
+    ) {
+      variationAmount.textContent =
+        'Sin comparación';
+      variationPercentage.textContent =
+        'Primer recibo disponible en el caso demo';
+    } else {
+      variationAmount.textContent =
+        difference > 0
+          ? `+${formatMoney(difference)}`
+          : formatMoney(difference);
 
-    variationPercentage.textContent =
-      difference > 0
-        ? `${data.comparison.percentage}% más que el mes anterior`
-        : `${Math.abs(
-            data.comparison.percentage
-          )}% menos que el mes anterior`;
+      variationPercentage.textContent =
+        difference > 0
+          ? `${data.comparison.percentage}% más que el recibo anterior`
+          : difference < 0
+            ? `${Math.abs(data.comparison.percentage)}% menos que el recibo anterior`
+            : 'Mismo total que el recibo anterior';
+    }
 
-    previousPeriod.textContent =
-      data.previousBill.period;
+    if (data.previousBill) {
+      previousPeriod.textContent =
+        data.previousBill.period;
 
-    previousTotal.textContent =
-      formatMoney(
-        data.previousBill.total
+      previousTotal.textContent =
+        formatMoney(
+          data.previousBill.total
+        );
+
+      renderItems(
+        previousItems,
+        data.previousBill.items
       );
+    } else {
+      previousPeriod.textContent =
+        'Sin recibo anterior';
+      previousTotal.textContent =
+        '—';
+      previousItems.innerHTML = '';
+      previousItems.appendChild(
+        createElement(
+          'span',
+          'empty-state',
+          'No hay un recibo anterior comparable en los datos disponibles.'
+        )
+      );
+    }
 
     comparisonCurrentPeriod.textContent =
       data.currentBill.period;
@@ -345,18 +394,16 @@
       );
 
     renderItems(
-      previousItems,
-      data.previousBill.items
-    );
-
-    renderItems(
       currentItems,
       data.currentBill.items
     );
 
-    renderCauses(
-      data.comparison.causes
-    );
+    renderCauses([
+      ...(
+        data.comparison?.causes || []
+      ),
+      ...(data.findings || [])
+    ]);
 
     renderActions(
       data.nextActions
@@ -442,6 +489,9 @@
       );
       sessionStorage.removeItem(
         'chatSessionId'
+      );
+      sessionStorage.removeItem(
+        'pendingAuthBillingPrompt'
       );
       window.location.href =
         '/login';

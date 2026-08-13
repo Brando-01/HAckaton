@@ -225,7 +225,34 @@ function normalizarContextoFacturacion(
                   )
                 : []
           }
-        : null
+        : null,
+
+    findings:
+      Array.isArray(
+        billingContext.findings
+      )
+        ? billingContext.findings.map(
+            (finding) => ({
+              code:
+                finding.code || null,
+              title:
+                finding.title ||
+                'Hallazgo del recibo',
+              description:
+                finding.description ||
+                null,
+              impact:
+                Number.isFinite(
+                  finding.impact
+                )
+                  ? finding.impact
+                  : null,
+              evidenceLevel:
+                finding.evidenceLevel ||
+                null
+            })
+          )
+        : []
   };
 }
 
@@ -246,7 +273,7 @@ function crearResumenAsesor({
     normalizarTexto(originalQuery || '');
 
   const isBillingQuery =
-    /(recibo|factura|facturacion|cobro|monto|pagar|pague|pagaba|aumento|subio|variacion|descuento|reconexion|cargo)/.test(
+    /(recibo|factura|facturacion|cobro|monto|pagar|pague|pagaba|aumento|subio|variacion|descuento|reconexion|cargo|prorrateo)/.test(
       normalizedQuery
     );
 
@@ -272,6 +299,31 @@ function crearResumenAsesor({
           detail:
             cause.description || null,
           impact
+        });
+      });
+  }
+
+  if (
+    billing &&
+    Array.isArray(
+      billing.findings
+    )
+  ) {
+    billing.findings
+      .forEach((finding) => {
+        findings.push({
+          title:
+            finding.title ||
+            'Hallazgo del recibo',
+          detail:
+            finding.description ||
+            null,
+          impact:
+            Number.isFinite(
+              finding.impact
+            )
+              ? finding.impact
+              : null
         });
       });
   }
@@ -311,6 +363,24 @@ function crearResumenAsesor({
       `${customerName} consultó por su facturación. ` +
       `El recibo ${movement} de S/ ${billing.previousBill.total} ` +
       `a S/ ${billing.currentBill.total}.`;
+  }
+
+  if (
+    isBillingQuery &&
+    billing?.currentBill &&
+    !billing?.previousBill &&
+    billing?.findings
+      ?.some(
+        (finding) =>
+          finding.code ===
+          'PRORATION'
+      )
+  ) {
+    headline =
+      'Prorrateo identificado en el recibo';
+    overview =
+      `${customerName} consultó por un primer recibo sin comparación mensual disponible. ` +
+      'Lucía transfirió el prorrateo verificado para revisión del asesor.';
   }
 
   const assistantMessages =
