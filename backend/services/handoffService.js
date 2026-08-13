@@ -15,6 +15,22 @@ function normalizarTexto(texto = '') {
     .trim();
 }
 
+function adaptarDescripcionParaAsesor(value) {
+  if (!value) {
+    return value || null;
+  }
+
+  return String(value)
+    .replace(/\bde tu recibo\b/gi, 'del recibo del cliente')
+    .replace(/\bde tu servicio\b/gi, 'del servicio del cliente')
+    .replace(/\btu recibo\b/gi, 'el recibo del cliente')
+    .replace(/\btu servicio\b/gi, 'el servicio del cliente')
+    .replace(/\btu facturaci[oó]n\b/gi, 'la facturación del cliente')
+    .replace(/\btu plan\b/gi, 'el plan del cliente')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function esSolicitudAsesor(mensaje) {
   const texto = normalizarTexto(mensaje);
 
@@ -213,8 +229,9 @@ function normalizarContextoFacturacion(
                         cause.title ||
                         'Variación detectada',
                       description:
-                        cause.description ||
-                        null,
+                        adaptarDescripcionParaAsesor(
+                          cause.description
+                        ),
                       impact:
                         Number.isFinite(
                           cause.impact
@@ -263,8 +280,9 @@ function normalizarContextoFacturacion(
                 finding.title ||
                 'Hallazgo del recibo',
               description:
-                finding.description ||
-                null,
+                adaptarDescripcionParaAsesor(
+                  finding.description
+                ),
               impact:
                 Number.isFinite(
                   finding.impact
@@ -598,6 +616,7 @@ function resetHandoffCases() {
 }
 
 module.exports = {
+  adaptarDescripcionParaAsesor,
   esSolicitudAsesor,
   determinarMotivoDerivacion,
   obtenerConsultaOriginal,

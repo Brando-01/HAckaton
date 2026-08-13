@@ -189,3 +189,112 @@ h1 {
     height: 50px;
   }
 }
+
+/* RELEASE 1 PREFLIGHT */
+
+.release-status-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 22px;
+  padding: 22px 24px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--card-bg);
+  box-shadow: 0 10px 28px rgba(11, 39, 57, 0.05);
+}
+
+.release-status-card.ready {
+  border-color: #a7dec0;
+  background: #f5fcf8;
+}
+
+.release-status-card.review {
+  border-color: #f0d6a0;
+  background: #fffaf0;
+}
+
+.release-status-copy h2 {
+  margin: 6px 0 6px;
+  font-size: 22px;
+}
+
+.release-status-copy p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.release-status-side {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+}
+
+.release-state-pill,
+.release-profile-chip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  font-weight: 750;
+}
+
+.release-state-pill {
+  padding: 7px 11px;
+  background: #eef1f4;
+  color: #59636d;
+  font-size: 12px;
+}
+
+.release-status-card.ready .release-state-pill {
+  background: #dff5e8;
+  color: #18794e;
+}
+
+.release-status-card.review .release-state-pill {
+  background: #fff0cf;
+  color: #8a5a00;
+}
+
+.release-profile-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.release-profile-chip {
+  padding: 6px 9px;
+  border: 1px solid #dbe4ea;
+  background: #fff;
+  color: #53616d;
+  font-size: 11px;
+}
+
+.release-profile-chip.ready {
+  border-color: #b8e2c9;
+  color: #18794e;
+}
+
+.release-profile-chip.review {
+  border-color: #f0d6a0;
+  color: #8a5a00;
+}
+
+@media (max-width: 850px) {
+  .release-status-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .release-status-side {
+    justify-items: start;
+  }
+
+  .release-profile-chips {
+    justify-content: flex-start;
+  }
+}

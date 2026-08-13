@@ -22,6 +22,18 @@
       </p>
     </section>
 
+    <section class="release-status-card loading" id="releaseStatusCard" aria-live="polite">
+      <div class="release-status-copy">
+        <span class="role-kicker">Release 1 · preflight local</span>
+        <h2 id="releaseStatusTitle">Verificando preparación de la demo...</h2>
+        <p id="releaseStatusDetail">Comprobando perfiles, grounding financiero, privacidad y trazabilidad de fuentes.</p>
+      </div>
+      <div class="release-status-side">
+        <span class="release-state-pill" id="releaseStatePill">Verificando</span>
+        <div class="release-profile-chips" id="releaseProfileChips"></div>
+      </div>
+    </section>
+
     <section class="role-grid" aria-label="Vistas de demostración">
       <article class="role-card primary-card">
         <span class="role-kicker">Cliente</span>
@@ -33,7 +45,7 @@
       <article class="role-card">
         <span class="role-kicker">Asistente virtual</span>
         <h2>Lucía</h2>
-        <p>Abre el chat directamente para realizar consultas, probar memoria conversacional y solicitar un asesor.</p>
+        <p>Abre Lucía sin login para consultas generales. Si preguntas por tu recibo, la autenticación se solicita recién cuando hace falta acceder a datos personales.</p>
         <a class="secondary-action" href="/chat">Abrir asistente</a>
       </article>
 
@@ -54,13 +66,14 @@
         <h2>Prueba el flujo completo</h2>
       </div>
       <ol>
-        <li>Entra a <strong>Mi Movistar</strong> e inicia sesión o usa un perfil demo.</li>
-        <li>Pulsa <strong>Entender mi aumento</strong>.</li>
-        <li>Haz preguntas de seguimiento en Lucía.</li>
-        <li>Solicita hablar con un asesor.</li>
-        <li>Revisa el caso y las métricas desde las vistas internas.</li>
+        <li>Abre <strong>Lucía</strong> sin sesión y prueba una consulta general como “¿Qué es un prorrateo?”.</li>
+        <li>Pregunta <strong>“¿Por qué subió mi recibo?”</strong> y deja que Lucía solicite autenticación.</li>
+        <li>Entra como <strong>Carlos</strong> para mostrar la reconexión verificada y luego deriva el caso al asesor.</li>
+        <li>Revisa el <strong>handoff con contexto y evidencia</strong> en el Portal del asesor.</li>
+        <li>Como escenario de respaldo, entra como <strong>Ana</strong> para mostrar primer recibo + prorrateo + renta adelantada.</li>
       </ol>
     </section>
   </main>
+  <script src="./demo.js"></script>
 </body>
 </html>

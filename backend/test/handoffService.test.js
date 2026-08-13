@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  adaptarDescripcionParaAsesor,
   esSolicitudAsesor,
   determinarMotivoDerivacion,
   obtenerConsultaOriginal,
@@ -445,5 +446,82 @@ test('transfiere un prorrateo de primer recibo como hallazgo al asesor', () => {
   assert.match(
     caso.advisorSummary.findings[0].detail,
     /S\/ 21\.92/
+  );
+});
+
+
+test('adapta el texto orientado al cliente para el portal del asesor', () => {
+  assert.equal(
+    adaptarDescripcionParaAsesor(
+      'Se agregó S/ 4.58 por la reconexión de tu servicio. Este cargo ya está incluido en el total de tu recibo.'
+    ),
+    'Se agregó S/ 4.58 por la reconexión del servicio del cliente. Este cargo ya está incluido en el total del recibo del cliente.'
+  );
+});
+
+test('el contexto de facturación transferido usa lenguaje del asesor y conserva el transcript original', () => {
+  resetHandoffCases();
+
+  const caso = crearCaso({
+    sessionId: 'session-advisor-audience',
+    customerIdentifier: 'CLI000001',
+    originalQuery: '¿Por qué subió mi recibo?',
+    customerContext: {
+      customerId: 'CLI000001',
+      name: 'Carlos Mendoza',
+      plan: 'Plan demo oficial'
+    },
+    billingContext: {
+      previousBill: {
+        period: 'Ciclo 15/06/2026',
+        total: 62.89
+      },
+      currentBill: {
+        period: 'Ciclo 15/07/2026',
+        total: 67.47
+      },
+      comparison: {
+        difference: 4.58,
+        percentage: 7.3,
+        direction: 'UP',
+        causes: [
+          {
+            code: 'RECONNECTION',
+            title: 'Cargo por reconexión',
+            description: 'Se agregó S/ 4.58 por la reconexión de tu servicio. Este cargo ya está incluido en el total de tu recibo.',
+            impact: 4.58,
+            evidenceLevel: 'HIGH'
+          }
+        ]
+      },
+      findings: []
+    },
+    conversation: [
+      {
+        role: 'user',
+        content: '¿Por qué subió mi recibo?'
+      },
+      {
+        role: 'assistant',
+        content: 'Este cargo ya está incluido en el total de tu recibo.'
+      }
+    ]
+  });
+
+  assert.match(
+    caso.billing.comparison.causes[0].description,
+    /recibo del cliente/i
+  );
+  assert.doesNotMatch(
+    caso.billing.comparison.causes[0].description,
+    /tu recibo/i
+  );
+  assert.match(
+    caso.advisorSummary.findings[0].detail,
+    /servicio del cliente/i
+  );
+  assert.match(
+    caso.conversation[1].content,
+    /tu recibo/i
   );
 });

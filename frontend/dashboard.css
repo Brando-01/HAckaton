@@ -630,3 +630,134 @@ tbody tr:hover {
         padding: 17px;
     }
 }
+
+/* RELEASE 1 READINESS */
+
+.readiness-title-row {
+    align-items: center;
+}
+
+.release-readiness-pill,
+.readiness-check-state,
+.release-scenario-chip {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    border-radius: 999px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.release-readiness-pill {
+    padding: 7px 11px;
+    font-size: 11px;
+}
+
+.release-readiness-pill.loading {
+    background: #eef1f4;
+    color: #59636d;
+}
+
+.release-readiness-pill.ready,
+.readiness-check-state.ready,
+.release-scenario-chip.ready {
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+.release-readiness-pill.review,
+.readiness-check-state.review,
+.release-scenario-chip.review {
+    background: var(--warning-soft);
+    color: var(--warning);
+}
+
+.readiness-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.readiness-card {
+    min-height: 148px;
+    padding: 17px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface-muted);
+}
+
+.readiness-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.readiness-card-top strong {
+    font-size: 13px;
+}
+
+.readiness-check-state {
+    padding: 5px 8px;
+    background: #eef1f4;
+    color: #59636d;
+    font-size: 10px;
+}
+
+.readiness-card p {
+    margin: 12px 0 0;
+    color: #55616c;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.release-scenario-strip {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 18px;
+    margin-top: 14px;
+    padding: 15px 17px;
+    border: 1px solid #cfe8f3;
+    border-radius: 12px;
+    background: #f5fbfe;
+}
+
+.release-scenario-strip strong {
+    font-size: 13px;
+}
+
+.release-scenario-chips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 7px;
+}
+
+.release-scenario-chip {
+    padding: 6px 9px;
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    font-size: 10px;
+}
+
+@media (max-width: 1150px) {
+    .readiness-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 700px) {
+    .readiness-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .release-scenario-strip,
+    .readiness-title-row {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .release-scenario-chips {
+        justify-content: flex-start;
+    }
+}

@@ -43,6 +43,10 @@ const {
 } = require('./services/demoProfileBindingService');
 
 const {
+  createRelease1ReadinessService
+} = require('./services/release1ReadinessService');
+
+const {
   requiresPersonalBillingAccess,
   buildGeneralBillingEducationReply,
   buildPersonalBillingReply
@@ -233,6 +237,12 @@ function createApp(options = {}) {
   const officialDemoExperienceService =
     options.officialDemoExperienceService ||
     createOfficialDemoExperienceService();
+
+  const release1ReadinessService =
+    options.release1ReadinessService ||
+    createRelease1ReadinessService({
+      officialDemoExperienceService
+    });
 
   async function getOfficialExperience(user) {
     return officialDemoExperienceService
@@ -542,6 +552,37 @@ function createApp(options = {}) {
       return res.json(
         getDemoMappingStatus()
       );
+    }
+  );
+
+  app.get(
+    '/api/demo/release/readiness',
+    async (req, res) => {
+      try {
+        const report =
+          await release1ReadinessService
+            .buildReport();
+
+        return res.json(report);
+      } catch (error) {
+        console.error(
+          '[RELEASE] No se pudo ejecutar el preflight:',
+          error
+        );
+
+        return res
+          .status(500)
+          .json({
+            schemaVersion:
+              'desafio1-release1-readiness-v1',
+            release: 'R1',
+            ready: false,
+            status:
+              'PREFLIGHT_ERROR',
+            error:
+              'No se pudo verificar la preparación del Release 1.'
+          });
+      }
     }
   );
 

@@ -53,7 +53,29 @@
     connectionDot:
       document.getElementById('connectionDot'),
     refreshDashboard:
-      document.getElementById('refreshDashboard')
+      document.getElementById('refreshDashboard'),
+    releaseReadinessStatus:
+      document.getElementById('releaseReadinessStatus'),
+    readinessProfilesState:
+      document.getElementById('readinessProfilesState'),
+    readinessProfilesDetail:
+      document.getElementById('readinessProfilesDetail'),
+    readinessGroundingState:
+      document.getElementById('readinessGroundingState'),
+    readinessGroundingDetail:
+      document.getElementById('readinessGroundingDetail'),
+    readinessPrivacyState:
+      document.getElementById('readinessPrivacyState'),
+    readinessPrivacyDetail:
+      document.getElementById('readinessPrivacyDetail'),
+    readinessLineageState:
+      document.getElementById('readinessLineageState'),
+    readinessLineageDetail:
+      document.getElementById('readinessLineageDetail'),
+    releaseScenarioSummary:
+      document.getElementById('releaseScenarioSummary'),
+    releaseScenarioChips:
+      document.getElementById('releaseScenarioChips')
   };
 
   let isLoading = false;
@@ -395,6 +417,221 @@
     renderInteractions(data.recentInteractions || []);
   }
 
+  function getReadinessCheck(
+    report,
+    id
+  ) {
+    return (
+      report?.checks || []
+    ).find(
+      (check) =>
+        check.id === id
+    ) || null;
+  }
+
+  function setReadinessCard(
+    stateElement,
+    detailElement,
+    check,
+    successLabel = 'OK'
+  ) {
+    const ok =
+      check?.ok === true;
+
+    stateElement.textContent =
+      ok
+        ? successLabel
+        : 'Revisar';
+
+    stateElement.className =
+      `readiness-check-state ${ok ? 'ready' : 'review'}`;
+
+    detailElement.textContent =
+      check?.detail ||
+      'No se pudo verificar este control.';
+  }
+
+  function renderReleaseReadiness(
+    report
+  ) {
+    const ready =
+      report?.ready === true;
+
+    elements.releaseReadinessStatus.textContent =
+      ready
+        ? 'Release listo'
+        : 'Revisar';
+
+    elements.releaseReadinessStatus.className =
+      `release-readiness-pill ${ready ? 'ready' : 'review'}`;
+
+    setReadinessCard(
+      elements.readinessProfilesState,
+      elements.readinessProfilesDetail,
+      getReadinessCheck(
+        report,
+        'PROFILE_COVERAGE'
+      ),
+      `${report?.summary?.readyProfiles ?? 0}/${report?.summary?.expectedProfiles ?? 0}`
+    );
+
+    setReadinessCard(
+      elements.readinessGroundingState,
+      elements.readinessGroundingDetail,
+      getReadinessCheck(
+        report,
+        'FINANCIAL_GROUNDING'
+      ),
+      'Verificado'
+    );
+
+    const privacyCheck =
+      getReadinessCheck(
+        report,
+        'PUBLIC_PAYLOAD_PRIVACY'
+      );
+
+    const copyCheck =
+      getReadinessCheck(
+        report,
+        'CUSTOMER_COPY_SAFE'
+      );
+
+    const privacyOk =
+      privacyCheck?.ok === true &&
+      copyCheck?.ok === true;
+
+    elements.readinessPrivacyState.textContent =
+      privacyOk
+        ? 'Protegido'
+        : 'Revisar';
+    elements.readinessPrivacyState.className =
+      `readiness-check-state ${privacyOk ? 'ready' : 'review'}`;
+    elements.readinessPrivacyDetail.textContent =
+      privacyOk
+        ? 'Sin identificadores oficiales ni nombres internos en la experiencia pública.'
+        : [
+            privacyCheck?.detail,
+            copyCheck?.detail
+          ]
+            .filter(Boolean)
+            .join(' ');
+
+    setReadinessCard(
+      elements.readinessLineageState,
+      elements.readinessLineageDetail,
+      getReadinessCheck(
+        report,
+        'DATA_LINEAGE'
+      ),
+      `${report?.summary?.lineageSources ?? 0}/${report?.summary?.expectedLineageSources ?? 0}`
+    );
+
+    const scenarios =
+      report?.profiles || [];
+
+    elements.releaseScenarioChips.innerHTML = '';
+
+    scenarios.forEach(
+      (profile) => {
+        const chip =
+          document.createElement(
+            'span'
+          );
+
+        chip.className =
+          `release-scenario-chip ${profile.ready ? 'ready' : 'review'}`;
+
+        chip.textContent =
+          `${profile.name || profile.customerId} · ${profile.scenarioLabel || profile.scenario || 'sin escenario'}`;
+
+        elements.releaseScenarioChips.appendChild(
+          chip
+        );
+      }
+    );
+
+    elements.releaseScenarioSummary.textContent =
+      ready
+        ? `${report.summary?.distinctScenarios ?? 0} escenarios críticos listos para la demostración`
+        : 'El preflight detectó controles que deben revisarse antes del pitch';
+  }
+
+  function renderReleaseReadinessError() {
+    elements.releaseReadinessStatus.textContent =
+      'Sin verificar';
+    elements.releaseReadinessStatus.className =
+      'release-readiness-pill review';
+
+    [
+      [
+        elements.readinessProfilesState,
+        elements.readinessProfilesDetail
+      ],
+      [
+        elements.readinessGroundingState,
+        elements.readinessGroundingDetail
+      ],
+      [
+        elements.readinessPrivacyState,
+        elements.readinessPrivacyDetail
+      ],
+      [
+        elements.readinessLineageState,
+        elements.readinessLineageDetail
+      ]
+    ].forEach(
+      ([state, detail]) => {
+        state.textContent = 'Revisar';
+        state.className =
+          'readiness-check-state review';
+        detail.textContent =
+          'No se pudo consultar el preflight del Release 1.';
+      }
+    );
+
+    elements.releaseScenarioSummary.textContent =
+      'Verifica la configuración local antes de iniciar la demo.';
+    elements.releaseScenarioChips.innerHTML = '';
+  }
+
+  async function loadReleaseReadiness(
+    signal
+  ) {
+    try {
+      const response =
+        await fetch(
+          '/api/demo/release/readiness',
+          {
+            cache: 'no-store',
+            signal
+          }
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          `HTTP ${response.status}`
+        );
+      }
+
+      const report =
+        await response.json();
+
+      renderReleaseReadiness(
+        report
+      );
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        console.error(
+          '[DASHBOARD] Preflight:',
+          error
+        );
+      }
+
+      renderReleaseReadinessError();
+    }
+  }
+
   function setConnectionState(state, message) {
     elements.connectionDot.className = `connection-dot ${state}`;
     elements.lastUpdate.textContent = message;
@@ -418,6 +655,11 @@
       elements.refreshDashboard.textContent = 'Actualizando...';
       setConnectionState('loading', 'Actualizando métricas...');
 
+      const readinessPromise =
+        loadReleaseReadiness(
+          controller.signal
+        );
+
       const response = await fetch(
         '/api/metrics/dashboard',
         {
@@ -432,6 +674,7 @@
 
       const data = await response.json();
       renderSummary(data);
+      await readinessPromise;
 
       lastSuccessfulUpdate = new Date();
       setConnectionState(

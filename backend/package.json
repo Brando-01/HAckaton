@@ -12,7 +12,9 @@
     "billing:inspect:desafio1": "node scripts/inspeccionarFacturacionDesafio1.js",
     "billing:explain:desafio1": "node scripts/explicarFacturacionDesafio1.js",
     "demo:rank:desafio1": "node scripts/seleccionarCasosDemoDesafio1.js",
-    "demo:configure:desafio1": "node scripts/configurarDemoDesafio1.js"
+    "demo:configure:desafio1": "node scripts/configurarDemoDesafio1.js",
+    "demo:preflight:desafio1": "node scripts/verificarRelease1Desafio1.js",
+    "demo:smoke:desafio1": "node scripts/smokeRelease1Desafio1.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

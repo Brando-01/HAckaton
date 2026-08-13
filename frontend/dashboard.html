@@ -172,44 +172,58 @@
         </section>
 
         <section class="section-block quality-section">
-            <div class="section-title-row">
+            <div class="section-title-row readiness-title-row">
                 <div>
-                    <span class="section-kicker">CALIDAD EXIGIDA POR EL RETO</span>
-                    <h2>Controles que no debemos fingir con datos insuficientes</h2>
+                    <span class="section-kicker">PREPARACIÓN DEL RELEASE 1</span>
+                    <h2>Controles reales del prototipo</h2>
                     <p>
-                        El reto también pide precisión de recuperación, cero alucinaciones financieras
-                        y precisión del handoff. Estos indicadores necesitan ground truth y logs de validación.
+                        Estado calculado en tiempo de ejecución sobre los dos perfiles demo oficiales.
+                        No sustituye métricas productivas como Retrieval Accuracy o NPS real.
                     </p>
                 </div>
+                <span class="release-readiness-pill loading" id="releaseReadinessStatus">Verificando</span>
             </div>
 
-            <div class="quality-grid">
-                <article class="quality-card">
-                    <div class="quality-top">
-                        <strong>Retrieval Accuracy</strong>
-                        <span class="quality-status pending">Pendiente</span>
+            <div class="readiness-grid">
+                <article class="readiness-card">
+                    <div class="readiness-card-top">
+                        <strong>Perfiles oficiales</strong>
+                        <span class="readiness-check-state" id="readinessProfilesState">—</span>
                     </div>
-                    <p>Requiere comparar la información recuperada contra respuestas esperadas del dataset oficial.</p>
-                    <span class="quality-next">Siguiente paso: suite de casos etiquetados.</span>
+                    <p id="readinessProfilesDetail">Comprobando el mapeo local de Carlos y Ana.</p>
                 </article>
 
-                <article class="quality-card">
-                    <div class="quality-top">
-                        <strong>Alucinación financiera</strong>
-                        <span class="quality-status pending">Pendiente</span>
+                <article class="readiness-card">
+                    <div class="readiness-card-top">
+                        <strong>Grounding financiero</strong>
+                        <span class="readiness-check-state" id="readinessGroundingState">—</span>
                     </div>
-                    <p>No se muestra un “0%” artificial: debe verificarse cada afirmación monetaria contra la base y sus logs.</p>
-                    <span class="quality-next">Siguiente paso: validación automática de montos y conceptos.</span>
+                    <p id="readinessGroundingDetail">Comprobando evidencia, conciliación y salvaguardas deterministas.</p>
                 </article>
 
-                <article class="quality-card">
-                    <div class="quality-top">
-                        <strong>Precisión del handoff</strong>
-                        <span class="quality-status partial">Reglas activas</span>
+                <article class="readiness-card">
+                    <div class="readiness-card-top">
+                        <strong>Privacidad de la experiencia</strong>
+                        <span class="readiness-check-state" id="readinessPrivacyState">—</span>
                     </div>
-                    <p>El sistema registra cuándo deriva y por qué; la precisión requiere casos donde sepamos si debía derivar o no.</p>
-                    <span class="quality-next">Siguiente paso: matriz esperada vs. decisión del bot.</span>
+                    <p id="readinessPrivacyDetail">Comprobando que la interfaz pública no exponga identificadores oficiales.</p>
                 </article>
+
+                <article class="readiness-card">
+                    <div class="readiness-card-top">
+                        <strong>Trazabilidad de fuentes</strong>
+                        <span class="readiness-check-state" id="readinessLineageState">—</span>
+                    </div>
+                    <p id="readinessLineageDetail">Comprobando las ocho fuentes importadas.</p>
+                </article>
+            </div>
+
+            <div class="release-scenario-strip">
+                <div>
+                    <span class="section-kicker">ESCENARIOS PREPARADOS</span>
+                    <strong id="releaseScenarioSummary">Verificando casos demo...</strong>
+                </div>
+                <div class="release-scenario-chips" id="releaseScenarioChips"></div>
             </div>
 
             <div class="impact-reference">
