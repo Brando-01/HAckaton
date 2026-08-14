@@ -179,7 +179,10 @@
       const variacion = document.createElement('p');
       const sube = tarjeta.variacion.direccion === 'AUMENTO';
       variacion.className = `tarjeta-variacion ${sube ? 'sube' : 'baja'}`;
-      variacion.textContent = `${sube ? '▲' : '▼'} ${soles(tarjeta.variacion.montoAbsoluto)} vs. ${soles(tarjeta.totalAnterior)} del mes anterior`;
+      // Antes decía "▲ S/ 42.95 vs. S/ 42.95", que es cierto (85.90 − 42.95)
+      // pero se lee absurdo. Se nombran los dos totales y aparte la
+      // diferencia, que es lo que el cliente necesita comparar.
+      variacion.textContent = `${sube ? '▲' : '▼'} ${soles(tarjeta.totalAnterior)} → ${soles(tarjeta.total)} (${sube ? '+' : '−'}${soles(tarjeta.variacion.montoAbsoluto).replace('S/ ', 'S/ ')})`;
       caja.appendChild(variacion);
     }
 

@@ -306,17 +306,23 @@ function extraerSlots(texto) {
  * exactamente el contacto repetido que el reto penaliza.
  */
 function esSeguimientoEliptico(texto, slots) {
+  // Si el mensaje nombra un periodo, es un seguimiento sin importar lo largo
+  // que sea. "me refiero al del mes pasado, el de junio" son 8 tokens y antes
+  // se descartaba por el límite: caía en DESCONOCIDA y el chat volvía a
+  // volcarle el recibo entero.
+  if (slots.mes || slots.mesesAtras) {
+    return true;
+  }
+
   const tokens = texto.split(' ').filter(Boolean);
 
   if (tokens.length > 6) {
     return false;
   }
 
-  if (/^y\b/.test(texto)) {
-    return true;
-  }
-
-  return Boolean(slots.mes || slots.mesesAtras);
+  // Aclaraciones cortas que solo tienen sentido sobre lo ya dicho.
+  return /^y\b/.test(texto)
+    || /\b(me refiero|hablo de|digo el|el otro|ese mismo)\b/.test(texto);
 }
 
 function aplicarRegla(regla, texto) {

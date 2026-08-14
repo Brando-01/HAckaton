@@ -65,7 +65,7 @@ test('el chat explica un recibo con dos causas sin mezclar los montos', { skip: 
 
   assert.match(reply, /S\/ 49\.89/);
   assert.match(reply, /S\/ 34\.95/);
-  assert.match(reply, /2 motivos/);
+  assert.match(reply, /2 (motivos|cosas)/, 'debe avisar que hubo más de una causa');
   assert.match(reply, /descuento/i);
 });
 
@@ -73,7 +73,7 @@ test('el chat no inventa causas cuando el recibo no cambió', { skip: SALTAR }, 
   const { reply } = await preguntar('58364152', '¿por qué subió mi recibo?');
 
   assert.match(reply, /S\/ 89\.91/);
-  assert.match(reply, /no hubo ninguna variación/i);
+  assert.match(reply, /no cambió|igual que|misma|sin variación/i, 'debe decir que no hubo cambio');
   assert.doesNotMatch(reply, /descuento|reconexión|cambio de plan/i);
 });
 

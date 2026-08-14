@@ -103,6 +103,54 @@ function hayBloque(bloque) {
   return Boolean(bloque && bloque.encontrado);
 }
 
+/**
+ * "15 de julio de 2026" → "julio".
+ *
+ * El periodo completo es la fecha de cierre del ciclo y decirlo entero en
+ * cada frase suena a máquina. El dato exacto sigue estando en la tarjeta.
+ */
+function mesDelPeriodo(periodo) {
+  const encontrado = String(periodo || '').match(/de ([a-záéíóúñ]+) de \d{4}/i);
+  return encontrado ? encontrado[1] : String(periodo || '');
+}
+
+/**
+ * Cómo nombrar el recibo del que se está hablando.
+ *
+ * Si el cliente pidió un ciclo concreto ("el de junio"), se le llama por su
+ * mes; si no, es simplemente el último.
+ */
+function nombrarRecibo(bloque, contexto) {
+  const mes = mesDelPeriodo(bloque.reciboActual.periodo);
+  return contexto.cicloPedido ? `tu recibo de ${mes}` : `tu último recibo, el de ${mes},`;
+}
+
+/**
+ * Frase de estado de pago.
+ *
+ * Se omite en los seguimientos: repetir "ya figura pagado, no tienes nada
+ * pendiente" en cada respuesta es lo que hace que suene a plantilla.
+ */
+function fraseEstado(bloque, contexto) {
+  if (contexto.esSeguimiento) {
+    return '';
+  }
+
+  const actual = bloque.reciboActual;
+
+  if (actual.deuda === 'CON DEUDA') {
+    return actual.vencimiento
+      ? ` Ojo que sigue pendiente: vence el ${formatearVencimiento(actual.vencimiento)}.`
+      : ' Ese sigue pendiente de pago.';
+  }
+
+  if (actual.deuda === 'SIN DEUDA') {
+    return ' Ese ya está pagado, así que tranquilo.';
+  }
+
+  return '';
+}
+
 function explicacionDe(codigoCausa) {
   return EXPLICACION[codigoCausa] || {
     corta: 'hubo un movimiento en tus cargos',
@@ -180,16 +228,19 @@ function responderFueraDeAlcance() {
 
 // ── Respuestas con datos ────────────────────────────────────────────────
 
-function responderMonto(bloque) {
+function responderMonto(bloque, contexto) {
   const actual = bloque.reciboActual;
-  const partes = [`Tu recibo del ciclo que cerró el ${actual.periodo} es de ${soles(actual.total)}.`];
+  const mes = mesDelPeriodo(actual.periodo);
 
-  if (actual.deuda === 'CON DEUDA') {
-    partes.push(actual.vencimiento
-      ? `Está pendiente de pago y vence el ${formatearVencimiento(actual.vencimiento)}.`
-      : 'Está pendiente de pago.');
-  } else if (actual.deuda === 'SIN DEUDA') {
-    partes.push('Ya figura pagado, no tienes nada pendiente.');
+  // Si vuelve a preguntar por lo mismo, se confirma en vez de repetir la
+  // frase palabra por palabra: eso es lo que delata a una plantilla.
+  let encabezado;
+  if (contexto.esRepeticion) {
+    encabezado = `Sí, ese mismo: el de ${mes} fueron ${soles(actual.total)}.`;
+  } else if (contexto.cicloPedido) {
+    encabezado = `El de ${mes} te salió ${soles(actual.total)}.`;
+  } else {
+    encabezado = `Tu recibo de ${mes} es de ${soles(actual.total)}.`;
   }
 
   const sugerencias = [CHIPS.DETALLE, CHIPS.HISTORIAL];
@@ -197,23 +248,30 @@ function responderMonto(bloque) {
     sugerencias.unshift(CHIPS.VARIACION);
   }
 
-  return { texto: partes.join(' '), sugerencias, tarjeta: construirTarjeta(bloque) };
+  return {
+    texto: `${encabezado}${fraseEstado(bloque, contexto)}`,
+    sugerencias,
+    tarjeta: construirTarjeta(bloque)
+  };
 }
 
 /** Los tres pasos: qué pasó, por qué, qué hacer. */
-function responderVariacion(bloque) {
+function responderVariacion(bloque, contexto) {
   const { variacion, reciboActual, reciboAnterior } = bloque;
+  const mes = mesDelPeriodo(reciboActual.periodo);
 
   if (!reciboAnterior) {
     return {
-      texto: `Tu recibo del ${reciboActual.periodo} es de ${soles(reciboActual.total)}. Es el primero que tenemos registrado, así que todavía no hay un mes anterior con el cual compararlo.`,
+      texto: `El de ${mes} salió ${soles(reciboActual.total)}, pero es el primero que tenemos registrado. Todavía no hay un mes anterior con el cual compararlo.`,
       sugerencias: [CHIPS.DETALLE]
     };
   }
 
+  const mesAnterior = mesDelPeriodo(reciboAnterior.periodo);
+
   if (variacion.direccion === 'SIN_CAMBIO') {
     return {
-      texto: `Tu recibo del ${reciboActual.periodo} es de ${soles(reciboActual.total)}, el mismo monto que el mes anterior. No hubo ninguna variación.`,
+      texto: `En realidad no cambió: el de ${mes} salió ${soles(reciboActual.total)}, igual que el de ${mesAnterior}.`,
       sugerencias: [CHIPS.DETALLE, CHIPS.HISTORIAL],
       tarjeta: construirTarjeta(bloque)
     };
@@ -222,18 +280,17 @@ function responderVariacion(bloque) {
   const verbo = variacion.direccion === 'AUMENTO' ? 'subió' : 'bajó';
   const pasos = [];
 
-  // 1. QUÉ PASÓ
-  pasos.push(`Tu recibo del ${reciboActual.periodo} es de ${soles(reciboActual.total)}: ${verbo} ${soles(variacion.montoAbsoluto)} frente a los ${soles(reciboAnterior.total)} del mes anterior.`);
+  // 1. QUÉ PASÓ — se nombran los dos meses para que la comparación se entienda.
+  pasos.push(`El de ${mes} ${verbo} ${soles(variacion.montoAbsoluto)}: pasaste de ${soles(reciboAnterior.total)} en ${mesAnterior} a ${soles(reciboActual.total)}.`);
 
   // 2. POR QUÉ
   if (bloque.causas.length === 1) {
-    const causa = bloque.causas[0];
-    pasos.push(`El motivo es que ${explicacionDe(causa.codigo).corta}.`);
+    pasos.push(`Fue porque ${explicacionDe(bloque.causas[0].codigo).corta}.`);
   } else if (bloque.causas.length > 1) {
     const lista = bloque.causas
       .map((causa) => `• ${causa.titulo} (${soles(causa.impacto)}): ${explicacionDe(causa.codigo).corta}`)
       .join('\n');
-    pasos.push(`Hay ${bloque.causas.length} motivos detrás:\n${lista}`);
+    pasos.push(`Fueron ${bloque.causas.length} cosas a la vez:\n${lista}`);
   }
 
   // 3. QUÉ HACER
@@ -266,7 +323,7 @@ function responderDetalle(bloque) {
   const cierre = omitidas > 0 ? `\n\nY ${omitidas} concepto(s) más de menor monto.` : '';
 
   return {
-    texto: `Tu recibo del ${bloque.reciboActual.periodo} suma ${soles(bloque.reciboActual.total)} y se compone así:\n\n${detalle}${cierre}`,
+    texto: `Los ${soles(bloque.reciboActual.total)} de ${mesDelPeriodo(bloque.reciboActual.periodo)} se reparten así:\n\n${detalle}${cierre}`,
     sugerencias: [CHIPS.VARIACION, CHIPS.HISTORIAL],
     tarjeta: construirTarjeta(bloque)
   };
@@ -277,17 +334,17 @@ function responderVencimiento(bloque) {
 
   if (!actual.vencimiento) {
     return {
-      texto: `No tengo registrada la fecha de vencimiento de tu recibo del ${actual.periodo}. Su monto es ${soles(actual.total)}.`,
+      texto: `No tengo registrada la fecha de vencimiento de ese recibo. Lo que sí te puedo decir es que salió ${soles(actual.total)}.`,
       sugerencias: [CHIPS.ASESOR]
     };
   }
 
   const estado = actual.deuda === 'CON DEUDA'
-    ? 'Todavía figura pendiente de pago.'
-    : 'Ya figura pagado, así que no tienes nada pendiente.';
+    ? 'y todavía está pendiente'
+    : 'aunque ya lo tienes pagado';
 
   return {
-    texto: `Tu recibo de ${soles(actual.total)} vence el ${formatearVencimiento(actual.vencimiento)}. ${estado}`,
+    texto: `Vence el ${formatearVencimiento(actual.vencimiento)}, ${estado}. Son ${soles(actual.total)}.`,
     sugerencias: [CHIPS.DETALLE, CHIPS.VARIACION],
     tarjeta: construirTarjeta(bloque)
   };
@@ -295,11 +352,11 @@ function responderVencimiento(bloque) {
 
 function responderHistorial(bloque) {
   const serie = bloque.historial
-    .map((ciclo) => `• ${ciclo.periodo}: ${soles(ciclo.total)}`)
+    .map((ciclo) => `• ${mesDelPeriodo(ciclo.periodo)}: ${soles(ciclo.total)}`)
     .join('\n');
 
   return {
-    texto: `Estos son tus últimos ${bloque.historial.length} recibos:\n\n${serie}\n\nEn promedio, ${soles(bloque.promedioHistorico)} por ciclo.`,
+    texto: `Mira cómo vienes pagando:\n\n${serie}\n\nEn promedio te sale ${soles(bloque.promedioHistorico)} al mes.`,
     sugerencias: [CHIPS.VARIACION, CHIPS.DETALLE],
     tarjeta: construirTarjeta(bloque)
   };
@@ -417,9 +474,9 @@ function construirRespuesta(clasificacion, bloque, contexto = {}) {
 
   switch (intencion) {
     case INTENCIONES.CONSULTA_MONTO:
-      return responderMonto(bloque);
+      return responderMonto(bloque, contexto);
     case INTENCIONES.CONSULTA_VARIACION:
-      return responderVariacion(bloque);
+      return responderVariacion(bloque, contexto);
     case INTENCIONES.CONSULTA_DETALLE:
       return responderDetalle(bloque);
     case INTENCIONES.CONSULTA_VENCIMIENTO:

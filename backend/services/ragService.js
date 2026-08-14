@@ -1190,6 +1190,7 @@ async function procesarConsultaFactura(
   let resumenFacturacion = '';
   let customerIdentifier = null;
   let bloqueDeHechos = null;
+  let pidioOtroCiclo = false;
 
   try {
     session =
@@ -1288,6 +1289,7 @@ async function procesarConsultaFactura(
         // contra los ciclos que el cliente realmente tuvo, no se adivina.
         const cicloPedido = resolverCicloPedido(mensajeTexto, bloqueDeHechos);
         if (cicloPedido) {
+          pidioOtroCiclo = true;
           bloqueDeHechos = await obtenerHechosDeCliente(rutaDatos, idBuscar, {
             cicloObjetivo: cicloPedido
           });
@@ -1316,11 +1318,30 @@ async function procesarConsultaFactura(
       intencionAnterior: session.context && session.context.intencionAnterior
     });
 
-    updateContext(activeSessionId, { intencionAnterior: clasificacion.intencion });
+    // Firma de "sobre qué se acaba de responder", para detectar cuando el
+    // cliente insiste con lo mismo y confirmarlo en vez de repetir la frase.
+    const cicloRespondido = bloqueDeHechos && bloqueDeHechos.encontrado
+      ? bloqueDeHechos.reciboActual.ciclo
+      : null;
+    const firmaTurno = `${clasificacion.intencion}:${cicloRespondido}`;
+    const esRepeticion = Boolean(
+      session.context && session.context.firmaTurnoAnterior === firmaTurno
+    );
+
+    updateContext(activeSessionId, {
+      intencionAnterior: clasificacion.intencion,
+      firmaTurnoAnterior: firmaTurno
+    });
 
     const respuestaPorCapas = construirRespuesta(clasificacion, bloqueDeHechos, {
       tieneCliente: Boolean(idBuscar),
-      nombreCliente: null
+      nombreCliente: null,
+      // Para hablar del recibo por su mes ("el de junio") en vez de repetir
+      // siempre la misma fórmula, y para no repetir el estado de pago en
+      // cada turno de una misma conversación.
+      cicloPedido: pidioOtroCiclo,
+      esSeguimiento: Boolean(clasificacion.esSeguimiento),
+      esRepeticion
     });
 
     if (respuestaPorCapas) {
