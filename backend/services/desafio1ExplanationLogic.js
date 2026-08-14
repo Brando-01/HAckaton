@@ -8,7 +8,7 @@ const {
 );
 
 const PHASE3_RULE_VERSION =
-  'desafio1-phase3-rules-v1';
+  'desafio1-phase3-rules-v2';
 
 const MONEY_MATCH_TOLERANCE =
   0.011;
@@ -223,6 +223,61 @@ function isPlanItem(item) {
   return (
     looksLikeFixedCharge &&
     mentionsPlan
+  );
+}
+
+function isPackageItem(item) {
+  if (!item) {
+    return false;
+  }
+
+  const groups = uniqueValues([
+    item.group,
+    ...(item.groups || [])
+  ])
+    .map(normalizeText);
+
+  const classifications = uniqueValues([
+    item.classification,
+    ...(item.classifications || [])
+  ])
+    .map(normalizeText);
+
+  return (
+    groups.some(
+      (value) =>
+        value === 'paquetes'
+    ) ||
+    classifications.some(
+      (value) =>
+        /(^| )paquete(s)?( |$)/.test(
+          value
+        )
+    )
+  );
+}
+
+function isExplicitPackageOrder(order) {
+  const text = normalizeText([
+    order?.reason,
+    order?.itemType
+  ].filter(Boolean).join(' '));
+
+  if (
+    !/(^| )paquete(s)?( |$)/.test(
+      text
+    )
+  ) {
+    return false;
+  }
+
+  return [
+    'activacion',
+    'afiliacion',
+    'desactivacion'
+  ].some(
+    (marker) =>
+      text.includes(marker)
   );
 }
 
@@ -1144,6 +1199,215 @@ function buildPlanChangeCauses({
   return causes;
 }
 
+function buildPackageCauses({
+  analysis,
+  claimedChargeCodes
+}) {
+  const causes = [];
+
+  if (!analysis.comparison) {
+    return causes;
+  }
+
+  const orders =
+    analysis.evidence
+      ?.ordersBetweenBills || [];
+
+  for (
+    const change of
+      analysis.comparison
+        .chargeChanges || []
+  ) {
+    if (
+      claimedChargeCodes.has(
+        change.chargeCode
+      ) ||
+      change.ignoreForExplanation ||
+      Math.abs(change.delta) <
+        MONEY_EPSILON
+    ) {
+      continue;
+    }
+
+    const context =
+      getChangeItemContext(
+        change,
+        analysis.currentBill,
+        analysis.previousBill
+      );
+
+    const currentIsPackage =
+      isPackageItem(
+        context.current
+      );
+
+    const previousIsPackage =
+      isPackageItem(
+        context.previous
+      );
+
+    if (
+      !currentIsPackage &&
+      !previousIsPackage
+    ) {
+      continue;
+    }
+
+    const sourceItem =
+      currentIsPackage
+        ? context.current
+        : context.previous;
+
+    const changeSubscribers =
+      new Set(
+        (
+          change.subscriberKeys ||
+          sourceItem?.subscriberKeys ||
+          []
+        )
+          .map(
+            (value) =>
+              String(value || '')
+                .trim()
+          )
+          .filter(Boolean)
+      );
+
+    const supportingOrders =
+      orders.filter(
+        (order) => {
+          if (
+            !isExplicitPackageOrder(
+              order
+            )
+          ) {
+            return false;
+          }
+
+          const orderSubscriber =
+            String(
+              order?.subscriberKey ||
+              ''
+            ).trim();
+
+          return (
+            !orderSubscriber ||
+            !changeSubscribers.size ||
+            changeSubscribers.has(
+              orderSubscriber
+            )
+          );
+        }
+      );
+
+    const impactAmount =
+      roundMoney(change.delta);
+
+    const direction =
+      impactAmount > 0
+        ? 'INCREASE'
+        : 'DECREASE';
+
+    const description =
+      sourceItem?.description ||
+      change.description ||
+      'paquete adicional';
+
+    let event = 'CHANGED';
+
+    if (
+      change.previousAmount <=
+        MONEY_EPSILON &&
+      change.currentAmount >
+        MONEY_EPSILON
+    ) {
+      event = 'ADDED';
+    } else if (
+      change.previousAmount >
+        MONEY_EPSILON &&
+      change.currentAmount <=
+        MONEY_EPSILON
+    ) {
+      event = 'REMOVED';
+    }
+
+    let explanation;
+
+    if (event === 'ADDED') {
+      explanation =
+        `Apareció un nuevo cargo de paquete por ${formatMoney(impactAmount)}: "${description}". El importe coincide exactamente con la variación de ese concepto en la facturación.`;
+    } else if (event === 'REMOVED') {
+      explanation =
+        `El recibo disminuyó ${formatMoney(impactAmount)} porque dejó de aparecer el cargo de paquete "${description}". La reducción coincide exactamente con la variación de ese concepto.`;
+    } else if (impactAmount > 0) {
+      explanation =
+        `El cargo del paquete "${description}" aumentó ${formatMoney(impactAmount)} entre ambos recibos. Ese cambio coincide exactamente con la variación del concepto facturado.`;
+    } else {
+      explanation =
+        `El cargo del paquete "${description}" disminuyó ${formatMoney(impactAmount)} entre ambos recibos. Ese cambio coincide exactamente con la variación del concepto facturado.`;
+    }
+
+    claimedChargeCodes.add(
+      change.chargeCode
+    );
+
+    causes.push({
+      code: 'PACKAGES',
+      label: 'Paquete adicional',
+      impactAmount,
+      direction,
+      evidenceLevel: 'HIGH',
+      ruleId:
+        supportingOrders.length
+          ? 'PACKAGE_STRUCTURED_CHARGE_DELTA_WITH_ORDER'
+          : 'PACKAGE_STRUCTURED_CHARGE_DELTA',
+      claimedChargeCodes: [
+        change.chargeCode
+      ],
+      chargeChange: {
+        chargeCode:
+          change.chargeCode,
+        description,
+        previousAmount:
+          change.previousAmount,
+        currentAmount:
+          change.currentAmount,
+        delta:
+          change.delta,
+        status:
+          change.status
+      },
+      evidence: {
+        packageMarker: {
+          group:
+            sourceItem?.group ||
+            null,
+          groups:
+            sourceItem?.groups ||
+            [],
+          classification:
+            sourceItem
+              ?.classification ||
+            null,
+          classifications:
+            sourceItem
+              ?.classifications ||
+            [],
+          sourceRows:
+            sourceItem?.sourceRows ||
+            []
+        },
+        orders:
+          supportingOrders
+      },
+      packageEvent: event,
+      explanation
+    });
+  }
+
+  return causes;
+}
+
 function buildProrationVariationCauses({
   analysis,
   prorationFindings,
@@ -1723,6 +1987,13 @@ function interpretBillingAnalysis(
     })
   );
 
+  causes.push(
+    ...buildPackageCauses({
+      analysis,
+      claimedChargeCodes
+    })
+  );
+
   const difference =
     analysis.comparison
       ?.difference ?? null;
@@ -1836,6 +2107,10 @@ function interpretBillingAnalysis(
         false,
       notesAddedAsCausesAutomatically:
         false,
+      packageCausesRequireStructuredMarker:
+        true,
+      packageCauseAmountsDerivedFromChargeDelta:
+        true,
       cycleDateAssumedAsIssueDate:
         false,
       note:
@@ -1853,6 +2128,8 @@ module.exports = {
   formatDateEs,
   formatMoney,
   isPlanItem,
+  isPackageItem,
+  isExplicitPackageOrder,
   isDiscountDescription,
   isProportionalComponent,
   buildRentContext,
@@ -1861,6 +2138,7 @@ module.exports = {
   buildReconnectionCauses,
   buildDiscountEndCauses,
   buildPlanChangeCauses,
+  buildPackageCauses,
   buildProrationVariationCauses,
   matchActiveDiscountFindings,
   buildAdjustmentFindings,

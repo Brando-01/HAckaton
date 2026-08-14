@@ -5,8 +5,10 @@ const {
   isGeneralBillingEducationQuery,
   requiresPersonalBillingAccess,
   classifyPersonalBillingIntent,
+  classifyPersonalBillingIntents,
   buildGeneralBillingEducationReply,
-  buildPersonalBillingReply
+  buildPersonalBillingReply,
+  buildPersonalBillingMultiReply
 } = require(
   '../services/desafio1ConversationLogic'
 );
@@ -187,6 +189,25 @@ test(
   }
 );
 
+
+test(
+  'cuánto pago ahora también se reconoce como consulta personal natural',
+  () => {
+    assert.equal(
+      requiresPersonalBillingAccess(
+        '¿Cuánto pago ahora?'
+      ),
+      true
+    );
+    assert.equal(
+      classifyPersonalBillingIntent(
+        '¿Cuánto pago ahora?'
+      ),
+      'CURRENT_TOTAL'
+    );
+  }
+);
+
 test(
   'qué tipo de renta tengo se trata como consulta personal',
   () => {
@@ -239,6 +260,12 @@ test(
     assert.equal(
       classifyPersonalBillingIntent(
         '¿Cuánto debo pagar?'
+      ),
+      'CURRENT_TOTAL'
+    );
+    assert.equal(
+      classifyPersonalBillingIntent(
+        '¿Cuál es el total de mi recibo?'
       ),
       'CURRENT_TOTAL'
     );
@@ -310,6 +337,25 @@ test(
       result.reply,
       /S\/ 34\.48/
     );
+
+    const naturalTotalQuestion =
+      buildPersonalBillingReply(
+        reconnectionExperience(),
+        '¿Cuál es el total de mi recibo?'
+      );
+
+    assert.equal(
+      naturalTotalQuestion.intent,
+      'CURRENT_TOTAL'
+    );
+    assert.match(
+      naturalTotalQuestion.reply,
+      /S\/ 34\.48/
+    );
+    assert.doesNotMatch(
+      naturalTotalQuestion.reply,
+      /mismo total/i
+    );
   }
 );
 
@@ -356,6 +402,216 @@ test(
     assert.match(
       result.reply,
       /Renta adelantada \(RA\)/
+    );
+  }
+);
+
+
+test(
+  'detecta varias preguntas financieras en un solo turno',
+  () => {
+    assert.deepEqual(
+      classifyPersonalBillingIntents(
+        '¿Cuánto pago ahora, cuánto pagué el mes pasado y por qué cambió mi recibo?'
+      ),
+      [
+        'PREVIOUS_BILL',
+        'CURRENT_TOTAL',
+        'EXPLANATION'
+      ]
+    );
+  }
+);
+
+test(
+  'no entendí conserva la última intención financiera en vez de cambiar de tema',
+  () => {
+    assert.equal(
+      classifyPersonalBillingIntent(
+        'No entendí, explícamelo más fácil',
+        {
+          hasPersonalBillingContext:
+            true,
+          lastBillingIntent:
+            'CURRENT_TOTAL'
+        }
+      ),
+      'CURRENT_TOTAL'
+    );
+
+    const result =
+      buildPersonalBillingReply(
+        reconnectionExperience(),
+        'No entendí, explícamelo más fácil',
+        {
+          hasPersonalBillingContext:
+            true,
+          lastBillingIntent:
+            'CURRENT_TOTAL'
+        }
+      );
+
+    assert.match(
+      result.reply,
+      /Recibo actual: S\/ 34\.48/
+    );
+    assert.doesNotMatch(
+      result.reply,
+      /aumentó S\/ 4\.58/i
+    );
+  }
+);
+
+
+test(
+  'una reparación financiera multi-intent responde en lenguaje corrido y no repite bullets',
+  () => {
+    const reply =
+      buildPersonalBillingMultiReply(
+        reconnectionExperience(),
+        [
+          'CURRENT_TOTAL',
+          'PREVIOUS_BILL'
+        ],
+        { repair: true }
+      );
+
+    assert.match(reply, /En simple/i);
+    assert.match(reply, /S\/ 34\.48/);
+    assert.match(reply, /S\/ 29\.90/);
+    assert.doesNotMatch(reply, /•/);
+  }
+);
+
+test(
+  'multi-intent financiero responde cada punto sin usar LLM para montos',
+  () => {
+    const reply =
+      buildPersonalBillingMultiReply(
+        reconnectionExperience(),
+        [
+          'CURRENT_TOTAL',
+          'PREVIOUS_BILL',
+          'EXPLANATION'
+        ]
+      );
+
+    assert.match(
+      reply,
+      /S\/ 34\.48/
+    );
+    assert.match(
+      reply,
+      /S\/ 29\.90/
+    );
+    assert.match(
+      reply,
+      /reconexión/i
+    );
+  }
+);
+
+test(
+  'una pregunta personal por un cobro de paquete requiere autenticación y usa intención dedicada',
+  () => {
+    assert.equal(
+      requiresPersonalBillingAccess(
+        '¿Me cobraron algún paquete en mi recibo?'
+      ),
+      true
+    );
+
+    assert.equal(
+      classifyPersonalBillingIntent(
+        '¿Me cobraron algún paquete en mi recibo?'
+      ),
+      'PACKAGE_CHARGE'
+    );
+  }
+);
+
+test(
+  'Lucía explica un paquete solo cuando Fase 13 lo reconoce como causa verificable',
+  () => {
+    const experience = {
+      currentBill: {
+        total: 49.89,
+        period:
+          'Ciclo 15/07/2026',
+        status: 'Sin deuda'
+      },
+      previousBill: {
+        total: 39.9,
+        period:
+          'Ciclo 15/06/2026'
+      },
+      comparison: {
+        difference: 9.99,
+        causes: [
+          {
+            code: 'PACKAGES',
+            description:
+              'En tu recibo apareció un cargo de S/ 9.99 correspondiente al paquete "Paquete 3GB de Internet".',
+            impact: 9.99
+          }
+        ]
+      },
+      findings: [],
+      financialExplanation: {
+        status:
+          'FULLY_EXPLAINED',
+        coveragePercent: 100,
+        customerFacing: {
+          headline:
+            'Tu recibo aumentó S/ 9.99',
+          summary:
+            'El paquete explica la variación.',
+          limitations: []
+        }
+      }
+    };
+
+    const result =
+      buildPersonalBillingReply(
+        experience,
+        '¿Me cobraron algún paquete en mi recibo?'
+      );
+
+    assert.equal(
+      result.intent,
+      'PACKAGE_CHARGE'
+    );
+    assert.match(
+      result.reply,
+      /S\/ 9\.99/
+    );
+    assert.match(
+      result.reply,
+      /Paquete 3GB/i
+    );
+    assert.equal(
+      result.financialReasoningByLlm,
+      false
+    );
+  }
+);
+
+test(
+  'Lucía no inventa un paquete cuando el motor causal no lo verificó',
+  () => {
+    const result =
+      buildPersonalBillingReply(
+        reconnectionExperience(),
+        '¿Me cobraron algún paquete en mi recibo?'
+      );
+
+    assert.equal(
+      result.intent,
+      'PACKAGE_CHARGE'
+    );
+    assert.match(
+      result.reply,
+      /no encontr[eé] una variaci[oó]n verificable/i
     );
   }
 );

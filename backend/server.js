@@ -46,10 +46,36 @@ const {
 } = require('./services/release1ReadinessService');
 
 const {
+  createDesafio1FunctionalCoverageService
+} = require('./services/desafio1FunctionalCoverageService');
+
+const {
+  createDesafio1ScenarioMappingService
+} = require('./services/desafio1ScenarioMappingService');
+
+const {
+  createDatasetExplorerService,
+  isDatasetExplorerError
+} = require('./services/datasetExplorerService');
+
+const {
+  createDatasetCustomerProfileService
+} = require('./services/desafio1CustomerProfileService');
+
+const {
+  buildCustomerProfileMultiReply
+} = require('./services/desafio1CustomerProfileLogic');
+
+const {
   requiresPersonalBillingAccess,
   buildGeneralBillingEducationReply,
   buildPersonalBillingReply
 } = require('./services/desafio1ConversationLogic');
+
+const {
+  planCustomerConversationTurn,
+  buildCompositeCustomerReply
+} = require('./services/desafio1ConversationalOrchestrator');
 
 const {
   esSolicitudAsesor,
@@ -243,14 +269,70 @@ function createApp(options = {}) {
       officialDemoExperienceService
     });
 
-  async function getOfficialExperience(user) {
+  const functionalCoverageService =
+    options.functionalCoverageService ||
+    createDesafio1FunctionalCoverageService();
+
+  const scenarioMappingService =
+    options.scenarioMappingService ||
+    createDesafio1ScenarioMappingService();
+
+  const datasetExplorerService =
+    options.datasetExplorerService ||
+    createDatasetExplorerService();
+
+  const customerProfileService =
+    options.customerProfileService ||
+    createDatasetCustomerProfileService({
+      resolveSubscriberKey:
+        async (user) => {
+          if (
+            user?.mode === 'EXPLORER' &&
+            user?.explorerDemoId
+          ) {
+            const explorerProfile =
+              await datasetExplorerService
+                .getPrivateProfile(
+                  user.explorerDemoId
+                );
+
+            return (
+              explorerProfile
+                ?.subscriberKey ||
+              null
+            );
+          }
+
+          const binding =
+            officialDemoExperienceService
+              .getBinding(
+                user?.customerId
+              );
+
+          return (
+            binding?.subscriberKey ||
+            null
+          );
+        }
+    });
+
+  async function getPersonalExperience(user) {
+    if (user?.mode === 'EXPLORER') {
+      return datasetExplorerService
+        .getExperienceForUser(user);
+    }
+
     return officialDemoExperienceService
       .getExperienceForUser(user);
   }
 
   async function getAppExperience(user) {
+    if (user?.mode === 'EXPLORER') {
+      return getPersonalExperience(user);
+    }
+
     try {
-      return await getOfficialExperience(
+      return await getPersonalExperience(
         user
       );
     } catch (error) {
@@ -279,6 +361,69 @@ function createApp(options = {}) {
         }
       };
     }
+  }
+
+
+  function sendExplorerError(
+    res,
+    error
+  ) {
+    const code =
+      error?.code ||
+      'EXPLORER_ERROR';
+
+    if (
+      code ===
+        'EXPLORER_INDEX_NOT_FOUND'
+    ) {
+      return res
+        .status(503)
+        .json({
+          error:
+            'El índice local del explorador todavía no está disponible.',
+          code,
+          action:
+            'npm run demo:coverage:desafio1'
+        });
+    }
+
+    if (
+      code ===
+        'EXPLORER_PROFILE_NOT_FOUND'
+    ) {
+      return res
+        .status(404)
+        .json({
+          error:
+            'Perfil DEMO no encontrado',
+          code
+        });
+    }
+
+    if (isDatasetExplorerError(error)) {
+      return res
+        .status(400)
+        .json({
+          error:
+            error.message ||
+            'No se pudo abrir el perfil del explorador',
+          code
+        });
+    }
+
+    console.error(
+      '[EXPLORER] Error inesperado:',
+      error
+    );
+
+    return res
+      .status(500)
+      .json({
+        error:
+          'No se pudo procesar la solicitud del explorador.',
+        code:
+          'EXPLORER_INTERNAL_ERROR'
+      });
   }
 
   app.use(cors());
@@ -387,6 +532,16 @@ function createApp(options = {}) {
       path.join(
         frontendPath,
         'dashboard.html'
+      )
+    );
+  });
+
+
+  app.get('/explorer', (req, res) => {
+    res.sendFile(
+      path.join(
+        frontendPath,
+        'explorer.html'
       )
     );
   });
@@ -615,6 +770,183 @@ function createApp(options = {}) {
     }
   );
 
+  app.get(
+    '/api/demo/data-coverage',
+    async (req, res) => {
+      try {
+        const report =
+          await functionalCoverageService
+            .buildReport();
+
+        return res.json(report);
+      } catch (error) {
+        console.error(
+          '[DATA COVERAGE] No se pudo generar la cobertura funcional:',
+          error
+        );
+
+        return res
+          .status(503)
+          .json({
+            schemaVersion:
+              'desafio1-functional-coverage-v1',
+            phase: 'PHASE_11',
+            status:
+              'COVERAGE_UNAVAILABLE',
+            error:
+              'No se pudo consultar la cobertura funcional del dataset.'
+          });
+      }
+    }
+  );
+
+  app.get(
+    '/api/demo/scenario-mapping',
+    async (req, res) => {
+      try {
+        const report =
+          await scenarioMappingService
+            .buildReport();
+
+        return res.json(report);
+      } catch (error) {
+        console.error(
+          '[SCENARIO MAPPING] No se pudo generar el mapeo:',
+          error
+        );
+
+        return res
+          .status(503)
+          .json({
+            schemaVersion:
+              'desafio1-scenario-mapping-v1',
+            phase: 'PHASE_12',
+            status:
+              'MAPPING_UNAVAILABLE',
+            error:
+              'No se pudo consultar el mapeo de escenarios del dataset.'
+          });
+      }
+    }
+  );
+
+
+  // =========================================================
+  // EXPLORADOR MASIVO DEL DATASET · FASE 10
+  // =========================================================
+
+  app.get(
+    '/api/explorer/summary',
+    async (req, res) => {
+      try {
+        return res.json(
+          await datasetExplorerService
+            .getSummary()
+        );
+      } catch (error) {
+        return sendExplorerError(
+          res,
+          error
+        );
+      }
+    }
+  );
+
+  app.get(
+    '/api/explorer/profiles',
+    async (req, res) => {
+      try {
+        const result =
+          await datasetExplorerService
+            .searchProfiles({
+              search:
+                req.query.search,
+              capability:
+                req.query.capability,
+              scenario:
+                req.query.scenario,
+              rentType:
+                req.query.rentType,
+              qualityTier:
+                req.query.qualityTier,
+              sort:
+                req.query.sort,
+              page:
+                req.query.page,
+              pageSize:
+                req.query.pageSize
+            });
+
+        return res.json(result);
+      } catch (error) {
+        return sendExplorerError(
+          res,
+          error
+        );
+      }
+    }
+  );
+
+  app.get(
+    '/api/explorer/profiles/:demoId',
+    async (req, res) => {
+      try {
+        return res.json(
+          await datasetExplorerService
+            .getSafeProfile(
+              req.params.demoId
+            )
+        );
+      } catch (error) {
+        return sendExplorerError(
+          res,
+          error
+        );
+      }
+    }
+  );
+
+  app.post(
+    '/api/explorer/open',
+    async (req, res) => {
+      try {
+        const user =
+          await datasetExplorerService
+            .createAuthUserForDemoId(
+              req.body?.demoId
+            );
+
+        // El explorador crea una sesión temporal, no una cuenta.
+        // Reemplazamos cualquier cookie demo anterior para que el
+        // chat rote su contexto al nuevo alias DEMO seleccionado.
+        destroyAuthSession(
+          getAuthToken(req)
+        );
+
+        const authSession =
+          createAuthSession(user);
+
+        setAuthCookie(
+          res,
+          authSession.token
+        );
+
+        return res.json({
+          ok: true,
+          user:
+            authSession.user,
+          redirect:
+            '/app?source=explorer'
+        });
+      } catch (error) {
+        return sendExplorerError(
+          res,
+          error
+        );
+      }
+    }
+  );
+
 
   // =========================================================
   // HEALTH
@@ -824,6 +1156,402 @@ function createApp(options = {}) {
                 )
             }
           );
+        }
+
+
+        // =====================================================
+        // CALIDAD CONVERSACIONAL · FASE 10
+        // Multi-intent, reparación y cambios de tema.
+        // =====================================================
+
+        const conversationPlan =
+          planCustomerConversationTurn(
+            cleanMessage,
+            {
+              lastProfileIntents:
+                metricsSession.context
+                  .lastCustomerProfileIntents ||
+                [],
+              lastBillingIntent:
+                metricsSession.context
+                  .lastBillingIntent ||
+                null,
+              lastConversationDomain:
+                metricsSession.context
+                  .lastConversationDomain ||
+                null,
+              hasPersonalBillingContext:
+                Boolean(
+                  metricsSession.context
+                    .hasOfficialBillingContext
+                )
+            }
+          );
+
+        const wantsHandoff =
+          esSolicitudAsesor(
+            cleanMessage
+          );
+
+        // Si el usuario mezcla varias preguntas en un solo
+        // turno, resolvemos todas con una sola carga del perfil
+        // y de la facturación. No hacemos varias llamadas al LLM.
+        if (
+          conversationPlan.isComposite &&
+          !wantsHandoff
+        ) {
+          if (!requestAuth) {
+            const reply =
+              'Puedo responder esas preguntas con los datos de tu perfil y recibo, pero primero debes iniciar sesión para vincular la consulta con tu servicio.';
+
+            addMessage(
+              activeSessionId,
+              'user',
+              cleanMessage
+            );
+            addMessage(
+              activeSessionId,
+              'assistant',
+              reply
+            );
+            registerMessage(
+              activeSessionId,
+              'assistant'
+            );
+
+            return res.json({
+              reply,
+              intents: [
+                ...conversationPlan
+                  .profileIntents,
+                ...conversationPlan
+                  .billingIntents
+              ],
+              foundData: false,
+              sessionId:
+                activeSessionId,
+              requiresAuth: true,
+              authUrl:
+                '/login?returnTo=' +
+                encodeURIComponent(
+                  '/chat?resume=1'
+                ),
+              requestedCapability:
+                'CUSTOMER_CONTEXT'
+            });
+          }
+
+          try {
+            const profilePromise =
+              conversationPlan.needsProfile
+                ? customerProfileService
+                    .getProfileForUser(
+                      requestAuth.session.user
+                    )
+                : Promise.resolve(null);
+
+            const experiencePromise =
+              getPersonalExperience(
+                requestAuth.session.user
+              );
+
+            const [
+              datasetProfile,
+              personalExperience
+            ] = await Promise.all([
+              profilePromise,
+              experiencePromise
+            ]);
+
+            const reply =
+              buildCompositeCustomerReply({
+                plan: conversationPlan,
+                profile:
+                  datasetProfile,
+                experience:
+                  personalExperience
+              });
+
+            addMessage(
+              activeSessionId,
+              'user',
+              cleanMessage
+            );
+            addMessage(
+              activeSessionId,
+              'assistant',
+              reply
+            );
+            registerMessage(
+              activeSessionId,
+              'assistant'
+            );
+
+            updateContext(
+              activeSessionId,
+              {
+                customerIdentifier:
+                  requestAuth.session.user
+                    .customerId,
+                identityLocked: true,
+                hasOfficialBillingContext:
+                  conversationPlan
+                    .needsBilling ||
+                  Boolean(
+                    metricsSession.context
+                      .hasOfficialBillingContext
+                  ),
+                lastCustomerProfileIntents:
+                  conversationPlan
+                    .needsProfile
+                    ? conversationPlan
+                        .profileIntents
+                    : [],
+                lastBillingIntent:
+                  conversationPlan
+                    .needsBilling
+                    ? (
+                        conversationPlan
+                          .billingIntents
+                          .slice(-1)[0] ||
+                        null
+                      )
+                    : null,
+                lastConversationDomain:
+                  conversationPlan
+                    .domain
+              }
+            );
+
+            registerInteractionContext(
+              activeSessionId,
+              {
+                customerIdentifier:
+                  requestAuth.session.user
+                    .customerId,
+                customerName:
+                  requestAuth.session.user
+                    .name
+              }
+            );
+
+            return res.json({
+              reply,
+              intent:
+                conversationPlan
+                  .profileIntents[0] ||
+                conversationPlan
+                  .billingIntents[0] ||
+                null,
+              intents: [
+                ...conversationPlan
+                  .profileIntents,
+                ...conversationPlan
+                  .billingIntents
+              ],
+              source:
+                'DESAFIO1_CONTEXT_DETERMINISTIC',
+              financialReasoningByLlm:
+                false,
+              foundData: true,
+              authenticated: true,
+              sessionId:
+                activeSessionId,
+              conversation: {
+                multiIntent: true,
+                intentCount:
+                  conversationPlan
+                    .intentCount,
+                repair:
+                  conversationPlan.repair,
+                domain:
+                  conversationPlan.domain
+              }
+            });
+          } catch (error) {
+            console.error(
+              '[CONVERSATION] No se pudo resolver el turno compuesto:',
+              error
+            );
+
+            return res
+              .status(503)
+              .json({
+                error:
+                  'No se pudo consultar el contexto del cliente',
+                code:
+                  error?.code ||
+                  'CUSTOMER_CONTEXT_ERROR',
+                sessionId:
+                  activeSessionId
+              });
+          }
+        }
+
+
+        // =====================================================
+        // PERFIL DEL CLIENTE DESDE EL DATASET · FASE 10
+        // =====================================================
+
+        const customerProfileIntents =
+          conversationPlan
+            .profileIntents;
+
+        if (
+          customerProfileIntents.length &&
+          !wantsHandoff
+        ) {
+          if (!requestAuth) {
+            const reply =
+              'Puedo consultar los datos disponibles de tu perfil, pero primero debes iniciar sesión para vincular la consulta con un cliente.';
+
+            addMessage(
+              activeSessionId,
+              'user',
+              cleanMessage
+            );
+            addMessage(
+              activeSessionId,
+              'assistant',
+              reply
+            );
+            registerMessage(
+              activeSessionId,
+              'assistant'
+            );
+
+            return res.json({
+              reply,
+              intent:
+                customerProfileIntents[0],
+              intents:
+                customerProfileIntents,
+              foundData: false,
+              sessionId:
+                activeSessionId,
+              requiresAuth: true,
+              authUrl:
+                '/login?returnTo=' +
+                encodeURIComponent(
+                  '/chat?resume=1'
+                ),
+              requestedCapability:
+                'CUSTOMER_PROFILE'
+            });
+          }
+
+          try {
+            const [
+              datasetProfile,
+              personalExperience
+            ] = await Promise.all([
+              customerProfileService
+                .getProfileForUser(
+                  requestAuth.session.user
+                ),
+              getPersonalExperience(
+                requestAuth.session.user
+              )
+            ]);
+
+            const reply =
+              buildCustomerProfileMultiReply({
+                intents:
+                  customerProfileIntents,
+                profile:
+                  datasetProfile,
+                experience:
+                  personalExperience,
+                repair:
+                  conversationPlan.repair
+              });
+
+            addMessage(
+              activeSessionId,
+              'user',
+              cleanMessage
+            );
+            addMessage(
+              activeSessionId,
+              'assistant',
+              reply
+            );
+            registerMessage(
+              activeSessionId,
+              'assistant'
+            );
+
+            updateContext(
+              activeSessionId,
+              {
+                customerIdentifier:
+                  requestAuth.session.user
+                    .customerId,
+                identityLocked: true,
+                lastCustomerProfileIntents:
+                  customerProfileIntents,
+                lastConversationDomain:
+                  'PROFILE'
+              }
+            );
+
+            registerInteractionContext(
+              activeSessionId,
+              {
+                customerIdentifier:
+                  requestAuth.session.user
+                    .customerId,
+                customerName:
+                  requestAuth.session.user
+                    .name
+              }
+            );
+
+            return res.json({
+              reply,
+              intent:
+                customerProfileIntents[0],
+              intents:
+                customerProfileIntents,
+              source:
+                'DESAFIO1_PROFILE_DETERMINISTIC',
+              foundData: true,
+              authenticated: true,
+              sessionId:
+                activeSessionId,
+              conversation: {
+                multiIntent:
+                  customerProfileIntents
+                    .length > 1,
+                repair:
+                  conversationPlan.repair
+              },
+              dataOrigin: {
+                profile:
+                  'PLANTA CLIENTES.csv',
+                billing:
+                  'FACTURACION-CLIENTES_.csv',
+                generatedByLlm: false
+              }
+            });
+          } catch (error) {
+            console.error(
+              '[PROFILE] No se pudo consultar el perfil del dataset:',
+              error
+            );
+
+            return res
+              .status(503)
+              .json({
+                error:
+                  'No se pudo consultar la información del perfil en el dataset',
+                code:
+                  error?.code ||
+                  'CUSTOMER_PROFILE_ERROR',
+                sessionId:
+                  activeSessionId
+              });
+          }
         }
 
 
@@ -1071,7 +1799,7 @@ function createApp(options = {}) {
 
           try {
             const officialExperience =
-              await getOfficialExperience(
+              await getPersonalExperience(
                 requestAuth.session.user
               );
 
@@ -1084,7 +1812,11 @@ function createApp(options = {}) {
                     Boolean(
                       billingSession.context
                         .hasOfficialBillingContext
-                    )
+                    ),
+                  lastBillingIntent:
+                    billingSession.context
+                      .lastBillingIntent ||
+                    null
                 }
               );
 
@@ -1099,6 +1831,8 @@ function createApp(options = {}) {
                   true,
                 lastBillingIntent:
                   personalReply.intent,
+                lastConversationDomain:
+                  'BILLING',
                 demoScenario:
                   officialExperience.customer
                     .demoScenario
@@ -1200,6 +1934,14 @@ function createApp(options = {}) {
             'assistant'
           );
 
+          updateContext(
+            activeSessionId,
+            {
+              lastConversationDomain:
+                'GENERAL'
+            }
+          );
+
           return res.json({
             reply:
               generalEducationReply,
@@ -1229,6 +1971,14 @@ function createApp(options = {}) {
                 Boolean(requestAuth)
             }
           );
+
+        updateContext(
+          activeSessionId,
+          {
+            lastConversationDomain:
+              'GENERAL'
+          }
+        );
 
 
         // Compatibilidad con respuestas
@@ -1576,9 +2326,20 @@ function createApp(options = {}) {
               customerId
           );
 
+      const knownExplorerProfile =
+        auth.session.user.mode ===
+          'EXPLORER' &&
+        Boolean(
+          auth.session.user
+            .explorerDemoId
+        );
+
       if (
         !customerId ||
-        !knownDemoProfile
+        (
+          !knownDemoProfile &&
+          !knownExplorerProfile
+        )
       ) {
         return res
           .status(400)

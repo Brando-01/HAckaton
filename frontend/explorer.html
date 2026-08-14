@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Explorador del dataset | Movistar AI Demo</title>
+  <link rel="stylesheet" href="./explorer.css">
+</head>
+<body>
+  <header class="explorer-header">
+    <a class="brand" href="/">
+      <img src="./logo.png" alt="Movistar">
+      <div>
+        <strong>Movistar AI Demo</strong>
+        <span>Explorador interno del dataset</span>
+      </div>
+    </a>
+    <nav class="header-nav" aria-label="Navegación de demo">
+      <a href="/">Inicio demo</a>
+      <a href="/login">Mi Movistar</a>
+      <a href="/chat">Lucía</a>
+      <a href="/dashboard">Dashboard</a>
+    </nav>
+  </header>
+
+  <main class="explorer-shell">
+    <section class="hero">
+      <div>
+        <span class="eyebrow">Fase 10 · exploración masiva</span>
+        <h1>Explora los clientes utilizables sin exponer identificadores oficiales</h1>
+        <p>
+          El índice local de Fase 9 resume la cobertura de los 20 000 registros. Aquí solo se muestran alias sintéticos
+          <strong>DEMO</strong>, capacidades y escenarios; los identificadores oficiales permanecen en SQLite local.
+        </p>
+      </div>
+      <div class="hero-badge" id="coverageBadge">Cargando índice…</div>
+    </section>
+
+    <section class="stats-grid" aria-label="Cobertura del dataset">
+      <article class="stat-card">
+        <span>Analizados</span>
+        <strong id="statScanned">—</strong>
+        <small id="statScannedDetail">Dataset oficial</small>
+      </article>
+      <article class="stat-card">
+        <span>Consultables</span>
+        <strong id="statConsultable">—</strong>
+        <small id="statConsultableDetail">—</small>
+      </article>
+      <article class="stat-card">
+        <span>Explicables</span>
+        <strong id="statExplainable">—</strong>
+        <small id="statExplainableDetail">—</small>
+      </article>
+      <article class="stat-card">
+        <span>Evidencia HIGH</span>
+        <strong id="statHigh">—</strong>
+        <small id="statHighDetail">—</small>
+      </article>
+      <article class="stat-card">
+        <span>Demo premium</span>
+        <strong id="statPremium">—</strong>
+        <small id="statPremiumDetail">—</small>
+      </article>
+    </section>
+
+    <section class="filters-card">
+      <div class="filters-heading">
+        <div>
+          <span class="eyebrow">Índice consultable</span>
+          <h2>Buscar y filtrar perfiles DEMO</h2>
+        </div>
+        <button class="ghost-button" id="resetFilters" type="button">Limpiar filtros</button>
+      </div>
+
+      <form class="filters-grid" id="filtersForm">
+        <label class="field search-field">
+          <span>Buscar</span>
+          <input id="searchInput" name="search" placeholder="DEMO000123, MOVIL, WRLS…" autocomplete="off">
+        </label>
+
+        <label class="field">
+          <span>Capacidad</span>
+          <select id="capabilitySelect" name="capability">
+            <option value="ALL">Todos los consultables</option>
+            <option value="COMPARABLE">Con comparación</option>
+            <option value="EXPLAINABLE">Con causa/hallazgo</option>
+            <option value="HIGH">Evidencia HIGH</option>
+            <option value="PREMIUM">Demo premium</option>
+            <option value="UNEXPLAINED">Sin causa reconocida</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Escenario</span>
+          <select id="scenarioSelect" name="scenario">
+            <option value="ALL">Todos los escenarios</option>
+            <option value="RECONNECTION">Reconexión</option>
+            <option value="ACTIVE_DISCOUNT">Descuento vigente</option>
+            <option value="PRORATION">Prorrateo</option>
+            <option value="DISCOUNT_ENDED">Fin de descuento</option>
+            <option value="DISCOUNT_REMOVED">Descuento retirado</option>
+            <option value="PLAN_CHANGE">Cambio de plan</option>
+            <option value="PACKAGES">Paquetes adicionales</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Tipo de renta</span>
+          <select id="rentTypeSelect" name="rentType">
+            <option value="ALL">RA y RV</option>
+            <option value="RA">Renta adelantada</option>
+            <option value="RV">Renta vencida</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Ordenar</span>
+          <select id="sortSelect" name="sort">
+            <option value="DEMO_ASC">Alias DEMO</option>
+            <option value="PREMIUM_FIRST">Premium primero</option>
+            <option value="COVERAGE_DESC">Mayor conciliación</option>
+            <option value="INVOICES_DESC">Más recibos</option>
+          </select>
+        </label>
+      </form>
+    </section>
+
+    <section class="results-section">
+      <div class="results-toolbar">
+        <div>
+          <h2>Perfiles encontrados</h2>
+          <p id="resultsSummary">Cargando…</p>
+        </div>
+        <div class="privacy-note">
+          <strong>Privacidad:</strong> la lista pública no contiene subscriberKey, customerKey ni cuenta financiera.
+        </div>
+      </div>
+
+      <div class="state-card" id="loadingState">Consultando el índice local…</div>
+      <div class="state-card error" id="errorState" hidden></div>
+      <div class="profiles-grid" id="profilesGrid"></div>
+
+      <div class="pagination" id="pagination" hidden>
+        <button id="previousPage" type="button">← Anterior</button>
+        <span id="pageIndicator">Página 1 de 1</span>
+        <button id="nextPage" type="button">Siguiente →</button>
+      </div>
+    </section>
+
+    <section class="explorer-note">
+      <div>
+        <span class="eyebrow">Sesión temporal</span>
+        <h2>“Abrir caso” no crea una cuenta de cliente</h2>
+      </div>
+      <p>
+        Al seleccionar un alias DEMO, el backend resuelve su vínculo local y crea una sesión temporal de exploración.
+        Mi Movistar y Lucía reciben el mismo motor financiero de Fases 2–3, sin convertir los 18 450 perfiles consultables en credenciales permanentes.
+      </p>
+    </section>
+  </main>
+
+  <script src="./explorer.js"></script>
+</body>
+</html>

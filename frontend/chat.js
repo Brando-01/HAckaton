@@ -1381,8 +1381,14 @@
         );
 
       if (authContextBadge) {
+        const badgeSuffix =
+          authData.user.mode ===
+            'EXPLORER'
+            ? 'explorador'
+            : 'autenticado';
+
         authContextBadge.textContent =
-          `${authData.user.name} · autenticado`;
+          `${authData.user.name} · ${badgeSuffix}`;
         authContextBadge.hidden = false;
       }
 

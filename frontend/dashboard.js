@@ -75,7 +75,37 @@
     releaseScenarioSummary:
       document.getElementById('releaseScenarioSummary'),
     releaseScenarioChips:
-      document.getElementById('releaseScenarioChips')
+      document.getElementById('releaseScenarioChips'),
+    dataCoverageStatus:
+      document.getElementById('dataCoverageStatus'),
+    coverageSourcesSummary:
+      document.getElementById('coverageSourcesSummary'),
+    coverageReadyScenarios:
+      document.getElementById('coverageReadyScenarios'),
+    coverageSubscribers:
+      document.getElementById('coverageSubscribers'),
+    coverageCatalogPct:
+      document.getElementById('coverageCatalogPct'),
+    datasetSourceGrid:
+      document.getElementById('datasetSourceGrid'),
+    scenarioCoverageList:
+      document.getElementById('scenarioCoverageList'),
+    confirmedRulesList:
+      document.getElementById('confirmedRulesList'),
+    scenarioMappingStatus:
+      document.getElementById('scenarioMappingStatus'),
+    mappingTargets:
+      document.getElementById('mappingTargets'),
+    mappingMapped:
+      document.getElementById('mappingMapped'),
+    mappingReview:
+      document.getElementById('mappingReview'),
+    mappingPromotable:
+      document.getElementById('mappingPromotable'),
+    scenarioMappingGrid:
+      document.getElementById('scenarioMappingGrid'),
+    scenarioMappingSafeguards:
+      document.getElementById('scenarioMappingSafeguards')
   };
 
   let isLoading = false;
@@ -632,6 +662,414 @@
     }
   }
 
+  function formatCompactNumber(value) {
+    const number = Number(value);
+
+    if (!Number.isFinite(number)) {
+      return '—';
+    }
+
+    return Math.round(number)
+      .toLocaleString('es-PE');
+  }
+
+  function coverageStatusLabel(status) {
+    const labels = {
+      READY: 'Consolidado',
+      CONTEXT_ONLY: 'Solo contexto',
+      PARTIAL: 'Parcial',
+      PENDING_MAPPING: 'Pendiente mapeo',
+      SOURCE_MISSING: 'Fuente faltante'
+    };
+
+    return labels[status] || status || 'Revisar';
+  }
+
+  function coverageStatusClass(status) {
+    if (status === 'READY') {
+      return 'ready';
+    }
+
+    if (status === 'CONTEXT_ONLY') {
+      return 'context';
+    }
+
+    if (
+      status === 'PARTIAL' ||
+      status === 'PENDING_MAPPING'
+    ) {
+      return 'review';
+    }
+
+    return 'danger';
+  }
+
+  function renderDataCoverage(report) {
+    const summary = report?.summary || {};
+    const diagnostics = report?.diagnostics || {};
+    const allSources =
+      summary.allSourcesImported === true;
+
+    elements.dataCoverageStatus.textContent =
+      allSources
+        ? '8 fuentes integradas'
+        : 'Revisar fuentes';
+    elements.dataCoverageStatus.className =
+      `release-readiness-pill ${allSources ? 'ready' : 'review'}`;
+
+    elements.coverageSourcesSummary.textContent =
+      `${summary.importedSources ?? 0}/${summary.expectedSources ?? 0}`;
+    elements.coverageReadyScenarios.textContent =
+      summary.readyScenarios ?? 0;
+    elements.coverageSubscribers.textContent =
+      formatCompactNumber(
+        diagnostics.facturationSubscribers
+      );
+    elements.coverageCatalogPct.textContent =
+      `${diagnostics.catalogChargeCoveragePct ?? 0}%`;
+
+    elements.datasetSourceGrid.innerHTML = '';
+
+    (report?.sources || []).forEach(
+      (source) => {
+        const card = document.createElement('div');
+        card.className = 'dataset-source-card';
+
+        const top = document.createElement('div');
+        top.className = 'dataset-source-top';
+
+        const name = document.createElement('strong');
+        name.textContent = source.label;
+
+        const badge = document.createElement('span');
+        badge.className =
+          `coverage-status-badge ${source.imported ? 'ready' : 'danger'}`;
+        badge.textContent =
+          source.imported ? 'Importado' : 'Falta';
+
+        top.appendChild(name);
+        top.appendChild(badge);
+
+        const role = document.createElement('p');
+        role.textContent = source.role;
+
+        const meta = document.createElement('small');
+        meta.textContent =
+          `${formatCompactNumber(source.importedRows)} filas · ${source.usage}`;
+
+        card.appendChild(top);
+        card.appendChild(role);
+        card.appendChild(meta);
+        elements.datasetSourceGrid.appendChild(card);
+      }
+    );
+
+    elements.scenarioCoverageList.innerHTML = '';
+
+    (report?.scenarios || []).forEach(
+      (scenario) => {
+        const item = document.createElement('div');
+        item.className = 'scenario-coverage-item';
+
+        const copy = document.createElement('div');
+        const title = document.createElement('strong');
+        title.textContent = scenario.label;
+        const detail = document.createElement('p');
+        detail.textContent = scenario.detail;
+        copy.appendChild(title);
+        copy.appendChild(detail);
+
+        const badge = document.createElement('span');
+        badge.className =
+          `coverage-status-badge ${coverageStatusClass(scenario.status)}`;
+        badge.textContent =
+          coverageStatusLabel(scenario.status);
+
+        item.appendChild(copy);
+        item.appendChild(badge);
+        elements.scenarioCoverageList.appendChild(item);
+      }
+    );
+
+    elements.confirmedRulesList.innerHTML = '';
+
+    (report?.confirmedRules || []).forEach(
+      (rule) => {
+        const chip = document.createElement('span');
+        chip.className = 'confirmed-rule-chip';
+        chip.textContent = `${rule.label}: ${rule.detail}`;
+        elements.confirmedRulesList.appendChild(chip);
+      }
+    );
+  }
+
+  function renderDataCoverageError() {
+    elements.dataCoverageStatus.textContent = 'Sin verificar';
+    elements.dataCoverageStatus.className =
+      'release-readiness-pill review';
+    elements.coverageSourcesSummary.textContent = '—';
+    elements.coverageReadyScenarios.textContent = '—';
+    elements.coverageSubscribers.textContent = '—';
+    elements.coverageCatalogPct.textContent = '—';
+    elements.datasetSourceGrid.innerHTML =
+      '<div class="coverage-empty">No se pudo consultar la auditoría funcional.</div>';
+    elements.scenarioCoverageList.innerHTML = '';
+    elements.confirmedRulesList.innerHTML = '';
+  }
+
+  async function loadDataCoverage(signal) {
+    try {
+      const response = await fetch(
+        '/api/demo/data-coverage',
+        {
+          cache: 'no-store',
+          signal
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      renderDataCoverage(
+        await response.json()
+      );
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        console.error(
+          '[DASHBOARD] Cobertura funcional:',
+          error
+        );
+      }
+
+      renderDataCoverageError();
+    }
+  }
+
+  function mappingStatusLabel(status) {
+    const labels = {
+      MAPPED: 'Mapeado',
+      PARTIAL: 'Parcial',
+      AMBIGUOUS: 'Ambiguo',
+      SEMANTICS_PENDING: 'Semántica pendiente',
+      NOT_MAPPABLE: 'No mapeable'
+    };
+
+    return labels[status] || status || 'Revisar';
+  }
+
+  function mappingStatusClass(status) {
+    if (status === 'MAPPED') {
+      return 'ready';
+    }
+
+    if (status === 'SEMANTICS_PENDING') {
+      return 'context';
+    }
+
+    if (
+      status === 'PARTIAL' ||
+      status === 'AMBIGUOUS'
+    ) {
+      return 'review';
+    }
+
+    return 'danger';
+  }
+
+  function evidenceLabel(key) {
+    const labels = {
+      billingRows: 'filas de facturación',
+      billingCodes: 'códigos',
+      billingSubscribers: 'suscriptores',
+      oneShotRows: 'paquetes únicos',
+      recurringRows: 'paquetes recurrentes',
+      packageOrderRows: 'órdenes de paquetes',
+      explicitEquipmentChargeRows: 'cargos explícitos equipo/cuota',
+      financingKeywordRows: 'señales de financiamiento',
+      financingDebtRows: 'financiamiento de deuda',
+      equipmentSubgroupRows: 'subgrupo EQUIPOS',
+      equipmentOrderRows: 'órdenes relacionadas con equipo',
+      trafficRows: 'tráfico adicional',
+      trafficSubscribers: 'suscriptores con tráfico',
+      roamingRows: 'roaming',
+      roamingSubscribers: 'suscriptores con roaming',
+      recurringServiceRows: 'servicios recurrentes adicionales',
+      otherUniqueRows: 'otros cargos únicos',
+      suspensionOrderRows: 'órdenes de suspensión/corte',
+      suspensionSubscribers: 'suscriptores con suspensión/corte',
+      explicitSuspensionChargeRows: 'cargos explícitos por suspensión',
+      nearbyProportionalInvoices: 'recibos proporcionales cercanos',
+      totalRows: 'notas',
+      crdRows: 'tipo CRD',
+      dscRows: 'tipo DSC',
+      crdNegativePct: 'CRD con monto negativo',
+      dscPositivePct: 'DSC con monto positivo',
+      matchedSubscriberCodeRows: 'notas cruzables por suscripción+código',
+      matchedSameCycleRows: 'notas cruzables en el mismo ciclo',
+      matchedSameCyclePct: 'cruce mismo ciclo'
+    };
+
+    return labels[key] || key;
+  }
+
+  function formatEvidenceValue(key, value) {
+    if (
+      key.endsWith('Pct') ||
+      key.toLowerCase().includes('percent')
+    ) {
+      return `${Number(value || 0)}%`;
+    }
+
+    return formatCompactNumber(value);
+  }
+
+  function renderScenarioMapping(report) {
+    const summary = report?.summary || {};
+    const reviewCount =
+      Number(summary.partial || 0) +
+      Number(summary.ambiguous || 0) +
+      Number(summary.semanticsPending || 0) +
+      Number(summary.notMappable || 0);
+
+    elements.scenarioMappingStatus.textContent =
+      `${summary.targets ?? 0} escenarios auditados`;
+    elements.scenarioMappingStatus.className =
+      'release-readiness-pill ready';
+    elements.mappingTargets.textContent =
+      summary.targets ?? 0;
+    elements.mappingMapped.textContent =
+      summary.mapped ?? 0;
+    elements.mappingReview.textContent =
+      reviewCount;
+    elements.mappingPromotable.textContent =
+      summary.promotableNow ?? 0;
+
+    elements.scenarioMappingGrid.innerHTML = '';
+
+    (report?.mappings || []).forEach(
+      (mapping) => {
+        const card = document.createElement('article');
+        card.className = 'scenario-mapping-card';
+
+        const top = document.createElement('div');
+        top.className = 'scenario-mapping-card-top';
+
+        const title = document.createElement('div');
+        const name = document.createElement('strong');
+        name.textContent = mapping.label;
+        const confidence = document.createElement('small');
+        confidence.textContent =
+          `Confianza del mapeo: ${mapping.confidence || '—'}`;
+        title.appendChild(name);
+        title.appendChild(confidence);
+
+        const badge = document.createElement('span');
+        badge.className =
+          `coverage-status-badge ${mappingStatusClass(mapping.status)}`;
+        badge.textContent =
+          mappingStatusLabel(mapping.status);
+
+        top.appendChild(title);
+        top.appendChild(badge);
+
+        const rationale = document.createElement('p');
+        rationale.textContent = mapping.rationale;
+
+        const evidence = document.createElement('div');
+        evidence.className = 'mapping-evidence-grid';
+
+        Object.entries(mapping.evidence || {})
+          .slice(0, 6)
+          .forEach(([key, value]) => {
+            const item = document.createElement('div');
+            const label = document.createElement('span');
+            const metric = document.createElement('strong');
+            label.textContent = evidenceLabel(key);
+            metric.textContent =
+              formatEvidenceValue(key, value);
+            item.appendChild(label);
+            item.appendChild(metric);
+            evidence.appendChild(item);
+          });
+
+        card.appendChild(top);
+        card.appendChild(rationale);
+        card.appendChild(evidence);
+
+        if (mapping.patterns?.length) {
+          const patterns = document.createElement('div');
+          patterns.className = 'mapping-patterns';
+
+          mapping.patterns
+            .slice(0, 3)
+            .forEach((pattern) => {
+              const chip = document.createElement('span');
+              chip.textContent =
+                `${pattern.description || pattern.chargeCode || 'Concepto'} · ${formatCompactNumber(pattern.rows)} filas`;
+              patterns.appendChild(chip);
+            });
+
+          card.appendChild(patterns);
+        }
+
+        elements.scenarioMappingGrid.appendChild(card);
+      }
+    );
+
+    elements.scenarioMappingSafeguards.innerHTML = '';
+    (report?.safeguards || []).forEach(
+      (item) => {
+        const chip = document.createElement('span');
+        chip.className = 'mapping-safeguard-chip';
+        chip.textContent = item;
+        elements.scenarioMappingSafeguards.appendChild(chip);
+      }
+    );
+  }
+
+  function renderScenarioMappingError() {
+    elements.scenarioMappingStatus.textContent = 'Sin verificar';
+    elements.scenarioMappingStatus.className =
+      'release-readiness-pill review';
+    elements.mappingTargets.textContent = '—';
+    elements.mappingMapped.textContent = '—';
+    elements.mappingReview.textContent = '—';
+    elements.mappingPromotable.textContent = '—';
+    elements.scenarioMappingGrid.innerHTML =
+      '<div class="coverage-empty">No se pudo consultar el mapeo de escenarios.</div>';
+    elements.scenarioMappingSafeguards.innerHTML = '';
+  }
+
+  async function loadScenarioMapping(signal) {
+    try {
+      const response = await fetch(
+        '/api/demo/scenario-mapping',
+        {
+          cache: 'no-store',
+          signal
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      renderScenarioMapping(
+        await response.json()
+      );
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        console.error(
+          '[DASHBOARD] Mapeo de escenarios:',
+          error
+        );
+      }
+
+      renderScenarioMappingError();
+    }
+  }
+
   function setConnectionState(state, message) {
     elements.connectionDot.className = `connection-dot ${state}`;
     elements.lastUpdate.textContent = message;
@@ -660,6 +1098,16 @@
           controller.signal
         );
 
+      const dataCoveragePromise =
+        loadDataCoverage(
+          controller.signal
+        );
+
+      const scenarioMappingPromise =
+        loadScenarioMapping(
+          controller.signal
+        );
+
       const response = await fetch(
         '/api/metrics/dashboard',
         {
@@ -674,7 +1122,11 @@
 
       const data = await response.json();
       renderSummary(data);
-      await readinessPromise;
+      await Promise.all([
+        readinessPromise,
+        dataCoveragePromise,
+        scenarioMappingPromise
+      ]);
 
       lastSuccessfulUpdate = new Date();
       setConnectionState(

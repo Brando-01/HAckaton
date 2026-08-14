@@ -34,6 +34,11 @@
       'openAssistantLink'
     );
 
+  const returnExplorerLink =
+    document.getElementById(
+      'returnExplorerLink'
+    );
+
   const customerName =
     document.getElementById(
       'customerName'
@@ -115,6 +120,7 @@
     );
 
   let activeCustomerId = null;
+  let activeAuthMode = null;
 
   function formatMoney(value) {
     const number =
@@ -479,17 +485,31 @@
   function renderAuthenticatedUser(user) {
     activeCustomerId =
       user.customerId;
+    activeAuthMode =
+      user.mode || null;
 
     authenticatedUserName.textContent =
       user.name;
 
+    const isExplorer =
+      user.mode === 'EXPLORER';
+
     authenticatedUserEmail.textContent =
-      user.email;
+      isExplorer
+        ? user.explorerDemoId || ''
+        : user.email || '';
 
     authModeBadge.textContent =
-      user.mode === 'DEMO'
-        ? 'Perfil demo'
-        : 'Sesión autenticada';
+      isExplorer
+        ? 'Explorador dataset'
+        : user.mode === 'DEMO'
+          ? 'Perfil demo'
+          : 'Sesión autenticada';
+
+    if (returnExplorerLink) {
+      returnExplorerLink.hidden =
+        !isExplorer;
+    }
 
     openAssistantLink.href =
       '/chat?source=app';
@@ -518,7 +538,9 @@
         'pendingAuthBillingPrompt'
       );
       window.location.href =
-        '/login';
+        activeAuthMode === 'EXPLORER'
+          ? '/explorer'
+          : '/login';
     }
   }
 

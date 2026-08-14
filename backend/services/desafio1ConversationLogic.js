@@ -35,6 +35,8 @@ const BILLING_TERMS = [
   'promocion',
   'prorrateo',
   'prorrateado',
+  'paquete',
+  'paquetes',
   'plan',
   'renta adelantada',
   'renta vencida'
@@ -50,6 +52,8 @@ const PERSONAL_MARKERS = [
   'tipo de renta tengo',
   'mi descuento',
   'mi promocion',
+  'mi paquete',
+  'mis paquetes',
   'mis recibos',
   'mis facturas',
   'cuanto debo',
@@ -236,21 +240,62 @@ function requiresPersonalBillingAccess(
     ) &&
     billingTerm;
 
+  const explicitPersonalIntent =
+    classifyPersonalBillingIntents(
+      text,
+      {
+        hasPersonalBillingContext
+      }
+    ).length > 0;
+
   return (
     (billingTerm && possessive) ||
-    variationQuestion
+    variationQuestion ||
+    explicitPersonalIntent
   );
 }
 
-function classifyPersonalBillingIntent(
+function isBillingRepairRequest(
+  message
+) {
+  const text = normalizeText(message);
+
+  return [
+    'no entendi',
+    'no lo entendi',
+    'explicamelo',
+    'explicamelo mejor',
+    'explicamelo mas facil',
+    'mas facil',
+    'en simple',
+    'en sencillo'
+  ].some(
+    (marker) =>
+      text === marker ||
+      text.startsWith(`${marker} `)
+  );
+}
+
+function classifyPersonalBillingIntents(
   message,
   {
     hasPersonalBillingContext =
-      false
+      false,
+    lastBillingIntent = null
   } = {}
 ) {
-  const text =
-    normalizeText(message);
+  const text = normalizeText(message);
+
+  if (!text) {
+    return [];
+  }
+
+  const intents = [];
+  const add = (intent) => {
+    if (!intents.includes(intent)) {
+      intents.push(intent);
+    }
+  };
 
   if (
     hasAny(
@@ -262,7 +307,7 @@ function classifyPersonalBillingIntent(
       ]
     )
   ) {
-    return 'PRORATION';
+    add('PRORATION');
   }
 
   if (
@@ -277,7 +322,7 @@ function classifyPersonalBillingIntent(
       ]
     )
   ) {
-    return 'RENT_TYPE';
+    add('RENT_TYPE');
   }
 
   if (
@@ -289,22 +334,70 @@ function classifyPersonalBillingIntent(
       ]
     )
   ) {
-    return 'DISCOUNT';
+    add('DISCOUNT');
   }
 
-  if (
+  const mentionsPackage =
     hasAny(
       text,
       [
-        'mes pasado',
+        'paquete',
+        'paquetes'
+      ]
+    );
+
+  const packageChargeQuestion =
+    mentionsPackage &&
+    hasAny(
+      text,
+      [
+        'cargo',
+        'cobro',
+        'cobraron',
+        'cobrado',
+        'recibo',
+        'factura',
+        'subio',
+        'aumento',
+        'cambio',
+        'variacion',
+        'por que'
+      ]
+    );
+
+  if (packageChargeQuestion) {
+    add('PACKAGE_CHARGE');
+  }
+
+  const explicitPreviousBill =
+    hasAny(
+      text,
+      [
         'recibo anterior',
         'factura anterior',
+        'recibo del mes pasado',
+        'factura del mes pasado',
         'cuanto era antes',
-        'cuanto pague antes'
+        'cuanto pague antes',
+        'cuanto pague el mes pasado',
+        'cuanto pagaba'
       ]
-    )
+    );
+
+  const contextualPreviousBill =
+    hasPersonalBillingContext &&
+    (
+      text === 'mes pasado' ||
+      text === 'y el mes pasado' ||
+      text === 'el anterior' ||
+      text === 'y el anterior'
+    );
+
+  if (
+    explicitPreviousBill ||
+    contextualPreviousBill
   ) {
-    return 'PREVIOUS_BILL';
+    add('PREVIOUS_BILL');
   }
 
   if (
@@ -313,37 +406,96 @@ function classifyPersonalBillingIntent(
       [
         'cuanto debo',
         'cuanto tengo que pagar',
+        'cuanto pago',
+        'cuanto pago ahora',
         'monto actual',
         'total actual',
+        'total de mi recibo',
+        'total de mi factura',
         'cuanto es mi recibo',
         'cuanto cuesta mi recibo'
       ]
+    ) ||
+    (
+      hasAny(
+        text,
+        ['total', 'monto']
+      ) &&
+      hasAny(
+        text,
+        ['recibo', 'factura']
+      ) &&
+      /(^| )(mi|mis)( |$)/.test(text)
     )
   ) {
-    return 'CURRENT_TOTAL';
+    add('CURRENT_TOTAL');
+  }
+
+  const variationMarkers = [
+    'por que cambio',
+    'por que subio',
+    'por que aumento',
+    'por que bajo',
+    'por que disminuyo',
+    'variacion',
+    'diferencia de mi recibo',
+    'explica mi recibo',
+    'explicame mi recibo'
+  ];
+
+  if (
+    hasAny(text, variationMarkers) ||
+    (
+      hasAny(
+        text,
+        [
+          'subio',
+          'aumento',
+          'bajo',
+          'disminuyo',
+          'cambio',
+          'diferencia'
+        ]
+      ) &&
+      hasAny(
+        text,
+        ['recibo', 'factura', 'monto']
+      )
+    )
+  ) {
+    add('EXPLANATION');
   }
 
   if (
-    hasAny(
-      text,
-      [
-        'por que',
-        'subio',
-        'aumento',
-        'bajo',
-        'disminuyo',
-        'cambio',
-        'diferencia',
-        'explicame',
-        'no entendi'
-      ]
-    ) ||
-    hasPersonalBillingContext
+    !intents.length &&
+    isBillingRepairRequest(text) &&
+    lastBillingIntent
   ) {
-    return 'EXPLANATION';
+    add(lastBillingIntent);
   }
 
-  return 'SUMMARY';
+  if (
+    !intents.length &&
+    hasPersonalBillingContext &&
+    isPersonalBillingFollowup(text)
+  ) {
+    add('EXPLANATION');
+  }
+
+  return intents;
+}
+
+function classifyPersonalBillingIntent(
+  message,
+  options = {}
+) {
+  const intents =
+    classifyPersonalBillingIntents(
+      message,
+      options
+    );
+
+  return intents[0] || 'SUMMARY';
 }
 
 function formatMoney(value) {
@@ -524,6 +676,26 @@ function buildDiscountReply(
   );
 }
 
+function buildPackageReply(
+  experience
+) {
+  const cause =
+    findCause(
+      experience,
+      'PACKAGES'
+    );
+
+  if (!cause) {
+    return (
+      'No encontré una variación verificable del recibo atribuible a un paquete entre los ciclos comparados.'
+    );
+  }
+
+  return sanitizeInternalTerms(
+    cause.description
+  );
+}
+
 function buildRentReply(
   experience
 ) {
@@ -646,6 +818,203 @@ function buildGeneralBillingEducationReply(
 }
 
 
+function buildPersonalBillingReplyForIntent(
+  experience,
+  intent,
+  {
+    concise = false
+  } = {}
+) {
+  switch (intent) {
+    case 'CURRENT_TOTAL': {
+      if (!concise) {
+        return buildCurrentTotalReply(
+          experience
+        );
+      }
+
+      const bill =
+        experience?.currentBill;
+
+      return bill
+        ? `Recibo actual: ${formatMoney(bill.total)}${bill.status ? ` · ${bill.status}` : ''}.`
+        : 'No tengo un recibo actual disponible.';
+    }
+
+    case 'PREVIOUS_BILL': {
+      if (!concise) {
+        return buildPreviousBillReply(
+          experience
+        );
+      }
+
+      const bill =
+        experience?.previousBill;
+
+      return bill
+        ? `Recibo anterior: ${formatMoney(bill.total)} (${bill.period}).`
+        : 'No hay un recibo anterior comparable disponible.';
+    }
+
+    case 'PRORATION':
+      return buildProrationReply(
+        experience
+      );
+
+    case 'DISCOUNT':
+      return buildDiscountReply(
+        experience
+      );
+
+    case 'PACKAGE_CHARGE':
+      return buildPackageReply(
+        experience
+      );
+
+    case 'RENT_TYPE': {
+      const current =
+        experience
+          ?.financialExplanation
+          ?.rentContext
+          ?.current;
+
+      if (
+        concise &&
+        current?.resolved &&
+        current?.rentType
+      ) {
+        return `Tipo de renta: ${current.label || current.rentType} (${current.rentType}).`;
+      }
+
+      return buildRentReply(
+        experience
+      );
+    }
+
+    case 'EXPLANATION': {
+      if (concise) {
+        const summary =
+          experience
+            ?.financialExplanation
+            ?.customerFacing
+            ?.summary;
+
+        if (summary) {
+          return sanitizeInternalTerms(
+            summary
+          );
+        }
+      }
+
+      return buildVariationReply(
+        experience
+      );
+    }
+
+    default:
+      return buildSummaryReply(
+        experience
+      );
+  }
+}
+
+
+function buildPersonalBillingRepairSummary(
+  experience,
+  intents,
+  {
+    includeIntro = true
+  } = {}
+) {
+  const uniqueIntents = Array.from(
+    new Set(
+      (intents || []).filter(Boolean)
+    )
+  );
+
+  const sentences = uniqueIntents
+    .map(
+      (intent) =>
+        buildPersonalBillingReplyForIntent(
+          experience,
+          intent,
+          { concise: true }
+        )
+    )
+    .filter(Boolean);
+
+  const body = sentences.join(' ');
+
+  if (!body) {
+    return null;
+  }
+
+  return includeIntro
+    ? `Claro. En simple:\n\n${body}`
+    : body;
+}
+
+function buildPersonalBillingMultiReply(
+  experience,
+  intents,
+  {
+    repair = false,
+    includeIntro = true
+  } = {}
+) {
+  const uniqueIntents = Array.from(
+    new Set(
+      (intents || []).filter(Boolean)
+    )
+  );
+
+  if (!uniqueIntents.length) {
+    return null;
+  }
+
+  if (uniqueIntents.length === 1) {
+    return buildPersonalBillingReplyForIntent(
+      experience,
+      uniqueIntents[0],
+      { concise: repair }
+    );
+  }
+
+  if (repair) {
+    return buildPersonalBillingRepairSummary(
+      experience,
+      uniqueIntents,
+      { includeIntro }
+    );
+  }
+
+  const lines = uniqueIntents
+    .map(
+      (intent) =>
+        buildPersonalBillingReplyForIntent(
+          experience,
+          intent,
+          { concise: true }
+        )
+    )
+    .filter(Boolean)
+    .map((reply) => `• ${reply}`);
+
+  const blocks = [];
+
+  if (includeIntro) {
+    blocks.push(
+      repair
+        ? 'Claro. En corto:'
+        : 'Claro. Te respondo punto por punto:'
+    );
+  }
+
+  blocks.push(lines.join('\n'));
+
+  return blocks.join('\n\n');
+}
+
 function buildPersonalBillingReply(
   experience,
   message,
@@ -657,58 +1026,17 @@ function buildPersonalBillingReply(
       options
     );
 
-  let reply;
-
-  switch (intent) {
-    case 'CURRENT_TOTAL':
-      reply =
-        buildCurrentTotalReply(
-          experience
-        );
-      break;
-
-    case 'PREVIOUS_BILL':
-      reply =
-        buildPreviousBillReply(
-          experience
-        );
-      break;
-
-    case 'PRORATION':
-      reply =
-        buildProrationReply(
-          experience
-        );
-      break;
-
-    case 'DISCOUNT':
-      reply =
-        buildDiscountReply(
-          experience
-        );
-      break;
-
-    case 'RENT_TYPE':
-      reply =
-        buildRentReply(
-          experience
-        );
-      break;
-
-    case 'EXPLANATION':
-      reply =
-        buildVariationReply(
-          experience
-        );
-      break;
-
-    default:
-      reply =
-        buildSummaryReply(
-          experience
-        );
-      break;
-  }
+  const reply =
+    buildPersonalBillingReplyForIntent(
+      experience,
+      intent,
+      {
+        concise:
+          isBillingRepairRequest(
+            message
+          )
+      }
+    );
 
   return {
     reply,
@@ -732,8 +1060,14 @@ module.exports = {
   normalizeText,
   isGeneralBillingEducationQuery,
   isPersonalBillingFollowup,
+  isBillingRepairRequest,
   requiresPersonalBillingAccess,
   classifyPersonalBillingIntent,
+  classifyPersonalBillingIntents,
   buildGeneralBillingEducationReply,
-  buildPersonalBillingReply
+  buildPackageReply,
+  buildPersonalBillingReply,
+  buildPersonalBillingReplyForIntent,
+  buildPersonalBillingMultiReply,
+  buildPersonalBillingRepairSummary
 };

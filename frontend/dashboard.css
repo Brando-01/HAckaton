@@ -761,3 +761,361 @@ tbody tr:hover {
         justify-content: flex-start;
     }
 }
+
+/* FASE 11 · COBERTURA FUNCIONAL DE DATOS */
+
+.data-coverage-title-row {
+    align-items: center;
+}
+
+.coverage-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.coverage-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: 14px;
+}
+
+.coverage-panel {
+    padding: 17px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface-muted);
+}
+
+.coverage-panel h3 {
+    margin: 3px 0 0;
+    font-size: 15px;
+}
+
+.dataset-source-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+    margin-top: 13px;
+}
+
+.dataset-source-card {
+    padding: 12px;
+    border: 1px solid #dce3e8;
+    border-radius: 10px;
+    background: #fff;
+}
+
+.dataset-source-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.dataset-source-top strong {
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.dataset-source-card p {
+    margin: 8px 0 6px;
+    color: #52606a;
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.dataset-source-card small {
+    color: #7a858e;
+    font-size: 10px;
+}
+
+.scenario-coverage-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 13px;
+}
+
+.scenario-coverage-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 11px 12px;
+    border: 1px solid #dce3e8;
+    border-radius: 10px;
+    background: #fff;
+}
+
+.scenario-coverage-item strong {
+    font-size: 11px;
+}
+
+.scenario-coverage-item p {
+    margin: 5px 0 0;
+    color: #5a6570;
+    font-size: 10px;
+    line-height: 1.45;
+}
+
+.coverage-status-badge {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    padding: 5px 8px;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.coverage-status-badge.ready {
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+.coverage-status-badge.context {
+    background: #eaf4ff;
+    color: #0a5f9e;
+}
+
+.coverage-status-badge.review {
+    background: var(--warning-soft);
+    color: var(--warning);
+}
+
+.coverage-status-badge.danger {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.confirmed-rules-strip {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    margin-top: 14px;
+    padding: 15px 17px;
+    border: 1px solid #cfe8f3;
+    border-radius: 12px;
+    background: #f5fbfe;
+}
+
+.confirmed-rules-strip strong {
+    display: block;
+    margin-top: 3px;
+    font-size: 12px;
+}
+
+.confirmed-rules-list {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 7px;
+}
+
+.confirmed-rule-chip {
+    max-width: 360px;
+    padding: 7px 9px;
+    border-radius: 9px;
+    background: #fff;
+    color: #41515e;
+    font-size: 9px;
+    line-height: 1.4;
+}
+
+.coverage-empty {
+    padding: 16px;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+@media (max-width: 1150px) {
+    .coverage-summary-grid,
+    .dataset-source-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .coverage-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 700px) {
+    .data-coverage-title-row,
+    .confirmed-rules-strip {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .coverage-summary-grid,
+    .dataset-source-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .confirmed-rules-list {
+        justify-content: flex-start;
+    }
+}
+
+/* FASE 12 · MAPEO DE ESCENARIOS FINANCIEROS */
+
+.scenario-mapping-title-row {
+    align-items: center;
+}
+
+.mapping-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.scenario-mapping-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.scenario-mapping-card {
+    padding: 15px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface-muted);
+}
+
+.scenario-mapping-card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.scenario-mapping-card-top > div {
+    min-width: 0;
+}
+
+.scenario-mapping-card-top strong {
+    display: block;
+    font-size: 13px;
+}
+
+.scenario-mapping-card-top small {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 9px;
+}
+
+.scenario-mapping-card > p {
+    margin: 10px 0 12px;
+    color: #52606a;
+    font-size: 10px;
+    line-height: 1.5;
+}
+
+.mapping-evidence-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+}
+
+.mapping-evidence-grid > div {
+    padding: 8px 9px;
+    border: 1px solid #dfe6eb;
+    border-radius: 9px;
+    background: #fff;
+}
+
+.mapping-evidence-grid span {
+    display: block;
+    color: #687580;
+    font-size: 8px;
+    line-height: 1.35;
+}
+
+.mapping-evidence-grid strong {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+}
+
+.mapping-patterns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.mapping-patterns span {
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: #fff;
+    color: #4d5d68;
+    font-size: 8px;
+    line-height: 1.35;
+}
+
+.mapping-safeguards-strip {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    margin-top: 14px;
+    padding: 15px 17px;
+    border: 1px solid #f0ddaa;
+    border-radius: 12px;
+    background: #fffaf0;
+}
+
+.mapping-safeguards-strip strong {
+    display: block;
+    margin-top: 3px;
+    font-size: 12px;
+}
+
+.mapping-safeguards-list {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 7px;
+}
+
+.mapping-safeguard-chip {
+    max-width: 360px;
+    padding: 7px 9px;
+    border-radius: 9px;
+    background: #fff;
+    color: #5c5547;
+    font-size: 9px;
+    line-height: 1.4;
+}
+
+@media (max-width: 1150px) {
+    .mapping-summary-grid,
+    .scenario-mapping-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 700px) {
+    .scenario-mapping-title-row,
+    .mapping-safeguards-strip {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .mapping-summary-grid,
+    .scenario-mapping-grid,
+    .mapping-evidence-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .mapping-safeguards-list {
+        justify-content: flex-start;
+    }
+}

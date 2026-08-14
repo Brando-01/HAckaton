@@ -440,9 +440,426 @@ async function readCoverageMeta({
   }
 }
 
+function parseJsonArray(value) {
+  try {
+    const parsed = JSON.parse(
+      value || '[]'
+    );
+
+    return Array.isArray(parsed)
+      ? parsed
+      : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function normalizePositiveInteger(
+  value,
+  fallback,
+  max = null
+) {
+  const parsed =
+    Number.parseInt(
+      value,
+      10
+    );
+
+  const normalized =
+    Number.isInteger(parsed) &&
+    parsed > 0
+      ? parsed
+      : fallback;
+
+  return Number.isInteger(max)
+    ? Math.min(normalized, max)
+    : normalized;
+}
+
+function mapSafeCoverageProfile(
+  row
+) {
+  if (!row) {
+    return null;
+  }
+
+  const difference =
+    Number(row.difference);
+
+  return {
+    demoId: row.demo_id,
+    lobType: row.lob_type || null,
+    businessType:
+      row.business_type || null,
+    invoiceCount:
+      Number(row.invoice_count || 0),
+    comparable:
+      Boolean(row.comparable),
+    explainable:
+      Boolean(row.explainable),
+    highConfidence:
+      Boolean(row.high_confidence),
+    fullyExplained:
+      Boolean(row.fully_explained),
+    demoPremium:
+      Boolean(row.demo_premium),
+    qualityTier:
+      row.quality_tier || null,
+    status:
+      row.explanation_status || null,
+    evidenceLevel:
+      row.evidence_level || null,
+    primaryScenario:
+      row.primary_scenario || null,
+    scenarioCodes:
+      parseJsonArray(
+        row.scenario_codes_json
+      ),
+    premiumScore:
+      row.premium_score == null
+        ? null
+        : Number(row.premium_score),
+    coveragePercent:
+      row.coverage_percent == null
+        ? null
+        : Number(row.coverage_percent),
+    currentCycleDate:
+      row.current_cycle_date || null,
+    previousCycleDate:
+      row.previous_cycle_date || null,
+    rentType:
+      row.rent_type || null,
+    integrityWarningCount:
+      Number(
+        row.integrity_warning_count || 0
+      ),
+    differenceDirection:
+      !Number.isFinite(difference)
+        ? null
+        : difference > 0
+          ? 'UP'
+          : difference < 0
+            ? 'DOWN'
+            : 'SAME'
+  };
+}
+
+function ensureCoverageDbExists(
+  dbPath
+) {
+  if (fs.existsSync(dbPath)) {
+    return;
+  }
+
+  const error = new Error(
+    'No existe el índice local de cobertura. Ejecuta npm run demo:coverage:desafio1.'
+  );
+  error.code =
+    'COVERAGE_DB_NOT_FOUND';
+  throw error;
+}
+
+function buildExplorerWhere({
+  search = '',
+  capability = 'ALL',
+  scenario = 'ALL',
+  rentType = 'ALL',
+  qualityTier = 'ALL'
+} = {}) {
+  const clauses = [
+    'demo_id IS NOT NULL',
+    'consultable = 1'
+  ];
+  const params = [];
+
+  const cleanSearch =
+    String(search || '')
+      .trim()
+      .toUpperCase();
+
+  if (cleanSearch) {
+    clauses.push(
+      "(UPPER(demo_id) LIKE ? OR UPPER(COALESCE(lob_type, '')) LIKE ? OR UPPER(COALESCE(business_type, '')) LIKE ?)"
+    );
+    const token =
+      `%${cleanSearch}%`;
+    params.push(
+      token,
+      token,
+      token
+    );
+  }
+
+  const capabilityMap = {
+    COMPARABLE: 'comparable = 1',
+    EXPLAINABLE: 'explainable = 1',
+    HIGH: 'high_confidence = 1',
+    PREMIUM: 'demo_premium = 1',
+    UNEXPLAINED: 'explainable = 0'
+  };
+
+  if (capabilityMap[capability]) {
+    clauses.push(
+      capabilityMap[capability]
+    );
+  }
+
+  if (
+    scenario &&
+    scenario !== 'ALL'
+  ) {
+    clauses.push(
+      'scenario_codes_json LIKE ?'
+    );
+    params.push(
+      `%\"${scenario}\"%`
+    );
+  }
+
+  if (
+    rentType &&
+    rentType !== 'ALL'
+  ) {
+    clauses.push(
+      'rent_type = ?'
+    );
+    params.push(rentType);
+  }
+
+  if (
+    qualityTier &&
+    qualityTier !== 'ALL'
+  ) {
+    clauses.push(
+      'quality_tier = ?'
+    );
+    params.push(qualityTier);
+  }
+
+  return {
+    sql:
+      clauses.join(' AND '),
+    params
+  };
+}
+
+const EXPLORER_SORTS =
+  Object.freeze({
+    DEMO_ASC:
+      'demo_id ASC',
+    PREMIUM_FIRST:
+      'demo_premium DESC, high_confidence DESC, COALESCE(premium_score, -1) DESC, demo_id ASC',
+    COVERAGE_DESC:
+      'COALESCE(coverage_percent, -1) DESC, high_confidence DESC, demo_id ASC',
+    INVOICES_DESC:
+      'invoice_count DESC, demo_id ASC'
+  });
+
+async function queryCoverageProfiles({
+  dbPath = null,
+  search = '',
+  capability = 'ALL',
+  scenario = 'ALL',
+  rentType = 'ALL',
+  qualityTier = 'ALL',
+  sort = 'DEMO_ASC',
+  page = 1,
+  pageSize = 24
+} = {}) {
+  const resolved =
+    resolveCoverageDbPath(dbPath);
+
+  ensureCoverageDbExists(resolved);
+
+  const safePage =
+    normalizePositiveInteger(
+      page,
+      1
+    );
+  const safePageSize =
+    normalizePositiveInteger(
+      pageSize,
+      24,
+      60
+    );
+
+  const where =
+    buildExplorerWhere({
+      search,
+      capability,
+      scenario,
+      rentType,
+      qualityTier
+    });
+
+  const orderBy =
+    EXPLORER_SORTS[sort] ||
+    EXPLORER_SORTS.DEMO_ASC;
+
+  const db =
+    await openDatabase(
+      resolved,
+      sqlite3.OPEN_READONLY
+    );
+
+  try {
+    const countRow =
+      await get(
+        db,
+        `
+          SELECT COUNT(*) AS total
+          FROM coverage_profiles
+          WHERE ${where.sql}
+        `,
+        where.params
+      );
+
+    const total =
+      Number(countRow?.total || 0);
+    const totalPages =
+      Math.max(
+        Math.ceil(
+          total / safePageSize
+        ),
+        1
+      );
+    const boundedPage =
+      Math.min(
+        safePage,
+        totalPages
+      );
+    const offset =
+      (boundedPage - 1) *
+      safePageSize;
+
+    const rows =
+      await new Promise(
+        (resolve, reject) => {
+          db.all(
+            `
+              SELECT
+                demo_id,
+                lob_type,
+                business_type,
+                invoice_count,
+                comparable,
+                explainable,
+                high_confidence,
+                fully_explained,
+                demo_premium,
+                quality_tier,
+                explanation_status,
+                evidence_level,
+                primary_scenario,
+                scenario_codes_json,
+                premium_score,
+                coverage_percent,
+                difference,
+                current_cycle_date,
+                previous_cycle_date,
+                rent_type,
+                integrity_warning_count
+              FROM coverage_profiles
+              WHERE ${where.sql}
+              ORDER BY ${orderBy}
+              LIMIT ? OFFSET ?
+            `,
+            [
+              ...where.params,
+              safePageSize,
+              offset
+            ],
+            (error, resultRows) => {
+              if (error) {
+                reject(error);
+                return;
+              }
+              resolve(resultRows || []);
+            }
+          );
+        }
+      );
+
+    return {
+      items:
+        rows.map(
+          mapSafeCoverageProfile
+        ),
+      pagination: {
+        page: boundedPage,
+        pageSize: safePageSize,
+        total,
+        totalPages
+      }
+    };
+  } finally {
+    await close(db);
+  }
+}
+
+async function readPrivateCoverageProfileByDemoId(
+  demoId,
+  {
+    dbPath = null
+  } = {}
+) {
+  const cleanDemoId =
+    String(demoId || '')
+      .trim()
+      .toUpperCase();
+
+  if (!/^DEMO\d{6}$/.test(cleanDemoId)) {
+    return null;
+  }
+
+  const resolved =
+    resolveCoverageDbPath(dbPath);
+
+  ensureCoverageDbExists(resolved);
+
+  const db =
+    await openDatabase(
+      resolved,
+      sqlite3.OPEN_READONLY
+    );
+
+  try {
+    const row =
+      await get(
+        db,
+        `
+          SELECT *
+          FROM coverage_profiles
+          WHERE demo_id = ?
+            AND consultable = 1
+          LIMIT 1
+        `,
+        [cleanDemoId]
+      );
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      ...mapSafeCoverageProfile(row),
+      subscriberKey:
+        row.subscriber_key,
+      customerKey:
+        row.customer_key || null
+    };
+  } finally {
+    await close(db);
+  }
+}
+
 module.exports = {
   DEFAULT_COVERAGE_DB_PATH,
   resolveCoverageDbPath,
   writeCoverageReport,
-  readCoverageMeta
+  readCoverageMeta,
+  queryCoverageProfiles,
+  readPrivateCoverageProfileByDemoId,
+  mapSafeCoverageProfile,
+  buildExplorerWhere
 };

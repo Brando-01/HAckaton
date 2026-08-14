@@ -397,3 +397,57 @@ test(
     assert.equal(percentage(2, 0), 0);
   }
 );
+
+test(
+  'una causa PACKAGES HIGH entra a cobertura masiva sin convertirse artificialmente en demo premium de Fase 4',
+  () => {
+    const explanation =
+      reconnectionExplanation();
+
+    explanation.interpretation.causes = [
+      {
+        code: 'PACKAGES',
+        label: 'Paquete adicional',
+        impactAmount: 9.99,
+        evidenceLevel: 'HIGH'
+      }
+    ];
+    explanation.interpretation.status =
+      'FULLY_EXPLAINED';
+    explanation.interpretation
+      .unexplainedAmount = 0;
+    explanation.comparison.difference =
+      9.99;
+    explanation.currentBill.total =
+      72.88;
+    explanation.previousBill.total =
+      62.89;
+
+    const profile =
+      buildCoverageProfile({
+        seed: seed('SUB-PKG', 2),
+        explanation
+      });
+
+    assert.equal(
+      profile.explainable,
+      true
+    );
+    assert.equal(
+      profile.highConfidence,
+      true
+    );
+    assert.deepEqual(
+      profile.scenarioCodes,
+      ['PACKAGES']
+    );
+    assert.equal(
+      profile.primaryScenario,
+      'PACKAGES'
+    );
+    assert.equal(
+      profile.demoPremium,
+      false
+    );
+  }
+);

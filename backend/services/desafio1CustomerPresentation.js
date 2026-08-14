@@ -121,6 +121,46 @@ function planChangeCustomerDescription(cause) {
   );
 }
 
+function packageCustomerDescription(cause) {
+  const impact = roundMoney(
+    cause?.impactAmount
+  );
+
+  const description =
+    cause?.chargeChange
+      ?.description ||
+    'paquete adicional';
+
+  const event =
+    cause?.packageEvent ||
+    cause?.chargeChange?.status ||
+    'CHANGED';
+
+  if (event === 'ADDED') {
+    return (
+      `En tu recibo apareció un cargo de ${formatMoney(impact)} correspondiente al paquete "${description}". ` +
+      'Ese importe explica la variación de ese concepto.'
+    );
+  }
+
+  if (event === 'REMOVED') {
+    return (
+      `Tu recibo bajó ${formatMoney(Math.abs(impact))} porque dejó de aparecer el paquete "${description}". ` +
+      'La reducción coincide con la variación de ese concepto.'
+    );
+  }
+
+  if (impact > 0) {
+    return (
+      `El cargo del paquete "${description}" aumentó ${formatMoney(impact)} entre ambos recibos.`
+    );
+  }
+
+  return (
+    `El cargo del paquete "${description}" disminuyó ${formatMoney(Math.abs(impact))} entre ambos recibos.`
+  );
+}
+
 function prorationCustomerDescription(finding) {
   const amount = formatMoney(
     finding?.amount ??
@@ -179,6 +219,11 @@ function buildCustomerCauseDescription(cause) {
 
     case 'PLAN_CHANGE':
       return planChangeCustomerDescription(
+        cause
+      );
+
+    case 'PACKAGES':
+      return packageCustomerDescription(
         cause
       );
 
@@ -254,6 +299,9 @@ function buildVerification(item) {
       'Facturación',
       'Órdenes del servicio'
     ],
+    PACKAGES: [
+      'Facturación'
+    ],
     PRORATION: [
       'Facturación',
       'Registro de prorrateo'
@@ -263,6 +311,17 @@ function buildVerification(item) {
       'Registro de promociones'
     ]
   };
+
+  if (
+    item?.code === 'PACKAGES' &&
+    (item?.evidence?.orders || [])
+      .length
+  ) {
+    sourceMap.PACKAGES = [
+      'Facturación',
+      'Órdenes del servicio'
+    ];
+  }
 
   const evidenceLevel =
     item?.evidenceLevel || null;
@@ -365,6 +424,7 @@ module.exports = {
   formatMoney,
   formatDateEs,
   sanitizeInternalTerms,
+  packageCustomerDescription,
   buildCustomerCauseDescription,
   buildCustomerFindingDescription,
   getImpactPresentation,

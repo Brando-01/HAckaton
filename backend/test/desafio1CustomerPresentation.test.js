@@ -265,3 +265,73 @@ test(
     );
   }
 );
+
+test(
+  'paquete adicional se explica con monto y nombre del concepto sin lenguaje técnico',
+  () => {
+    const text =
+      buildCustomerCauseDescription({
+        code: 'PACKAGES',
+        impactAmount: 9.99,
+        packageEvent: 'ADDED',
+        chargeChange: {
+          description:
+            'Paquete 3GB de Internet 10dias x S/10'
+        }
+      });
+
+    assert.match(
+      text,
+      /cargo de S\/ 9\.99/i
+    );
+    assert.match(
+      text,
+      /Paquete 3GB de Internet/i
+    );
+    assert.doesNotMatch(
+      text,
+      /GRUPO|CLASIFICACION|SUBSCRIBER/i
+    );
+  }
+);
+
+test(
+  'verificación de paquete solo menciona órdenes cuando realmente existen',
+  () => {
+    const withoutOrder =
+      buildVerification({
+        code: 'PACKAGES',
+        evidenceLevel: 'HIGH',
+        evidence: {
+          orders: []
+        }
+      });
+
+    assert.deepEqual(
+      withoutOrder.sources,
+      ['Facturación']
+    );
+
+    const withOrder =
+      buildVerification({
+        code: 'PACKAGES',
+        evidenceLevel: 'HIGH',
+        evidence: {
+          orders: [
+            {
+              reason:
+                'Activacion de Paquetes Datos OneShot'
+            }
+          ]
+        }
+      });
+
+    assert.deepEqual(
+      withOrder.sources,
+      [
+        'Facturación',
+        'Órdenes del servicio'
+      ]
+    );
+  }
+);

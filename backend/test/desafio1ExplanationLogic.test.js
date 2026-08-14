@@ -1907,3 +1907,343 @@ test(
     );
   }
 );
+
+test(
+  'paquete estructurado explica exactamente el delta del cargo sin requerir una orden para afirmar una compra',
+  () => {
+    const oldBill =
+      invoice({
+        number: 'INV-OLD',
+        cycle: '2026-06-15',
+        total: 39.9,
+        items: [
+          item({
+            code: 'PLAN',
+            description: 'RV Plan Base',
+            amount: 39.9
+          })
+        ]
+      });
+
+    const packageItem =
+      item({
+        code: 'OC_PAQRE33',
+        description:
+          'Paquete 3GB de Internet 10dias x S/10',
+        amount: 9.99,
+        classification:
+          'Cargo Unico Paquete',
+        group: 'PAQUETES',
+        rentType: null
+      });
+
+    const newBill =
+      invoice({
+        number: 'INV-NEW',
+        cycle: '2026-07-15',
+        total: 49.89,
+        items: [
+          item({
+            code: 'PLAN',
+            description: 'RV Plan Base',
+            amount: 39.9
+          }),
+          packageItem
+        ]
+      });
+
+    const result =
+      interpretBillingAnalysis(
+        analysis({
+          currentBill: newBill,
+          previousBill: oldBill,
+          comparison:
+            comparison({
+              previousTotal: 39.9,
+              currentTotal: 49.89,
+              chargeChanges: [
+                change({
+                  code: 'OC_PAQRE33',
+                  description:
+                    'Paquete 3GB de Internet 10dias x S/10',
+                  previousAmount: 0,
+                  currentAmount: 9.99,
+                  status: 'ADDED'
+                })
+              ]
+            })
+        })
+      );
+
+    assert.equal(
+      result.interpretation.status,
+      'FULLY_EXPLAINED'
+    );
+    assert.equal(
+      result.interpretation.causes.length,
+      1
+    );
+
+    const cause =
+      result.interpretation.causes[0];
+
+    assert.equal(cause.code, 'PACKAGES');
+    assert.equal(cause.impactAmount, 9.99);
+    assert.equal(cause.evidenceLevel, 'HIGH');
+    assert.equal(
+      cause.ruleId,
+      'PACKAGE_STRUCTURED_CHARGE_DELTA'
+    );
+    assert.equal(cause.packageEvent, 'ADDED');
+    assert.equal(
+      cause.evidence.orders.length,
+      0
+    );
+    assert.equal(
+      result.interpretation.unexplainedAmount,
+      0
+    );
+    assert.equal(
+      result.interpretation.coveragePercent,
+      100
+    );
+  }
+);
+
+test(
+  'una orden explícita de paquete refuerza la evidencia pero el monto causal sigue saliendo del delta de facturación',
+  () => {
+    const oldBill =
+      invoice({
+        number: 'INV-OLD',
+        cycle: '2026-06-15',
+        total: 50,
+        items: []
+      });
+
+    const newBill =
+      invoice({
+        number: 'INV-NEW',
+        cycle: '2026-07-15',
+        total: 60,
+        items: [
+          item({
+            code: 'PKG10',
+            description: 'Paquete Datos',
+            amount: 10,
+            classification:
+              'Cargo Unico Paquete',
+            group: 'PAQUETES',
+            rentType: null
+          })
+        ]
+      });
+
+    const result =
+      interpretBillingAnalysis(
+        analysis({
+          currentBill: newBill,
+          previousBill: oldBill,
+          comparison:
+            comparison({
+              previousTotal: 50,
+              currentTotal: 60,
+              chargeChanges: [
+                change({
+                  code: 'PKG10',
+                  description: 'Paquete Datos',
+                  previousAmount: 0,
+                  currentAmount: 10,
+                  status: 'ADDED'
+                })
+              ]
+            }),
+          orders: [
+            {
+              subscriberKey: 'SUB-1',
+              reason:
+                'Activacion de Paquetes Datos OneShot',
+              itemType: 'Cambiar',
+              status: 'Terminado'
+            }
+          ]
+        })
+      );
+
+    const cause =
+      result.interpretation.causes[0];
+
+    assert.equal(cause.code, 'PACKAGES');
+    assert.equal(cause.impactAmount, 10);
+    assert.equal(
+      cause.ruleId,
+      'PACKAGE_STRUCTURED_CHARGE_DELTA_WITH_ORDER'
+    );
+    assert.equal(
+      cause.evidence.orders.length,
+      1
+    );
+  }
+);
+
+test(
+  'una descripción que solo menciona paquete no se convierte en causa sin marcador estructurado',
+  () => {
+    const oldBill =
+      invoice({
+        number: 'INV-OLD',
+        cycle: '2026-06-15',
+        total: 40,
+        items: []
+      });
+
+    const newBill =
+      invoice({
+        number: 'INV-NEW',
+        cycle: '2026-07-15',
+        total: 50,
+        items: [
+          item({
+            code: 'GENERIC',
+            description:
+              'Paquete descrito manualmente',
+            amount: 10,
+            classification: 'Cargo Unico',
+            group: 'OTROS',
+            rentType: null
+          })
+        ]
+      });
+
+    const result =
+      interpretBillingAnalysis(
+        analysis({
+          currentBill: newBill,
+          previousBill: oldBill,
+          comparison:
+            comparison({
+              previousTotal: 40,
+              currentTotal: 50,
+              chargeChanges: [
+                change({
+                  code: 'GENERIC',
+                  description:
+                    'Paquete descrito manualmente',
+                  previousAmount: 0,
+                  currentAmount: 10,
+                  status: 'ADDED'
+                })
+              ]
+            })
+        })
+      );
+
+    assert.equal(
+      result.interpretation.causes.length,
+      0
+    );
+    assert.equal(
+      result.interpretation.status,
+      'UNEXPLAINED'
+    );
+  }
+);
+
+test(
+  'prorrateo verificado conserva prioridad sobre la etiqueta de paquete para no duplicar una misma variación',
+  () => {
+    const oldBill =
+      invoice({
+        number: 'INV-OLD',
+        cycle: '2026-06-15',
+        total: 0,
+        items: []
+      });
+
+    const packageProportional =
+      item({
+        code: 'PKG_PROP',
+        description:
+          'Paquete proporcional',
+        amount: 5,
+        classification:
+          'Cargo Unico Paquete',
+        group: 'PAQUETES',
+        rentType: 'RA',
+        components: [
+          {
+            amount: 5,
+            netAmount: 5,
+            description:
+              'Paquete proporcional',
+            classification:
+              'Cargo Unico Paquete',
+            group:
+              'PAQUETES PROPORCIONAL',
+            subgroup:
+              'PAQUETES PROPORCIONAL',
+            subscriberKey: 'SUB-1',
+            sourceRow: 22
+          }
+        ]
+      });
+
+    const newBill =
+      invoice({
+        number: 'INV-NEW',
+        cycle: '2026-07-15',
+        total: 5,
+        items: [packageProportional]
+      });
+
+    const result =
+      interpretBillingAnalysis(
+        analysis({
+          currentBill: newBill,
+          previousBill: oldBill,
+          comparison:
+            comparison({
+              previousTotal: 0,
+              currentTotal: 5,
+              chargeChanges: [
+                change({
+                  code: 'PKG_PROP',
+                  description:
+                    'Paquete proporcional',
+                  previousAmount: 0,
+                  currentAmount: 5,
+                  status: 'ADDED'
+                })
+              ]
+            }),
+          currentEvidence:
+            evidence({
+              invoiceNumber: 'INV-NEW',
+              cycleDate: '2026-07-15',
+              observedRentTypes: ['RA'],
+              proration: [
+                {
+                  amount: 5,
+                  periodStartDate:
+                    '2026-07-10 00:00:00',
+                  periodEndDate:
+                    '2026-07-15 00:00:00',
+                  sourceRows: [300]
+                }
+              ]
+            })
+        })
+      );
+
+    assert.deepEqual(
+      result.interpretation.causes.map(
+        (cause) => cause.code
+      ),
+      ['PRORATION']
+    );
+    assert.equal(
+      result.interpretation.unexplainedAmount,
+      0
+    );
+  }
+);

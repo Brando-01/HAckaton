@@ -239,6 +239,120 @@
             </div>
         </section>
 
+        <section class="section-block data-coverage-section">
+            <div class="section-title-row data-coverage-title-row">
+                <div>
+                    <span class="section-kicker">FASE 11 · COBERTURA FUNCIONAL</span>
+                    <h2>¿Qué aporta cada dataset al prototipo?</h2>
+                    <p>
+                        Auditoría agregada de las ocho fuentes importadas y de los escenarios que ya tienen
+                        una regla verificable. No expone identificadores de suscriptores.
+                    </p>
+                </div>
+                <span class="release-readiness-pill loading" id="dataCoverageStatus">Verificando</span>
+            </div>
+
+            <div class="coverage-summary-grid">
+                <article class="small-metric-card">
+                    <span>Fuentes integradas</span>
+                    <strong id="coverageSourcesSummary">—</strong>
+                    <small>Importación local validada</small>
+                </article>
+                <article class="small-metric-card">
+                    <span>Escenarios consolidados</span>
+                    <strong id="coverageReadyScenarios">—</strong>
+                    <small>Con regla/evidencia definida</small>
+                </article>
+                <article class="small-metric-card">
+                    <span>Suscriptores facturados</span>
+                    <strong id="coverageSubscribers">—</strong>
+                    <small>Conteo agregado</small>
+                </article>
+                <article class="small-metric-card">
+                    <span>Cobertura del catálogo</span>
+                    <strong id="coverageCatalogPct">—</strong>
+                    <small>Códigos usados en facturación</small>
+                </article>
+            </div>
+
+            <div class="coverage-layout">
+                <article class="coverage-panel">
+                    <div class="card-heading">
+                        <div>
+                            <span class="section-kicker">8 FUENTES</span>
+                            <h3>Rol dentro de la solución</h3>
+                        </div>
+                    </div>
+                    <div class="dataset-source-grid" id="datasetSourceGrid"></div>
+                </article>
+
+                <article class="coverage-panel">
+                    <div class="card-heading">
+                        <div>
+                            <span class="section-kicker">ESCENARIOS</span>
+                            <h3>Cobertura y pendientes reales</h3>
+                        </div>
+                    </div>
+                    <div class="scenario-coverage-list" id="scenarioCoverageList"></div>
+                </article>
+            </div>
+
+            <div class="confirmed-rules-strip">
+                <div>
+                    <span class="section-kicker">REGLAS DE DATOS CONFIRMADAS</span>
+                    <strong>Decisiones que ya no dependen de supuestos del equipo</strong>
+                </div>
+                <div class="confirmed-rules-list" id="confirmedRulesList"></div>
+            </div>
+        </section>
+
+        <section class="section-block scenario-mapping-section">
+            <div class="section-title-row scenario-mapping-title-row">
+                <div>
+                    <span class="section-kicker">FASE 12 · MAPEO DE ESCENARIOS</span>
+                    <h2>¿Qué causas faltantes pueden demostrarse con la data?</h2>
+                    <p>
+                        Exploración agregada de paquetes, equipo financiado, cargos adicionales, suspensión y notas.
+                        Un patrón encontrado no se convierte automáticamente en causa financiera.
+                    </p>
+                </div>
+                <span class="release-readiness-pill loading" id="scenarioMappingStatus">Analizando</span>
+            </div>
+
+            <div class="mapping-summary-grid">
+                <article class="small-metric-card">
+                    <span>Objetivos auditados</span>
+                    <strong id="mappingTargets">—</strong>
+                    <small>Escenarios pendientes del desafío</small>
+                </article>
+                <article class="small-metric-card">
+                    <span>Mapeados</span>
+                    <strong id="mappingMapped">—</strong>
+                    <small>Con marcador estructurado directo</small>
+                </article>
+                <article class="small-metric-card">
+                    <span>Parciales / ambiguos</span>
+                    <strong id="mappingReview">—</strong>
+                    <small>Requieren regla o semántica adicional</small>
+                </article>
+                <article class="small-metric-card">
+                    <span>Promovibles a Fase 13</span>
+                    <strong id="mappingPromotable">—</strong>
+                    <small>Sin saltarse reconciliación monetaria</small>
+                </article>
+            </div>
+
+            <div class="scenario-mapping-grid" id="scenarioMappingGrid"></div>
+
+            <div class="mapping-safeguards-strip">
+                <div>
+                    <span class="section-kicker">GUARDAS DE INTERPRETACIÓN</span>
+                    <strong>Encontrar una señal no significa inventar una causa</strong>
+                </div>
+                <div class="mapping-safeguards-list" id="scenarioMappingSafeguards"></div>
+            </div>
+        </section>
+
         <section class="interactions-section">
             <div class="section-header">
                 <div>
