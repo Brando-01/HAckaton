@@ -394,3 +394,102 @@ test(
     );
   }
 );
+
+test(
+  'Fase 14 recupera como máximo seis recibos históricos sin cargar evidencia causal',
+  async () => {
+    const requested = {
+      headerLimit: null,
+      invoices: []
+    };
+
+    const repository = {
+      async open() {},
+      async getSubscriber(key) {
+        return {
+          subscriberKey: key
+        };
+      },
+      async listInvoiceHeadersForSubscriber(
+        key,
+        options
+      ) {
+        assert.equal(
+          key,
+          'SUB_HISTORY'
+        );
+        requested.headerLimit =
+          options.limit;
+        return [
+          {
+            invoiceNumber: 'INV3',
+            billingArrangement: 'BA',
+            cycleDate: '2026-07-15'
+          },
+          {
+            invoiceNumber: 'INV2',
+            billingArrangement: 'BA',
+            cycleDate: '2026-06-15'
+          },
+          {
+            invoiceNumber: 'INV1',
+            billingArrangement: 'BA',
+            cycleDate: '2026-05-15'
+          }
+        ];
+      },
+      async getInvoiceCharges(
+        invoiceNumber
+      ) {
+        requested.invoices.push(
+          invoiceNumber
+        );
+        return [
+          {
+            invoiceNumber,
+            chargeCode: 'PLAN',
+            chargeTotalAmount: 49.9,
+            chargeNetAmount: 42.29,
+            description: 'Plan',
+            classification:
+              'Cargo Recurrente De Plan',
+            group: 'CARGO FIJO',
+            subgroup: null,
+            subscriberKey:
+              'SUB_HISTORY',
+            debtStatus: 'SIN DEUDA',
+            cycleDate: '2026-07-15'
+          }
+        ];
+      },
+      async getCatalogEntries() {
+        return [];
+      }
+    };
+
+    const service =
+      createBillingAnalysisService({
+        repository
+      });
+
+    const bills =
+      await service.getBillHistory(
+        'SUB_HISTORY',
+        { limit: 99 }
+      );
+
+    assert.equal(
+      requested.headerLimit,
+      6
+    );
+    assert.deepEqual(
+      requested.invoices,
+      ['INV3', 'INV2', 'INV1']
+    );
+    assert.equal(bills.length, 3);
+    assert.equal(
+      bills[0].anchorSubscriberKey,
+      'SUB_HISTORY'
+    );
+  }
+);

@@ -25,6 +25,7 @@ const SOURCE_DEFINITIONS = Object.freeze([
       'BILLING',
       'PRODUCT',
       'COMPARISON',
+      'BILLING_HISTORY',
       'DEBT',
       'PACKAGE_CHARGE'
     ]
@@ -139,6 +140,16 @@ const SCENARIO_DEFINITIONS = Object.freeze([
     status: 'READY',
     detail:
       'Se reconstruye el recibo actual y el anterior con importes estructurados y sin cálculo monetario generativo.'
+  },
+  {
+    id: 'BILLING_HISTORY',
+    label: 'Histórico de hasta cinco recibos previos',
+    sourceKeys: [
+      'facturacion_clientes'
+    ],
+    status: 'READY',
+    detail:
+      'Fase 14 recupera el recibo actual y hasta cinco anteriores por suscripción, calcula tendencias y recurrencia de cargos con importes estructurados y sin delegar cálculos al LLM.'
   },
   {
     id: 'RENT_TYPE',

@@ -110,6 +110,10 @@ function planCustomerConversationTurn(
     );
 
   return {
+    message:
+      String(message || ''),
+    previousBillingIntent:
+      lastBillingIntent || null,
     profileIntents,
     billingIntents,
     repair,
@@ -161,7 +165,12 @@ function buildCompositeCustomerReply({
         {
           repair:
             Boolean(plan.repair),
-          includeIntro: false
+          includeIntro: false,
+          message:
+            plan.message || '',
+          lastBillingIntent:
+            plan.previousBillingIntent ||
+            null
         }
       )
     );

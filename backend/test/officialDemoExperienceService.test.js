@@ -478,3 +478,153 @@ test(
     );
   }
 );
+
+test(
+  'Fase 14 expone un histórico seguro de hasta seis recibos en la experiencia pública',
+  () => {
+    const explanation =
+      reconnectionExplanation();
+
+    const historyInvoices = [
+      baseInvoice({
+        total: 34.48,
+        cycleDate: '2026-07-27'
+      }),
+      baseInvoice({
+        total: 29.9,
+        cycleDate: '2026-06-27'
+      }),
+      baseInvoice({
+        total: 31.9,
+        cycleDate: '2026-05-27'
+      })
+    ];
+
+    const experience =
+      buildOfficialDemoExperience({
+        user: {
+          customerId: 'CLI000001',
+          name: 'Carlos Mendoza'
+        },
+        binding: {
+          subscriberKey:
+            'SECRET_SUBSCRIBER_A',
+          scenario: 'RECONNECTION',
+          scenarioLabel: 'Reconexión'
+        },
+        explanation,
+        historyInvoices
+      });
+
+    assert.equal(
+      experience.billingHistory
+        .availableBills,
+      3
+    );
+    assert.equal(
+      experience.billingHistory
+        .previousBills,
+      2
+    );
+    assert.equal(
+      experience.billingHistory
+        .bills[0].period,
+      'Ciclo 27/07/2026'
+    );
+    const publicHistory =
+      JSON.stringify(
+        experience.billingHistory
+      );
+
+    assert.doesNotMatch(
+      publicHistory,
+      /SECRET_SUBSCRIBER_A|SECRET_CUSTOMER_A/
+    );
+    assert.doesNotMatch(
+      publicHistory,
+      /subscriberKey|customerKey|invoiceNumber|billingArrangement|financialAccount/i
+    );
+  }
+);
+
+test(
+  'el histórico completo se consulta solo cuando el consumidor lo solicita',
+  async (t) => {
+    const {
+      dir,
+      configPath
+    } = writeConfig();
+
+    t.after(
+      () =>
+        fs.rmSync(
+          dir,
+          {
+            recursive: true,
+            force: true
+          }
+        )
+    );
+
+    let historyCalls = 0;
+
+    const service =
+      createOfficialDemoExperienceService({
+        configPath,
+        explainSubscriber:
+          async () =>
+            reconnectionExplanation(),
+        loadHistory:
+          async () => {
+            historyCalls += 1;
+            return [
+              baseInvoice({
+                total: 34.48,
+                cycleDate:
+                  '2026-07-27'
+              }),
+              baseInvoice({
+                total: 29.9,
+                cycleDate:
+                  '2026-06-27'
+              }),
+              baseInvoice({
+                total: 31.9,
+                cycleDate:
+                  '2026-05-27'
+              })
+            ];
+          }
+      });
+
+    const user = {
+      customerId: 'CLI000001',
+      name: 'Carlos Mendoza'
+    };
+
+    const regular =
+      await service
+        .getExperienceForUser(user);
+
+    assert.equal(historyCalls, 0);
+    assert.equal(
+      regular.billingHistory
+        .availableBills,
+      2
+    );
+
+    const historical =
+      await service
+        .getExperienceForUser(
+          user,
+          { includeHistory: true }
+        );
+
+    assert.equal(historyCalls, 1);
+    assert.equal(
+      historical.billingHistory
+        .availableBills,
+      3
+    );
+  }
+);

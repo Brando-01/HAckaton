@@ -286,3 +286,81 @@ test(
     );
   }
 );
+
+test(
+  'Fase 14 carga el histórico del explorer solo cuando se solicita',
+  async () => {
+    let historyCalls = 0;
+    const service =
+      new DatasetExplorerService({
+        async readPrivateProfile() {
+          return privateProfile();
+        },
+        async explainSubscriber() {
+          return explanation();
+        },
+        async loadHistory(key) {
+          historyCalls += 1;
+          assert.equal(
+            key,
+            'SUB_SECRET'
+          );
+          return [
+            explanation().currentBill,
+            explanation().previousBill
+          ];
+        },
+        buildExperience({
+          user,
+          explanation,
+          historyInvoices
+        }) {
+          return {
+            customer: {
+              customerId:
+                user.customerId
+            },
+            currentBill:
+              explanation.currentBill,
+            historyCount:
+              historyInvoices
+                ?.length || 0
+          };
+        }
+      });
+
+    const user = {
+      userId: 'EXP_DEMO000777',
+      customerId:
+        'EXP_DEMO000777',
+      name:
+        'Cliente DEMO000777',
+      mode: 'EXPLORER',
+      explorerDemoId:
+        'DEMO000777'
+    };
+
+    const regular =
+      await service
+        .getExperienceForUser(user);
+
+    assert.equal(historyCalls, 0);
+    assert.equal(
+      regular.historyCount,
+      0
+    );
+
+    const historical =
+      await service
+        .getExperienceForUser(
+          user,
+          { includeHistory: true }
+        );
+
+    assert.equal(historyCalls, 1);
+    assert.equal(
+      historical.historyCount,
+      2
+    );
+  }
+);

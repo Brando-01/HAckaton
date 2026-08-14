@@ -109,6 +109,26 @@
       'currentItems'
     );
 
+  const billHistoryList =
+    document.getElementById(
+      'billHistoryList'
+    );
+
+  const historyDescription =
+    document.getElementById(
+      'historyDescription'
+    );
+
+  const historySummary =
+    document.getElementById(
+      'historySummary'
+    );
+
+  const askHistoryButton =
+    document.getElementById(
+      'askHistoryButton'
+    );
+
   const causesList =
     document.getElementById(
       'causesList'
@@ -194,6 +214,111 @@
         container.appendChild(row);
       }
     );
+  }
+
+  function renderBillHistory(history) {
+    if (!billHistoryList) {
+      return;
+    }
+
+    billHistoryList.innerHTML = '';
+
+    const bills =
+      history?.bills || [];
+
+    if (!bills.length) {
+      billHistoryList.appendChild(
+        createElement(
+          'p',
+          'empty-state',
+          'No hay recibos históricos disponibles para este servicio.'
+        )
+      );
+
+      if (historySummary) {
+        historySummary.textContent = '';
+      }
+      return;
+    }
+
+    if (historyDescription) {
+      historyDescription.textContent =
+        history.completeWindow
+          ? `Se muestran el recibo actual y ${history.previousBills} recibos anteriores.`
+          : `Hay ${history.availableBills} recibo${history.availableBills === 1 ? '' : 's'} disponible${history.availableBills === 1 ? '' : 's'} para este servicio.`;
+    }
+
+    bills.forEach(
+      (bill, index) => {
+        const card =
+          createElement(
+            'article',
+            index === 0
+              ? 'history-bill-card current'
+              : 'history-bill-card'
+          );
+
+        card.appendChild(
+          createElement(
+            'span',
+            null,
+            index === 0
+              ? 'Recibo actual'
+              : `Recibo anterior ${index}`
+          )
+        );
+
+        card.appendChild(
+          createElement(
+            'strong',
+            null,
+            formatMoney(bill.total)
+          )
+        );
+
+        card.appendChild(
+          createElement(
+            'small',
+            null,
+            bill.period ||
+              'Ciclo no disponible'
+          )
+        );
+
+        billHistoryList.appendChild(card);
+      }
+    );
+
+    if (!historySummary) {
+      return;
+    }
+
+    const oldest =
+      history.summary?.oldestBill;
+    const newest =
+      history.summary?.newestBill;
+    const netChange =
+      Number(history.summary?.netChange);
+
+    if (
+      !oldest ||
+      !newest ||
+      !Number.isFinite(netChange) ||
+      history.availableBills < 2
+    ) {
+      historySummary.textContent =
+        'Se necesita al menos un recibo anterior para calcular una tendencia.';
+      return;
+    }
+
+    if (Math.abs(netChange) < 0.005) {
+      historySummary.textContent =
+        `Entre ${oldest.period} y ${newest.period}, el total terminó en el mismo nivel: ${formatMoney(newest.total)}.`;
+      return;
+    }
+
+    historySummary.textContent =
+      `Entre ${oldest.period} y ${newest.period}, el total ${netChange > 0 ? 'subió' : 'bajó'} ${formatMoney(Math.abs(netChange))}, de ${formatMoney(oldest.total)} a ${formatMoney(newest.total)}.`;
   }
 
   function renderCauses(causes) {
@@ -428,6 +553,10 @@
       data.currentBill.items
     );
 
+    renderBillHistory(
+      data.billingHistory
+    );
+
     renderCauses([
       ...(
         data.comparison?.causes || []
@@ -542,6 +671,17 @@
           ? '/explorer'
           : '/login';
     }
+  }
+
+  if (askHistoryButton) {
+    askHistoryButton.addEventListener(
+      'click',
+      () => {
+        openChat(
+          '¿Cómo ha cambiado mi recibo en los últimos meses?'
+        );
+      }
+    );
   }
 
   logoutButton.addEventListener(

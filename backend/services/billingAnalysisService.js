@@ -201,6 +201,73 @@ class BillingAnalysisService {
     });
   }
 
+  async getBillHistory(
+    subscriberKey,
+    {
+      limit = 6
+    } = {}
+  ) {
+    await this.ensureOpen();
+
+    const key =
+      normalizeIdentifier(
+        subscriberKey
+      );
+
+    if (!key) {
+      throw new BillingAnalysisError(
+        'SUBSCRIBER_REQUIRED',
+        'Se requiere un subscriberKey'
+      );
+    }
+
+    const subscriber =
+      await this.repository
+        .getSubscriber(key);
+
+    if (!subscriber) {
+      throw new BillingAnalysisError(
+        'SUBSCRIBER_NOT_FOUND',
+        `No existe el suscriptor ${key} en PLANTA CLIENTES`
+      );
+    }
+
+    const safeLimit =
+      Math.min(
+        Math.max(
+          Number.parseInt(
+            limit,
+            10
+          ) || 6,
+          1
+        ),
+        6
+      );
+
+    const headers =
+      await this.repository
+        .listInvoiceHeadersForSubscriber(
+          key,
+          {
+            limit: safeLimit
+          }
+        );
+
+    const bills = [];
+
+    for (const header of headers) {
+      bills.push(
+        await this.hydrateInvoice({
+          ...header,
+          anchorSubscriberKey:
+            key
+        })
+      );
+    }
+
+    return bills;
+  }
+
   async analyzeSubscriber(
     subscriberKey
   ) {

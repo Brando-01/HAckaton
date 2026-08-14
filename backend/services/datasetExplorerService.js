@@ -55,6 +55,19 @@ function defaultExplainSubscriber(
   );
 }
 
+function defaultLoadHistory(
+  subscriberKey
+) {
+  const {
+    loadSubscriberBillingHistory
+  } = require(
+    './billingHistoryService'
+  );
+  return loadSubscriberBillingHistory(
+    subscriberKey
+  );
+}
+
 function defaultBuildExperience(args) {
   const {
     buildOfficialDemoExperience
@@ -97,6 +110,7 @@ class DatasetExplorerService {
     queryProfiles = null,
     readPrivateProfile = null,
     explainSubscriber = null,
+    loadHistory = null,
     buildExperience = null
   } = {}) {
     this.dbPath = dbPath;
@@ -111,6 +125,9 @@ class DatasetExplorerService {
     this.explainSubscriber =
       explainSubscriber ||
       defaultExplainSubscriber;
+    this.loadHistory =
+      loadHistory ||
+      defaultLoadHistory;
     this.buildExperience =
       buildExperience ||
       defaultBuildExperience;
@@ -213,7 +230,10 @@ class DatasetExplorerService {
   }
 
   async getExperienceForUser(
-    user
+    user,
+    {
+      includeHistory = false
+    } = {}
   ) {
     if (
       user?.mode !== 'EXPLORER' ||
@@ -230,10 +250,19 @@ class DatasetExplorerService {
         user.explorerDemoId
       );
 
-    const explanation =
-      await this.explainSubscriber(
+    const [
+      explanation,
+      historyInvoices
+    ] = await Promise.all([
+      this.explainSubscriber(
         profile.subscriberKey
-      );
+      ),
+      includeHistory
+        ? this.loadHistory(
+            profile.subscriberKey
+          )
+        : Promise.resolve(null)
+    ]);
 
     const experience =
       this.buildExperience({
@@ -242,7 +271,8 @@ class DatasetExplorerService {
           buildExplorerBinding(
             profile
           ),
-        explanation
+        explanation,
+        historyInvoices
       });
 
     return {

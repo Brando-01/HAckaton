@@ -12,6 +12,18 @@ const {
 );
 
 const {
+  loadSubscriberBillingHistory
+} = require(
+  './billingHistoryService'
+);
+
+const {
+  buildBillingHistoryView
+} = require(
+  './desafio1BillingHistoryLogic'
+);
+
+const {
   buildCustomerCauseDescription,
   buildCustomerFindingDescription,
   getImpactPresentation,
@@ -186,7 +198,20 @@ function transformCause(cause) {
     verification:
       buildVerification(
         cause
-      )
+      ),
+    subject:
+      cause?.chargeChange
+        ? {
+            chargeCode:
+              cause.chargeChange
+                .chargeCode || null,
+            label:
+              cause.chargeChange
+                .description ||
+              cause.label ||
+              null
+          }
+        : null
   };
 }
 
@@ -221,6 +246,19 @@ function transformFinding(
       buildVerification(
         finding
       ),
+    subject:
+      finding?.chargeCode
+        ? {
+            chargeCode:
+              finding.chargeCode,
+            label:
+              finding
+                .chargeDescription ||
+              finding.description ||
+              finding.label ||
+              null
+          }
+        : null,
     finding: true
   };
 }
@@ -256,7 +294,8 @@ function transformBill(invoice) {
 function buildOfficialDemoExperience({
   user,
   binding,
-  explanation
+  explanation,
+  historyInvoices = null
 }) {
   if (!user?.customerId) {
     throw new Error(
@@ -284,6 +323,22 @@ function buildOfficialDemoExperience({
   const previousBill =
     transformBill(
       explanation.previousBill
+    );
+
+  const historySource =
+    Array.isArray(historyInvoices) &&
+    historyInvoices.length
+      ? historyInvoices
+      : [
+          explanation.currentBill,
+          explanation.previousBill
+        ].filter(Boolean);
+
+  const billingHistory =
+    buildBillingHistoryView(
+      historySource
+        .map(transformBill)
+        .filter(Boolean)
     );
 
   const interpretation =
@@ -358,6 +413,7 @@ function buildOfficialDemoExperience({
     },
     currentBill,
     previousBill,
+    billingHistory,
     comparison,
     findings,
     financialExplanation: {
@@ -418,7 +474,8 @@ function buildOfficialDemoExperience({
 class OfficialDemoExperienceService {
   constructor({
     configPath = null,
-    explainSubscriber = null
+    explainSubscriber = null,
+    loadHistory = null
   } = {}) {
     this.configPath =
       configPath;
@@ -428,6 +485,15 @@ class OfficialDemoExperienceService {
       (
         (subscriberKey) =>
           explainSubscriberBilling(
+            subscriberKey
+          )
+      );
+
+    this.loadHistory =
+      loadHistory ||
+      (
+        (subscriberKey) =>
+          loadSubscriberBillingHistory(
             subscriberKey
           )
       );
@@ -446,7 +512,10 @@ class OfficialDemoExperienceService {
   }
 
   async getExperienceForUser(
-    user
+    user,
+    {
+      includeHistory = false
+    } = {}
   ) {
     const binding =
       this.getBinding(
@@ -460,15 +529,25 @@ class OfficialDemoExperienceService {
       );
     }
 
-    const explanation =
-      await this.explainSubscriber(
+    const [
+      explanation,
+      historyInvoices
+    ] = await Promise.all([
+      this.explainSubscriber(
         binding.subscriberKey
-      );
+      ),
+      includeHistory
+        ? this.loadHistory(
+            binding.subscriberKey
+          )
+        : Promise.resolve(null)
+    ]);
 
     return buildOfficialDemoExperience({
       user,
       binding,
-      explanation
+      explanation,
+      historyInvoices
     });
   }
 }

@@ -4,6 +4,31 @@ const {
   './desafio1CustomerPresentation'
 );
 
+const {
+  findHistoryChargeByText,
+  analyzeChargeRecurrence
+} = require(
+  './desafio1BillingHistoryLogic'
+);
+
+const BILLING_HISTORY_INTENTS =
+  new Set([
+    'BILL_HISTORY',
+    'HIGHEST_BILL',
+    'LATEST_INCREASE',
+    'CHARGE_RECURRENCE'
+  ]);
+
+function needsBillingHistoryForIntents(
+  intents = []
+) {
+  return (intents || []).some(
+    (intent) =>
+      BILLING_HISTORY_INTENTS
+        .has(intent)
+  );
+}
+
 function normalizeText(value) {
   return String(value ?? '')
     .normalize('NFD')
@@ -39,7 +64,9 @@ const BILLING_TERMS = [
   'paquetes',
   'plan',
   'renta adelantada',
-  'renta vencida'
+  'renta vencida',
+  'historial',
+  'recurrente'
 ];
 
 const PERSONAL_MARKERS = [
@@ -64,7 +91,14 @@ const PERSONAL_MARKERS = [
   'me aumentaron',
   'me descontaron',
   'recibo anterior',
-  'factura anterior'
+  'factura anterior',
+  'mis ultimos recibos',
+  'ultimos meses',
+  'recibo mas caro',
+  'factura mas cara',
+  'desde cuando estoy pagando mas',
+  'este cargo',
+  'este cobro'
 ];
 
 const GENERAL_EDUCATION_PREFIXES = [
@@ -98,7 +132,11 @@ const PERSONAL_FOLLOWUPS = [
   'explicamelo mejor',
   'mas facil',
   'no entendi',
-  'y eso por que'
+  'y eso por que',
+  'y en los ultimos meses',
+  'este cargo',
+  'este cobro',
+  'es recurrente'
 ];
 
 function isGeneralBillingEducationQuery(
@@ -297,6 +335,96 @@ function classifyPersonalBillingIntents(
     }
   };
 
+  const historyTrendQuestion =
+    hasAny(
+      text,
+      [
+        'historial de recibos',
+        'historial de facturas',
+        'mis ultimos recibos',
+        'mis ultimas facturas',
+        'ultimos recibos',
+        'ultimas facturas',
+        'ultimos meses',
+        'como ha cambiado mi recibo',
+        'como cambio mi recibo en los ultimos',
+        'evolucion de mi recibo',
+        'evolucion de mis recibos'
+      ]
+    );
+
+  const highestBillQuestion =
+    hasAny(
+      text,
+      [
+        'recibo mas caro',
+        'factura mas cara',
+        'recibo mas alto',
+        'factura mas alta',
+        'cuando pague mas',
+        'en que mes pague mas',
+        'cual fue el mayor recibo',
+        'cual fue la mayor factura'
+      ]
+    );
+
+  const latestIncreaseQuestion =
+    hasAny(
+      text,
+      [
+        'desde cuando estoy pagando mas',
+        'desde cuando pago mas',
+        'cuando empece a pagar mas',
+        'cuando comenzo a subir mi recibo',
+        'cuando subio mi recibo',
+        'cual fue el ultimo aumento'
+      ]
+    );
+
+  const recurrenceQuestion =
+    hasAny(
+      text,
+      [
+        'unico o recurrente',
+        'unica o recurrente',
+        'es recurrente',
+        'fue recurrente',
+        'aparece todos los meses',
+        'sale todos los meses',
+        'me lo cobran todos los meses',
+        'cada mes',
+        'se repite'
+      ]
+    ) &&
+    hasAny(
+      text,
+      [
+        'cargo',
+        'cobro',
+        'paquete',
+        'concepto',
+        'recibo',
+        'factura',
+        'recurrente'
+      ]
+    );
+
+  if (historyTrendQuestion) {
+    add('BILL_HISTORY');
+  }
+
+  if (highestBillQuestion) {
+    add('HIGHEST_BILL');
+  }
+
+  if (latestIncreaseQuestion) {
+    add('LATEST_INCREASE');
+  }
+
+  if (recurrenceQuestion) {
+    add('CHARGE_RECURRENCE');
+  }
+
   if (
     hasAny(
       text,
@@ -444,22 +572,27 @@ function classifyPersonalBillingIntents(
   ];
 
   if (
-    hasAny(text, variationMarkers) ||
+    !historyTrendQuestion &&
+    !highestBillQuestion &&
+    !latestIncreaseQuestion &&
     (
-      hasAny(
-        text,
-        [
-          'subio',
-          'aumento',
-          'bajo',
-          'disminuyo',
-          'cambio',
-          'diferencia'
-        ]
-      ) &&
-      hasAny(
-        text,
-        ['recibo', 'factura', 'monto']
+      hasAny(text, variationMarkers) ||
+      (
+        hasAny(
+          text,
+          [
+            'subio',
+            'aumento',
+            'bajo',
+            'disminuyo',
+            'cambio',
+            'diferencia'
+          ]
+        ) &&
+        hasAny(
+          text,
+          ['recibo', 'factura', 'monto']
+        )
       )
     )
   ) {
@@ -696,6 +829,253 @@ function buildPackageReply(
   );
 }
 
+function getHistory(
+  experience
+) {
+  return experience?.billingHistory || null;
+}
+
+function historyBillLabel(bill) {
+  return bill?.period ||
+    bill?.cycleDate ||
+    'ciclo no disponible';
+}
+
+function buildBillHistoryReply(
+  experience
+) {
+  const history =
+    getHistory(experience);
+
+  if (!history?.availableBills) {
+    return (
+      'No tengo recibos históricos disponibles para este servicio.'
+    );
+  }
+
+  const bills =
+    history.bills || [];
+
+  if (bills.length === 1) {
+    return (
+      `Solo tengo un recibo disponible: ${historyBillLabel(bills[0])}, por ${formatMoney(bills[0].total)}. ` +
+      'Con un solo recibo no puedo calcular una tendencia.'
+    );
+  }
+
+  const summary =
+    history.summary || {};
+  const oldest =
+    summary.oldestBill;
+  const newest =
+    summary.newestBill;
+  const netChange =
+    Number(summary.netChange);
+
+  const list = bills
+    .map(
+      (bill) =>
+        `• ${historyBillLabel(bill)}: ${formatMoney(bill.total)}`
+    )
+    .join('\n');
+
+  let trend = '';
+
+  if (
+    oldest &&
+    newest &&
+    Number.isFinite(netChange)
+  ) {
+    if (Math.abs(netChange) < 0.005) {
+      trend =
+        `Entre ${historyBillLabel(oldest)} y ${historyBillLabel(newest)}, el total terminó en el mismo nivel: ${formatMoney(newest.total)}.`;
+    } else {
+      const verb =
+        netChange > 0
+          ? 'subió'
+          : 'bajó';
+
+      trend =
+        `Entre ${historyBillLabel(oldest)} y ${historyBillLabel(newest)}, el total ${verb} ${formatMoney(Math.abs(netChange))}, de ${formatMoney(oldest.total)} a ${formatMoney(newest.total)}.`;
+    }
+  }
+
+  return [
+    `Revisé ${history.availableBills} recibos disponibles (el actual y hasta ${history.maxPreviousBills} anteriores):`,
+    list,
+    trend
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+function buildHighestBillReply(
+  experience
+) {
+  const history =
+    getHistory(experience);
+  const highest =
+    history?.summary
+      ?.highestBill;
+
+  if (!highest) {
+    return (
+      'No tengo suficiente histórico para identificar el recibo más alto.'
+    );
+  }
+
+  return (
+    `Dentro de los ${history.availableBills} recibos disponibles, el total más alto fue ${formatMoney(highest.total)} en ${historyBillLabel(highest)}.`
+  );
+}
+
+function buildLatestIncreaseReply(
+  experience
+) {
+  const history =
+    getHistory(experience);
+
+  if (
+    !history ||
+    history.availableBills < 2
+  ) {
+    return (
+      'Necesito al menos dos recibos para identificar cuándo ocurrió un aumento.'
+    );
+  }
+
+  const increase =
+    history.summary
+      ?.mostRecentIncrease;
+
+  if (!increase) {
+    return (
+      `En los ${history.availableBills} recibos disponibles no encontré un aumento entre dos ciclos consecutivos.`
+    );
+  }
+
+  const prefix =
+    increase.isCurrentChange
+      ? 'El aumento más reciente ocurrió'
+      : 'Tu recibo actual no aumentó frente al anterior. El aumento más reciente que puedo verificar ocurrió';
+
+  return (
+    `${prefix} entre ${historyBillLabel(increase.from)} y ${historyBillLabel(increase.to)}: pasó de ${formatMoney(increase.from.total)} a ${formatMoney(increase.to.total)}, una diferencia de ${formatMoney(increase.difference)}.`
+  );
+}
+
+function causeSubjectForContext(
+  experience,
+  lastBillingIntent
+) {
+  const causes =
+    experience?.comparison
+      ?.causes || [];
+
+  if (lastBillingIntent === 'PACKAGE_CHARGE') {
+    return causes.find(
+      (cause) =>
+        cause.code === 'PACKAGES' &&
+        cause.subject
+    )?.subject || null;
+  }
+
+  const withSubject =
+    causes.filter(
+      (cause) =>
+        cause.subject
+    );
+
+  if (withSubject.length === 1) {
+    return withSubject[0].subject;
+  }
+
+  const currentItems =
+    experience?.currentBill
+      ?.items || [];
+
+  if (currentItems.length === 1) {
+    return {
+      chargeCode:
+        currentItems[0]
+          .chargeCode || null,
+      label:
+        currentItems[0]
+          .label || null
+    };
+  }
+
+  return null;
+}
+
+function buildChargeRecurrenceReply(
+  experience,
+  message,
+  {
+    lastBillingIntent = null
+  } = {}
+) {
+  const history =
+    getHistory(experience);
+
+  if (!history?.availableBills) {
+    return (
+      'No tengo recibos históricos disponibles para revisar si ese cargo se repite.'
+    );
+  }
+
+  const subject =
+    findHistoryChargeByText(
+      history,
+      message
+    ) ||
+    causeSubjectForContext(
+      experience,
+      lastBillingIntent
+    );
+
+  if (!subject) {
+    return (
+      'Puedo revisar si un cobro se repite, pero necesito que me indiques cuál cargo o paquete quieres comparar.'
+    );
+  }
+
+  const recurrence =
+    analyzeChargeRecurrence(
+      history,
+      subject
+    );
+
+  if (!recurrence ||
+      recurrence.status === 'NOT_FOUND') {
+    return (
+      `No encontré el cargo "${subject.label || 'indicado'}" dentro de los recibos históricos disponibles.`
+    );
+  }
+
+  if (
+    recurrence.status ===
+      'ALL_AVAILABLE'
+  ) {
+    return (
+      `El cargo "${recurrence.label}" aparece en los ${recurrence.billCount} recibos disponibles que revisé. Dentro de este histórico se comporta como un cobro recurrente.`
+    );
+  }
+
+  if (
+    recurrence.status ===
+      'RECURRING'
+  ) {
+    return (
+      `El cargo "${recurrence.label}" aparece en ${recurrence.occurrenceCount} de ${recurrence.billCount} recibos disponibles. Se repite, pero no está presente en todos los recibos del histórico.`
+    );
+  }
+
+  return (
+    `El cargo "${recurrence.label}" aparece una sola vez dentro de los ${recurrence.billCount} recibos disponibles. En esta ventana se comporta como un cobro puntual; no puedo afirmar qué ocurrió fuera del histórico disponible.`
+  );
+}
+
 function buildRentReply(
   experience
 ) {
@@ -822,7 +1202,9 @@ function buildPersonalBillingReplyForIntent(
   experience,
   intent,
   {
-    concise = false
+    concise = false,
+    message = '',
+    lastBillingIntent = null
   } = {}
 ) {
   switch (intent) {
@@ -855,6 +1237,30 @@ function buildPersonalBillingReplyForIntent(
         ? `Recibo anterior: ${formatMoney(bill.total)} (${bill.period}).`
         : 'No hay un recibo anterior comparable disponible.';
     }
+
+    case 'BILL_HISTORY':
+      return buildBillHistoryReply(
+        experience
+      );
+
+    case 'HIGHEST_BILL':
+      return buildHighestBillReply(
+        experience
+      );
+
+    case 'LATEST_INCREASE':
+      return buildLatestIncreaseReply(
+        experience
+      );
+
+    case 'CHARGE_RECURRENCE':
+      return buildChargeRecurrenceReply(
+        experience,
+        message,
+        {
+          lastBillingIntent
+        }
+      );
 
     case 'PRORATION':
       return buildProrationReply(
@@ -923,7 +1329,9 @@ function buildPersonalBillingRepairSummary(
   experience,
   intents,
   {
-    includeIntro = true
+    includeIntro = true,
+    message = '',
+    lastBillingIntent = null
   } = {}
 ) {
   const uniqueIntents = Array.from(
@@ -938,7 +1346,11 @@ function buildPersonalBillingRepairSummary(
         buildPersonalBillingReplyForIntent(
           experience,
           intent,
-          { concise: true }
+          {
+            concise: true,
+            message,
+            lastBillingIntent
+          }
         )
     )
     .filter(Boolean);
@@ -959,7 +1371,9 @@ function buildPersonalBillingMultiReply(
   intents,
   {
     repair = false,
-    includeIntro = true
+    includeIntro = true,
+    message = '',
+    lastBillingIntent = null
   } = {}
 ) {
   const uniqueIntents = Array.from(
@@ -976,7 +1390,11 @@ function buildPersonalBillingMultiReply(
     return buildPersonalBillingReplyForIntent(
       experience,
       uniqueIntents[0],
-      { concise: repair }
+      {
+        concise: repair,
+        message,
+        lastBillingIntent
+      }
     );
   }
 
@@ -984,7 +1402,11 @@ function buildPersonalBillingMultiReply(
     return buildPersonalBillingRepairSummary(
       experience,
       uniqueIntents,
-      { includeIntro }
+      {
+        includeIntro,
+        message,
+        lastBillingIntent
+      }
     );
   }
 
@@ -994,7 +1416,11 @@ function buildPersonalBillingMultiReply(
         buildPersonalBillingReplyForIntent(
           experience,
           intent,
-          { concise: true }
+          {
+            concise: true,
+            message,
+            lastBillingIntent
+          }
         )
     )
     .filter(Boolean)
@@ -1034,7 +1460,11 @@ function buildPersonalBillingReply(
         concise:
           isBillingRepairRequest(
             message
-          )
+          ),
+        message,
+        lastBillingIntent:
+          options.lastBillingIntent ||
+          null
       }
     );
 
@@ -1064,7 +1494,12 @@ module.exports = {
   requiresPersonalBillingAccess,
   classifyPersonalBillingIntent,
   classifyPersonalBillingIntents,
+  needsBillingHistoryForIntents,
   buildGeneralBillingEducationReply,
+  buildBillHistoryReply,
+  buildHighestBillReply,
+  buildLatestIncreaseReply,
+  buildChargeRecurrenceReply,
   buildPackageReply,
   buildPersonalBillingReply,
   buildPersonalBillingReplyForIntent,

@@ -93,6 +93,7 @@ body {
 .current-bill,
 .variation-card,
 .bill-card,
+.history-section,
 .causes-section,
 .actions-section {
     background: white;
@@ -141,18 +142,21 @@ body {
 }
 
 .comparison-section,
+.history-section,
 .causes-section,
 .actions-section {
     margin-top: 24px;
 }
 
 .section-title h2,
+.history-section h2,
 .causes-section h2,
 .actions-section h2 {
     margin-top: 0;
 }
 
 .section-title p,
+.history-section p,
 .actions-section p {
     color: #777;
 }
@@ -165,6 +169,70 @@ body {
 
 .bill-card.highlighted {
     border-color: #019be1;
+}
+
+.history-title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.history-chat-button {
+    flex: 0 0 auto;
+    padding: 10px 14px;
+    border: 1px solid #019be1;
+    border-radius: 10px;
+    background: #fff;
+    color: #017bb3;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.history-chat-button:hover {
+    background: #f1fbff;
+}
+
+.bill-history-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.history-bill-card {
+    padding: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #f8fafc;
+}
+
+.history-bill-card.current {
+    border-color: #019be1;
+    background: #f4fbff;
+}
+
+.history-bill-card span {
+    display: block;
+    color: #6b7280;
+    font-size: 12px;
+}
+
+.history-bill-card strong {
+    display: block;
+    margin: 7px 0 4px;
+    font-size: 22px;
+}
+
+.history-bill-card small {
+    color: #6b7280;
+}
+
+.history-summary {
+    margin: 16px 0 0;
+    padding-top: 14px;
+    border-top: 1px solid #edf0f2;
+    line-height: 1.5;
 }
 
 .bill-card h3 {
@@ -266,8 +334,13 @@ body {
     }
 
     .bill-summary,
-    .comparison-grid {
+    .comparison-grid,
+    .bill-history-list {
         grid-template-columns: 1fr;
+    }
+
+    .history-title-row {
+        flex-direction: column;
     }
 
     .app-container {

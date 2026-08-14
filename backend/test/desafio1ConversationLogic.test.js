@@ -6,6 +6,7 @@ const {
   requiresPersonalBillingAccess,
   classifyPersonalBillingIntent,
   classifyPersonalBillingIntents,
+  needsBillingHistoryForIntents,
   buildGeneralBillingEducationReply,
   buildPersonalBillingReply,
   buildPersonalBillingMultiReply
@@ -612,6 +613,339 @@ test(
     assert.match(
       result.reply,
       /no encontr[eé] una variaci[oó]n verificable/i
+    );
+  }
+);
+
+function historyExperience() {
+  return {
+    ...reconnectionExperience(),
+    currentBill: {
+      ...reconnectionExperience()
+        .currentBill,
+      items: [
+        {
+          chargeCode: 'PLAN',
+          label: 'Plan principal',
+          amount: 29.9
+        },
+        {
+          chargeCode: 'PKG_3GB',
+          label:
+            'Paquete 3GB de Internet',
+          amount: 9.99
+        }
+      ]
+    },
+    comparison: {
+      ...reconnectionExperience()
+        .comparison,
+      causes: [
+        {
+          code: 'PACKAGES',
+          description:
+            'En tu recibo apareció un cargo de S/ 9.99 correspondiente al paquete "Paquete 3GB de Internet".',
+          impact: 9.99,
+          subject: {
+            chargeCode: 'PKG_3GB',
+            label:
+              'Paquete 3GB de Internet'
+          }
+        }
+      ]
+    },
+    billingHistory: {
+      schemaVersion:
+        'desafio1-billing-history-v1',
+      maxBills: 6,
+      maxPreviousBills: 5,
+      availableBills: 4,
+      previousBills: 3,
+      completeWindow: false,
+      bills: [
+        {
+          cycleDate: '2026-07-15',
+          period: 'Ciclo 15/07/2026',
+          total: 49.89,
+          items: [
+            {
+              chargeCode: 'PLAN',
+              label: 'Plan principal',
+              amount: 39.9
+            },
+            {
+              chargeCode: 'PKG_3GB',
+              label:
+                'Paquete 3GB de Internet',
+              amount: 9.99
+            }
+          ]
+        },
+        {
+          cycleDate: '2026-06-15',
+          period: 'Ciclo 15/06/2026',
+          total: 39.9,
+          items: [
+            {
+              chargeCode: 'PLAN',
+              label: 'Plan principal',
+              amount: 39.9
+            }
+          ]
+        },
+        {
+          cycleDate: '2026-05-15',
+          period: 'Ciclo 15/05/2026',
+          total: 44.9,
+          items: [
+            {
+              chargeCode: 'PLAN',
+              label: 'Plan principal',
+              amount: 39.9
+            },
+            {
+              chargeCode: 'PKG_3GB',
+              label:
+                'Paquete 3GB de Internet',
+              amount: 5
+            }
+          ]
+        },
+        {
+          cycleDate: '2026-04-15',
+          period: 'Ciclo 15/04/2026',
+          total: 39.9,
+          items: [
+            {
+              chargeCode: 'PLAN',
+              label: 'Plan principal',
+              amount: 39.9
+            }
+          ]
+        }
+      ],
+      summary: {
+        averageTotal: 43.65,
+        highestBill: {
+          cycleDate: '2026-07-15',
+          period: 'Ciclo 15/07/2026',
+          total: 49.89
+        },
+        lowestBill: {
+          cycleDate: '2026-06-15',
+          period: 'Ciclo 15/06/2026',
+          total: 39.9
+        },
+        oldestBill: {
+          cycleDate: '2026-04-15',
+          period: 'Ciclo 15/04/2026',
+          total: 39.9
+        },
+        newestBill: {
+          cycleDate: '2026-07-15',
+          period: 'Ciclo 15/07/2026',
+          total: 49.89
+        },
+        netChange: 9.99,
+        netDirection: 'UP',
+        mostRecentIncrease: {
+          from: {
+            cycleDate: '2026-06-15',
+            period: 'Ciclo 15/06/2026',
+            total: 39.9
+          },
+          to: {
+            cycleDate: '2026-07-15',
+            period: 'Ciclo 15/07/2026',
+            total: 49.89
+          },
+          difference: 9.99,
+          isCurrentChange: true
+        }
+      }
+    }
+  };
+}
+
+test(
+  'Fase 14 clasifica consultas históricas sin confundirlas con la variación de dos recibos',
+  () => {
+    assert.deepEqual(
+      classifyPersonalBillingIntents(
+        '¿Cómo ha cambiado mi recibo en los últimos meses?'
+      ),
+      ['BILL_HISTORY']
+    );
+    assert.equal(
+      classifyPersonalBillingIntent(
+        '¿Cuál fue mi recibo más caro?'
+      ),
+      'HIGHEST_BILL'
+    );
+    assert.equal(
+      classifyPersonalBillingIntent(
+        '¿Desde cuándo estoy pagando más?'
+      ),
+      'LATEST_INCREASE'
+    );
+  }
+);
+
+test(
+  'las consultas históricas requieren autenticación y activan la carga de hasta seis recibos',
+  () => {
+    assert.equal(
+      requiresPersonalBillingAccess(
+        'Muéstrame mis últimos recibos'
+      ),
+      true
+    );
+    assert.equal(
+      needsBillingHistoryForIntents([
+        'BILL_HISTORY'
+      ]),
+      true
+    );
+    assert.equal(
+      needsBillingHistoryForIntents([
+        'CURRENT_TOTAL'
+      ]),
+      false
+    );
+  }
+);
+
+test(
+  'Lucía resume hasta seis recibos con montos estructurados y sin LLM',
+  () => {
+    const result =
+      buildPersonalBillingReply(
+        historyExperience(),
+        '¿Cómo ha cambiado mi recibo en los últimos meses?'
+      );
+
+    assert.equal(
+      result.intent,
+      'BILL_HISTORY'
+    );
+    assert.match(
+      result.reply,
+      /4 recibos disponibles/i
+    );
+    assert.match(
+      result.reply,
+      /S\/ 49\.89/
+    );
+    assert.match(
+      result.reply,
+      /S\/ 39\.90/
+    );
+    assert.equal(
+      result.financialReasoningByLlm,
+      false
+    );
+  }
+);
+
+test(
+  'Lucía identifica el recibo más alto solo dentro del histórico disponible',
+  () => {
+    const result =
+      buildPersonalBillingReply(
+        historyExperience(),
+        '¿Cuál fue mi recibo más caro?'
+      );
+
+    assert.match(
+      result.reply,
+      /S\/ 49\.89/
+    );
+    assert.match(
+      result.reply,
+      /Ciclo 15\/07\/2026/
+    );
+    assert.match(
+      result.reply,
+      /4 recibos disponibles/i
+    );
+  }
+);
+
+test(
+  'Lucía responde cuándo ocurrió el aumento más reciente sin afirmar una tendencia infinita',
+  () => {
+    const result =
+      buildPersonalBillingReply(
+        historyExperience(),
+        '¿Desde cuándo estoy pagando más?'
+      );
+
+    assert.match(
+      result.reply,
+      /aumento más reciente/i
+    );
+    assert.match(
+      result.reply,
+      /15\/06\/2026/
+    );
+    assert.match(
+      result.reply,
+      /15\/07\/2026/
+    );
+    assert.match(
+      result.reply,
+      /S\/ 9\.99/
+    );
+  }
+);
+
+test(
+  'un seguimiento de paquete puede determinar recurrencia usando el charge code del contexto',
+  () => {
+    const result =
+      buildPersonalBillingReply(
+        historyExperience(),
+        '¿Este cobro fue único o recurrente?',
+        {
+          hasPersonalBillingContext:
+            true,
+          lastBillingIntent:
+            'PACKAGE_CHARGE'
+        }
+      );
+
+    assert.equal(
+      result.intent,
+      'CHARGE_RECURRENCE'
+    );
+    assert.match(
+      result.reply,
+      /2 de 4 recibos/i
+    );
+    assert.match(
+      result.reply,
+      /se repite/i
+    );
+  }
+);
+
+test(
+  'si el cargo es ambiguo Lucía pide especificarlo en vez de escoger uno arbitrariamente',
+  () => {
+    const experience =
+      historyExperience();
+
+    experience.comparison.causes = [];
+
+    const result =
+      buildPersonalBillingReply(
+        experience,
+        '¿Este cargo aparece todos los meses?'
+      );
+
+    assert.match(
+      result.reply,
+      /indique.*cu[aá]l cargo|qué cargo/i
     );
   }
 );

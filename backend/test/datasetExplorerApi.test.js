@@ -43,6 +43,74 @@ function explorerExperience(user) {
       dueDate: null,
       items: []
     },
+    billingHistory: {
+      schemaVersion:
+        'desafio1-billing-history-v1',
+      maxBills: 6,
+      maxPreviousBills: 5,
+      availableBills: 3,
+      previousBills: 2,
+      completeWindow: false,
+      bills: [
+        {
+          cycleDate: '2026-07-15',
+          period: 'Ciclo 15/07/2026',
+          total: 67.47,
+          items: []
+        },
+        {
+          cycleDate: '2026-06-15',
+          period: 'Ciclo 15/06/2026',
+          total: 62.89,
+          items: []
+        },
+        {
+          cycleDate: '2026-05-15',
+          period: 'Ciclo 15/05/2026',
+          total: 71.2,
+          items: []
+        }
+      ],
+      summary: {
+        averageTotal: 67.19,
+        highestBill: {
+          cycleDate: '2026-05-15',
+          period: 'Ciclo 15/05/2026',
+          total: 71.2
+        },
+        lowestBill: {
+          cycleDate: '2026-06-15',
+          period: 'Ciclo 15/06/2026',
+          total: 62.89
+        },
+        oldestBill: {
+          cycleDate: '2026-05-15',
+          period: 'Ciclo 15/05/2026',
+          total: 71.2
+        },
+        newestBill: {
+          cycleDate: '2026-07-15',
+          period: 'Ciclo 15/07/2026',
+          total: 67.47
+        },
+        netChange: -3.73,
+        netDirection: 'DOWN',
+        mostRecentIncrease: {
+          from: {
+            cycleDate: '2026-06-15',
+            period: 'Ciclo 15/06/2026',
+            total: 62.89
+          },
+          to: {
+            cycleDate: '2026-07-15',
+            period: 'Ciclo 15/07/2026',
+            total: 67.47
+          },
+          difference: 4.58,
+          isCurrentChange: true
+        }
+      }
+    },
     comparison: {
       difference: 4.58,
       percentage: 7.3,
@@ -330,6 +398,12 @@ test(
         'DEMO000123'
       );
 
+      assert.equal(
+        appData.billingHistory
+          .availableBills,
+        3
+      );
+
       const bindResponse =
         await fetch(
           `http://127.0.0.1:${port}/api/session/phase10-explorer/customer`,
@@ -605,6 +679,49 @@ test(
       assert.doesNotMatch(
         repairData.reply,
         /recibo aument|reconexi[oó]n|descuento|prorrateo/i
+      );
+
+      const historyResponse =
+        await fetch(
+          `http://127.0.0.1:${port}/api/chat`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json',
+              Cookie: cookie
+            },
+            body: JSON.stringify({
+              message:
+                '¿Cuál fue mi recibo más caro?',
+              sessionId:
+                repairData.sessionId
+            })
+          }
+        );
+      const historyData =
+        await historyResponse.json();
+
+      assert.equal(
+        historyResponse.status,
+        200
+      );
+      assert.equal(
+        historyData.intent,
+        'HIGHEST_BILL'
+      );
+      assert.match(
+        historyData.reply,
+        /S\/ 71\.20/
+      );
+      assert.match(
+        historyData.reply,
+        /15\/05\/2026/
+      );
+      assert.equal(
+        historyData
+          .financialReasoningByLlm,
+        false
       );
 
       const handoffResponse =

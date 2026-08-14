@@ -69,7 +69,8 @@ const {
 const {
   requiresPersonalBillingAccess,
   buildGeneralBillingEducationReply,
-  buildPersonalBillingReply
+  buildPersonalBillingReply,
+  needsBillingHistoryForIntents
 } = require('./services/desafio1ConversationLogic');
 
 const {
@@ -316,24 +317,37 @@ function createApp(options = {}) {
         }
     });
 
-  async function getPersonalExperience(user) {
+  async function getPersonalExperience(
+    user,
+    options = {}
+  ) {
     if (user?.mode === 'EXPLORER') {
       return datasetExplorerService
-        .getExperienceForUser(user);
+        .getExperienceForUser(
+          user,
+          options
+        );
     }
 
     return officialDemoExperienceService
-      .getExperienceForUser(user);
+      .getExperienceForUser(
+        user,
+        options
+      );
   }
 
   async function getAppExperience(user) {
     if (user?.mode === 'EXPLORER') {
-      return getPersonalExperience(user);
+      return getPersonalExperience(
+        user,
+        { includeHistory: true }
+      );
     }
 
     try {
       return await getPersonalExperience(
-        user
+        user,
+        { includeHistory: true }
       );
     } catch (error) {
       if (!isDemoMappingError(error)) {
@@ -1252,7 +1266,14 @@ function createApp(options = {}) {
 
             const experiencePromise =
               getPersonalExperience(
-                requestAuth.session.user
+                requestAuth.session.user,
+                {
+                  includeHistory:
+                    needsBillingHistoryForIntents(
+                      conversationPlan
+                        .billingIntents
+                    )
+                }
               );
 
             const [
@@ -1800,7 +1821,14 @@ function createApp(options = {}) {
           try {
             const officialExperience =
               await getPersonalExperience(
-                requestAuth.session.user
+                requestAuth.session.user,
+                {
+                  includeHistory:
+                    needsBillingHistoryForIntents(
+                      conversationPlan
+                        .billingIntents
+                    )
+                }
               );
 
             const personalReply =
