@@ -311,6 +311,18 @@ test(
       experience.customer.demoScenario,
       'RECONNECTION'
     );
+    assert.equal(
+      experience.resolution.status,
+      'RESOLVED'
+    );
+    assert.equal(
+      experience.nextActions.some(
+        (item) =>
+          item.id ===
+            'CONTACT_ADVISOR'
+      ),
+      false
+    );
   }
 );
 
@@ -433,6 +445,18 @@ test(
       experience.findings[0]
         .impactPresentation,
       'INCLUDED_IN_TOTAL'
+    );
+    assert.equal(
+      experience.resolution.status,
+      'RESOLVED'
+    );
+    assert.equal(
+      experience.nextActions.some(
+        (item) =>
+          item.id ===
+            'CONTACT_ADVISOR'
+      ),
+      false
     );
     assert.match(
       experience.findings[0]

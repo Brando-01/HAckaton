@@ -451,6 +451,17 @@
               openChat(
                 action.prompt
               );
+              return;
+            }
+
+            if (
+              action.type === 'NAVIGATE' &&
+              typeof action.href ===
+                'string' &&
+              action.href.startsWith('/')
+            ) {
+              window.location.href =
+                action.href;
             }
           }
         );

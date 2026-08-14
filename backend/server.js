@@ -79,6 +79,10 @@ const {
 } = require('./services/desafio1ConversationalOrchestrator');
 
 const {
+  aggregateCustomerResolutions
+} = require('./services/desafio1ResolutionLogic');
+
+const {
   esSolicitudAsesor,
   determinarMotivoDerivacion,
   obtenerConsultaOriginal,
@@ -1293,6 +1297,26 @@ function createApp(options = {}) {
                   personalExperience
               });
 
+            const turnResolution =
+              aggregateCustomerResolutions({
+                profile:
+                  datasetProfile,
+                experience:
+                  personalExperience,
+                profileIntents:
+                  conversationPlan
+                    .profileIntents,
+                billingIntents:
+                  conversationPlan
+                    .billingIntents,
+                message:
+                  cleanMessage,
+                lastBillingIntent:
+                  metricsSession.context
+                    .lastBillingIntent ||
+                  null
+              });
+
             addMessage(
               activeSessionId,
               'user',
@@ -1340,7 +1364,19 @@ function createApp(options = {}) {
                     : null,
                 lastConversationDomain:
                   conversationPlan
-                    .domain
+                    .domain,
+                lastResolutionStatus:
+                  turnResolution
+                    ?.status ||
+                  metricsSession.context
+                    .lastResolutionStatus ||
+                  null,
+                lastResolutionReason:
+                  turnResolution
+                    ?.reasonCode ||
+                  metricsSession.context
+                    .lastResolutionReason ||
+                  null
               }
             );
 
@@ -1378,6 +1414,14 @@ function createApp(options = {}) {
               authenticated: true,
               sessionId:
                 activeSessionId,
+              resolution:
+                turnResolution,
+              resolutionStatus:
+                turnResolution
+                  ?.status || null,
+              nextActions:
+                turnResolution
+                  ?.nextActions || [],
               conversation: {
                 multiIntent: true,
                 intentCount:
@@ -1487,6 +1531,18 @@ function createApp(options = {}) {
                   conversationPlan.repair
               });
 
+            const profileResolution =
+              aggregateCustomerResolutions({
+                profile:
+                  datasetProfile,
+                experience:
+                  personalExperience,
+                profileIntents:
+                  customerProfileIntents,
+                message:
+                  cleanMessage
+              });
+
             addMessage(
               activeSessionId,
               'user',
@@ -1512,7 +1568,13 @@ function createApp(options = {}) {
                 lastCustomerProfileIntents:
                   customerProfileIntents,
                 lastConversationDomain:
-                  'PROFILE'
+                  'PROFILE',
+                lastResolutionStatus:
+                  profileResolution
+                    ?.status || null,
+                lastResolutionReason:
+                  profileResolution
+                    ?.reasonCode || null
               }
             );
 
@@ -1540,6 +1602,14 @@ function createApp(options = {}) {
               authenticated: true,
               sessionId:
                 activeSessionId,
+              resolution:
+                profileResolution,
+              resolutionStatus:
+                profileResolution
+                  ?.status || null,
+              nextActions:
+                profileResolution
+                  ?.nextActions || [],
               conversation: {
                 multiIntent:
                   customerProfileIntents
@@ -1863,7 +1933,16 @@ function createApp(options = {}) {
                   'BILLING',
                 demoScenario:
                   officialExperience.customer
-                    .demoScenario
+                    .demoScenario,
+                lastResolutionStatus:
+                  personalReply
+                    .resolutionStatus ||
+                  null,
+                lastResolutionReason:
+                  personalReply
+                    .resolution
+                    ?.reasonCode ||
+                  null
               }
             );
 

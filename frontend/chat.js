@@ -419,6 +419,118 @@
   }
 
 
+  function appendNextActions(actions) {
+    if (chatMessages) {
+      chatMessages
+        .querySelectorAll(
+          '.resolution-actions'
+        )
+        .forEach(
+          (element) =>
+            element.remove()
+        );
+    }
+
+    if (
+      !chatMessages ||
+      !Array.isArray(actions) ||
+      !actions.length
+    ) {
+      return;
+    }
+
+    const safeActions =
+      actions.filter(
+        (action) =>
+          action &&
+          action.id &&
+          action.label &&
+          [
+            'CHAT',
+            'NAVIGATE'
+          ].includes(action.type)
+      );
+
+    if (!safeActions.length) {
+      return;
+    }
+
+    const wrapper =
+      document.createElement('div');
+
+    wrapper.className =
+      'resolution-actions';
+
+    const label =
+      document.createElement('span');
+
+    label.className =
+      'resolution-actions-label';
+    label.textContent =
+      'Siguiente paso';
+
+    wrapper.appendChild(label);
+
+    const buttons =
+      document.createElement('div');
+
+    buttons.className =
+      'resolution-actions-buttons';
+
+    safeActions.forEach(
+      (action) => {
+        const button =
+          document.createElement('button');
+
+        button.type = 'button';
+        button.className =
+          'resolution-action-button';
+        button.textContent =
+          action.label;
+
+        button.addEventListener(
+          'click',
+          () => {
+            if (
+              interactionFinished ||
+              sendingMessage
+            ) {
+              return;
+            }
+
+            if (
+              action.type === 'CHAT' &&
+              action.prompt &&
+              userInput
+            ) {
+              userInput.value =
+                action.prompt;
+              sendMessage();
+              return;
+            }
+
+            if (
+              action.type === 'NAVIGATE' &&
+              typeof action.href ===
+                'string' &&
+              action.href.startsWith('/')
+            ) {
+              window.location.href =
+                action.href;
+            }
+          }
+        );
+
+        buttons.appendChild(button);
+      }
+    );
+
+    wrapper.appendChild(buttons);
+    chatMessages.appendChild(wrapper);
+    scrollToBottom();
+  }
+
+
   function showTyping() {
     if (!chatMessages) {
       return;
@@ -1029,6 +1141,17 @@
           'bot'
         );
       }
+
+      appendNextActions(
+        !data.requiresAuth &&
+        !data.handoff &&
+        Array.isArray(
+          data.nextActions
+        )
+          ? data.nextActions
+          : []
+      );
+
 
       if (data.requiresAuth) {
         sessionStorage.setItem(

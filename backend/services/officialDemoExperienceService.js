@@ -24,6 +24,12 @@ const {
 );
 
 const {
+  buildAppNextActions
+} = require(
+  './desafio1ResolutionLogic'
+);
+
+const {
   buildCustomerCauseDescription,
   buildCustomerFindingDescription,
   getImpactPresentation,
@@ -385,7 +391,7 @@ function buildOfficialDemoExperience({
           causes: []
         };
 
-  return {
+  const experience = {
     schemaVersion:
       'desafio1-demo-experience-v1',
     dataSource:
@@ -442,31 +448,20 @@ function buildOfficialDemoExperience({
         clone(
           explanation.safeguards || {}
         )
-    },
-    nextActions: [
-      {
-        id:
-          'EXPLAIN_BILL',
-        label:
-          previousBill
-            ? 'Entender mi variación'
-            : 'Entender mi recibo',
-        type: 'CHAT',
-        prompt:
-          previousBill
-            ? 'Explícame por qué cambió mi recibo'
-            : 'Explícame mi recibo y el prorrateo'
-      },
-      {
-        id:
-          'CONTACT_ADVISOR',
-        label:
-          'Hablar con un asesor',
-        type: 'CHAT',
-        prompt:
-          'Quiero hablar con un asesor'
-      }
-    ]
+    }
+  };
+
+  const actionPolicy =
+    buildAppNextActions(
+      experience
+    );
+
+  return {
+    ...experience,
+    resolution:
+      actionPolicy.resolution,
+    nextActions:
+      actionPolicy.nextActions
   };
 }
 

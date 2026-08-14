@@ -230,6 +230,17 @@ test(
       result.reply,
       /no puedo afirmar/i
     );
+    assert.equal(
+      result.resolutionStatus,
+      'PARTIALLY_RESOLVED'
+    );
+    assert.equal(
+      result.nextActions.some(
+        (action) =>
+          action.id === 'PAY_BILL'
+      ),
+      false
+    );
   }
 );
 
@@ -390,6 +401,15 @@ test(
     assert.equal(
       naturalTotalQuestion.intent,
       'CURRENT_TOTAL'
+    );
+    assert.equal(
+      result.resolutionStatus,
+      'PARTIALLY_RESOLVED'
+    );
+    assert.equal(
+      naturalTotalQuestion
+        .resolutionStatus,
+      'RESOLVED'
     );
     assert.match(
       naturalTotalQuestion.reply,

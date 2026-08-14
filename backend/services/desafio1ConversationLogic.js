@@ -5,10 +5,16 @@ const {
 );
 
 const {
-  findHistoryChargeByText,
   analyzeChargeRecurrence
 } = require(
   './desafio1BillingHistoryLogic'
+);
+
+const {
+  resolveHistoryChargeSubject,
+  aggregateBillingResolutions
+} = require(
+  './desafio1ResolutionLogic'
 );
 
 const BILLING_HISTORY_INTENTS =
@@ -1043,50 +1049,6 @@ function buildLatestIncreaseReply(
   );
 }
 
-function causeSubjectForContext(
-  experience,
-  lastBillingIntent
-) {
-  const causes =
-    experience?.comparison
-      ?.causes || [];
-
-  if (lastBillingIntent === 'PACKAGE_CHARGE') {
-    return causes.find(
-      (cause) =>
-        cause.code === 'PACKAGES' &&
-        cause.subject
-    )?.subject || null;
-  }
-
-  const withSubject =
-    causes.filter(
-      (cause) =>
-        cause.subject
-    );
-
-  if (withSubject.length === 1) {
-    return withSubject[0].subject;
-  }
-
-  const currentItems =
-    experience?.currentBill
-      ?.items || [];
-
-  if (currentItems.length === 1) {
-    return {
-      chargeCode:
-        currentItems[0]
-          .chargeCode || null,
-      label:
-        currentItems[0]
-          .label || null
-    };
-  }
-
-  return null;
-}
-
 function buildChargeRecurrenceReply(
   experience,
   message,
@@ -1104,13 +1066,12 @@ function buildChargeRecurrenceReply(
   }
 
   const subject =
-    findHistoryChargeByText(
-      history,
-      message
-    ) ||
-    causeSubjectForContext(
+    resolveHistoryChargeSubject(
       experience,
-      lastBillingIntent
+      message,
+      {
+        lastBillingIntent
+      }
     );
 
   if (!subject) {
@@ -1568,6 +1529,16 @@ function buildPersonalBillingReply(
       }
     );
 
+  const resolution =
+    aggregateBillingResolutions({
+      experience,
+      intents: [intent],
+      message,
+      lastBillingIntent:
+        options.lastBillingIntent ||
+        null
+    });
+
   return {
     reply,
     intent,
@@ -1582,7 +1553,12 @@ function buildPersonalBillingReply(
     coveragePercent:
       experience
         ?.financialExplanation
-        ?.coveragePercent ?? null
+        ?.coveragePercent ?? null,
+    resolution,
+    resolutionStatus:
+      resolution?.status || null,
+    nextActions:
+      resolution?.nextActions || []
   };
 }
 

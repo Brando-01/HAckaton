@@ -633,3 +633,54 @@ body {
 .auth-required-button:focus-visible {
   filter: brightness(0.95);
 }
+
+/* FASE 15 · SIGUIENTES ACCIONES DETERMINISTAS */
+.resolution-actions {
+    align-self: flex-start;
+    max-width: 85%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: -8px;
+    animation: fadeIn 0.25s ease-out;
+}
+
+.resolution-actions-label {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.resolution-actions-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.resolution-action-button {
+    border: 1px solid rgba(0, 169, 224, 0.35);
+    border-radius: 999px;
+    background: #ffffff;
+    color: var(--movistar-blue-dark);
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition:
+        background 0.2s ease,
+        border-color 0.2s ease,
+        transform 0.1s ease;
+}
+
+.resolution-action-button:hover,
+.resolution-action-button:focus-visible {
+    background: #EAF8FD;
+    border-color: var(--movistar-blue);
+    outline: none;
+}
+
+.resolution-action-button:active {
+    transform: scale(0.98);
+}
