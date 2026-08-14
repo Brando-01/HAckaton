@@ -15,7 +15,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { esSolicitudAsesor, determinarMotivoDerivacion } = require('../services/handoffService');
+const {
+  esSolicitudAsesor,
+  esDisputaBlanda,
+  determinarMotivoDerivacion
+} = require('../services/handoffService');
 
 /** Frases que SÍ deben derivar. */
 const DERIVAR = {
@@ -33,13 +37,8 @@ const DERIVAR = {
     'derivame con alguien',
     'quiero hablar con alguien'
   ],
-  'está en desacuerdo con el cobro': [
+  'está en desacuerdo y ya quiere escalar': [
     'no estoy de acuerdo con el monto',
-    'no me cuadra lo que me cobran',
-    'esto esta mal',
-    'esta mal mi recibo',
-    'me cobraron de mas',
-    'esto es un cobro indebido',
     'esto es un abuso',
     'me estan estafando'
   ],
@@ -95,8 +94,31 @@ const NO_DERIVAR = {
     'gracias',
     'ya entendi, gracias',
     'perfecto'
+  ],
+  'disputa blanda: se explica primero, no se deriva': [
+    'no me cuadra lo que me cobran',
+    'esto esta mal',
+    'esta mal mi recibo',
+    'me cobraron de mas',
+    'esto es un cobro indebido'
   ]
 };
+
+/**
+ * Disputa blanda: el cobro no le cuadra pero todavía no pidió escalar.
+ *
+ * El reto pide derivar por umbrales de incomprensión, no por palabra clave.
+ * Estas frases las atiende `respuestaProgresiva.responderDisputa`, que explica
+ * el cobro con los datos reales y OFRECE el asesor en vez de imponerlo. Si el
+ * cliente insiste, su siguiente frase suele caer en escalamiento duro.
+ */
+const DISPUTA_BLANDA = [
+  'no me cuadra lo que me cobran',
+  'esto esta mal',
+  'esta mal mi recibo',
+  'me cobraron de mas',
+  'esto es un cobro indebido'
+];
 
 test('deriva cuando el cliente lo pide o está disconforme', () => {
   const fallos = [];
@@ -126,11 +148,36 @@ test('NO deriva cuando el cliente solo quiere una explicación', () => {
   assert.deepEqual(fallos, [], `falsos positivos: se derivaron ${fallos.length} frases que no debían`);
 });
 
+test('la disputa blanda se reconoce, pero no deriva de entrada', () => {
+  for (const frase of DISPUTA_BLANDA) {
+    assert.equal(esSolicitudAsesor(frase), false, `"${frase}" no debería derivar aún`);
+    assert.equal(esDisputaBlanda(frase), true, `"${frase}" debería reconocerse como disputa`);
+  }
+});
+
+test('si el cliente escala tras la disputa, ahí sí se deriva', () => {
+  // El recorrido real: primero no le cuadra, se le explica, e insiste.
+  assert.equal(esSolicitudAsesor('no me cuadra el cobro'), false);
+  assert.equal(esSolicitudAsesor('sigo sin entender, quiero reclamar'), true);
+  assert.equal(esSolicitudAsesor('esto no me ayudo, pasame con un asesor'), true);
+});
+
+test('escalar y disputar son excluyentes: nunca los dos a la vez', () => {
+  const todas = [...Object.values(DERIVAR).flat(), ...DISPUTA_BLANDA];
+
+  for (const frase of todas) {
+    assert.ok(
+      !(esSolicitudAsesor(frase) && esDisputaBlanda(frase)),
+      `"${frase}" cae en las dos categorías`
+    );
+  }
+});
+
 test('funciona con y sin tildes y sin importar mayúsculas', () => {
   assert.equal(esSolicitudAsesor('Quiero hablar con un ASESOR'), true);
-  assert.equal(esSolicitudAsesor('no me cuadra'), true);
-  assert.equal(esSolicitudAsesor('No me cuadrá'), true);
   assert.equal(esSolicitudAsesor('QUIERO RECLAMAR'), true);
+  assert.equal(esDisputaBlanda('No me cuadrá'), true);
+  assert.equal(esDisputaBlanda('NO ME CUADRA'), true);
 });
 
 test('un mensaje vacío no deriva', () => {
@@ -163,7 +210,6 @@ test('el motivo del caso distingue desacuerdo, no resuelto y pedido', () => {
   assert.equal(determinarMotivoDerivacion('quiero dar de baja mi servicio'), 'CLIENT_REQUEST');
 
   assert.equal(determinarMotivoDerivacion('no estoy de acuerdo'), 'CUSTOMER_DISAGREES');
-  assert.equal(determinarMotivoDerivacion('no me cuadra el cobro'), 'CUSTOMER_DISAGREES');
   assert.equal(determinarMotivoDerivacion('quiero reclamar'), 'CUSTOMER_DISAGREES');
   assert.equal(determinarMotivoDerivacion('voy a ir a osiptel'), 'CUSTOMER_DISAGREES');
   assert.equal(determinarMotivoDerivacion('me cobraron de mas'), 'CUSTOMER_DISAGREES');

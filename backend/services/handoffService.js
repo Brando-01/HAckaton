@@ -38,24 +38,18 @@ const PIDE_HUMANO = [
 ];
 
 /**
- * Disconformidad, reclamo o riesgo de fuga: casos donde el reto pide derivar
- * aunque el cliente no nombre a un asesor.
+ * Escalamiento duro: la conversación ya se pasó de lo que un bot debe manejar.
  *
- * Incluye las vías de escalamiento peruanas (Osiptel, Indecopi, libro de
- * reclamaciones): si el cliente las menciona, la conversación ya se pasó de
- * lo que un bot debe manejar solo.
+ * Son señales donde explicar mejor no aporta nada — el cliente ya decidió
+ * escalar o irse. Las vías peruanas (Osiptel, Indecopi, libro de
+ * reclamaciones) entran acá por lo mismo.
  */
-const DISCONFORMIDAD = [
+const ESCALAMIENTO_DURO = [
   /\bno estoy de acuerdo\b/,
   /\bno resolvio mi (problema|duda|consulta)\b/,
   /\besto no me ayudo\b/,
-  /\bno me (cuadra|convence|parece justo)\b/,
-  /\besto esta mal\b/,
-  /\besta mal (el|mi) (cobro|recibo|monto|factura)\b/,
   /\b(quiero|deseo|voy a|necesito) (hacer un |presentar un |poner un )?reclamo\b/,
   /\breclamar\b/,
-  /\bme cobraron de mas\b/,
-  /\bcobro (indebido|injusto|excesivo)\b/,
   /\b(es un|esto es un) (abuso|robo)\b/,
   /\b(estafa|estafando|estafaron)\b/,
   /\b(osiptel|indecopi|libro de reclamaciones)\b/,
@@ -68,12 +62,35 @@ const DISCONFORMIDAD = [
 ];
 
 /**
- * ¿Hay que derivar a un asesor humano?
+ * Disputa blanda: el cobro no le cuadra, pero todavía no pidió escalar.
  *
- * Ojo con lo que NO deriva: "no entiendo", "explícame mejor" o "no me queda
- * claro" son peticiones de explicación, y explicar es justo el trabajo del
- * asistente. Derivarlas contaría como falso positivo en la precisión del
- * hand-off y además arruina la experiencia.
+ * NO deriva de entrada. El reto pide derivar por *umbrales de incomprensión*,
+ * no por palabra clave: un keyword match es un botón, no un umbral. Estas
+ * frases las atiende `respuestaProgresiva.responderDisputa`, que explica el
+ * cobro con los datos reales y ofrece el asesor. Si el cliente insiste, la
+ * siguiente frase suele caer en ESCALAMIENTO_DURO y ahí sí se deriva.
+ *
+ * Se exportan para que el clasificador de intención las reconozca como
+ * DISPUTA_COBRO y para no tener dos listas que se contradigan.
+ */
+const DISPUTA_BLANDA = [
+  /\bno me (cuadra|convence|parece justo)\b/,
+  /\besto esta mal\b/,
+  /\besta mal (el|mi) (cobro|recibo|monto|factura)\b/,
+  /\bme cobraron de mas\b/,
+  /\bcobro (indebido|injusto|excesivo)\b/
+];
+
+/**
+ * ¿Hay que derivar a un asesor humano AHORA?
+ *
+ * Ojo con lo que NO deriva:
+ *
+ *   - "no entiendo", "explícame mejor", "no me queda claro" → explicar es el
+ *     trabajo del asistente. Derivarlas cuenta como falso positivo y sube las
+ *     llamadas al call center, que es el indicador de negocio a bajar.
+ *   - "no me cuadra", "me cobraron de más" → primero se explica el cobro con
+ *     los datos reales; el asesor se ofrece, no se impone.
  */
 function esSolicitudAsesor(mensaje) {
   const texto = normalizarTexto(mensaje);
@@ -83,7 +100,18 @@ function esSolicitudAsesor(mensaje) {
   }
 
   return PIDE_HUMANO.some((patron) => patron.test(texto))
-    || DISCONFORMIDAD.some((patron) => patron.test(texto));
+    || ESCALAMIENTO_DURO.some((patron) => patron.test(texto));
+}
+
+/** `true` si el cliente disputa el cobro sin haber pedido escalar todavía. */
+function esDisputaBlanda(mensaje) {
+  const texto = normalizarTexto(mensaje);
+
+  if (!texto || esSolicitudAsesor(mensaje)) {
+    return false;
+  }
+
+  return DISPUTA_BLANDA.some((patron) => patron.test(texto));
 }
 
 /**
@@ -542,6 +570,7 @@ function resetHandoffCases() {
 
 module.exports = {
   esSolicitudAsesor,
+  esDisputaBlanda,
   determinarMotivoDerivacion,
   obtenerConsultaOriginal,
   crearCaso,

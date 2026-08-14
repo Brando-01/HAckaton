@@ -944,6 +944,23 @@ function createApp() {
   app.get(
     '/api/app/customers/:customerId',
     (req, res) => {
+      // Zero Trust: devolvía el recibo completo de cualquier cliente con solo
+      // poner su ID en la URL, sin token. Contradecía al resto del código,
+      // que ya trata la identidad de sesión como única fuente válida.
+      const auth = getRequestAuth(req);
+
+      if (!auth) {
+        return res.status(401).json({
+          error: 'Debes iniciar sesión para ver la información de un cliente'
+        });
+      }
+
+      if (String(auth.session.user.customerId) !== String(req.params.customerId)) {
+        return res.status(403).json({
+          error: 'Solo puedes consultar la cuenta con la que iniciaste sesión'
+        });
+      }
+
       const experience =
         getCustomerExperience(
           req.params.customerId

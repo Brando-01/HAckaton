@@ -29,6 +29,9 @@ const {
   verificarMontos
 } = require('./narradorRecibos');
 
+const { clasificarIntencion, INTENCIONES } = require('./intencionService');
+const { construirRespuesta } = require('./respuestaProgresiva');
+
 const {
   getOrCreateSession,
   addMessage,
@@ -752,6 +755,58 @@ function construirRespuestaFallback(
 }
 
 /**
+ * Decide qué contexto auxiliar entra al prompt.
+ *
+ * El prompt declaraba el bloque de hechos como "fuente de verdad de todo
+ * monto" y unas líneas más abajo inyectaba, siempre, cuatro secciones que
+ * traen cifras rivales: el volcado de archivos, los datos cruzados, el
+ * resumen legacy y el contexto del cliente. Se le pedía al modelo ignorar
+ * datos que uno mismo le ponía delante, y luego el verificador limpiaba el
+ * resultado. Eso convierte una garantía arquitectónica en una esperanza
+ * estadística.
+ *
+ * Si el motor resolvió el recibo, el bloque es la ÚNICA fuente numérica.
+ * Las secciones auxiliares solo aparecen cuando no hay bloque.
+ */
+function construirContextoAuxiliar({
+  motorResolvio,
+  dataContextTexto,
+  contextoClientePorId,
+  resumenFacturacion,
+  contextoCliente
+}) {
+  if (motorResolvio) {
+    return [
+      '--- CONTEXTO ADICIONAL ---',
+      '',
+      'Omitido a propósito. El bloque de hechos de arriba ya resolvió el recibo',
+      'de este cliente y es la única fuente numérica válida para esta respuesta.'
+    ].join('\n');
+  }
+
+  return [
+    '--- CONTEXTO DE ARCHIVOS DE DATA ---',
+    '',
+    recortarPorRegistros(dataContextTexto || 'No hay archivos de datos disponibles para leer.', 1500),
+    '',
+    '',
+    '--- DATOS CRUZADOS DEL CLIENTE ---',
+    '',
+    contextoClientePorId || 'No hay coincidencias específicas para este identificador.',
+    '',
+    '',
+    '--- RESUMEN ESTRUCTURADO DE FACTURACIÓN ---',
+    '',
+    resumenFacturacion || 'No hay resumen estructurado disponible.',
+    '',
+    '',
+    '--- CONTEXTO DEL CLIENTE ---',
+    '',
+    contextoCliente
+  ].join('\n');
+}
+
+/**
  * Lista blanca de montos que la respuesta puede mencionar.
  *
  * Se arma con las tres únicas fuentes legítimas de cifras: el bloque de
@@ -789,10 +844,10 @@ function construirFuenteDeMontos(bloqueDeHechos, customerId) {
  * cuenta de la que no sabemos nada.
  */
 function blindarConFuentes(respuesta, bloqueDeHechos, customerId, contexto = {}) {
-  if (!customerId) {
-    return respuesta;
-  }
-
+  // Antes acá había un `if (!customerId) return respuesta`, que dejaba SIN
+  // verificar justo el escenario donde el modelo más inventa: sin datos que
+  // narrar, rellena con precios plausibles. La verificación corre siempre; lo
+  // que cambia sin cliente es la lista blanca, que se reduce al catálogo.
   const fuentes = construirFuenteDeMontos(bloqueDeHechos, customerId);
   const verificacion = verificarMontos(respuesta, fuentes);
 
@@ -807,6 +862,10 @@ function blindarConFuentes(respuesta, bloqueDeHechos, customerId, contexto = {})
 
   if (bloqueDeHechos && bloqueDeHechos.encontrado) {
     return narrarBloqueDeHechos(bloqueDeHechos);
+  }
+
+  if (!customerId) {
+    return 'Prefiero no darte cifras que no pueda confirmar. Si quieres consultar tu recibo, inicia sesión y lo revisamos con tus datos reales.';
   }
 
   return [
@@ -1240,6 +1299,50 @@ async function procesarConsultaFactura(
     }
 
 
+    // -------------------------------------------------------
+    // 3.c Intención y respuesta por capas.
+    //
+    //     Antes todo mensaje entraba al mismo pipeline y lo
+    //     único que decidía la respuesta era SI HABÍA DATOS, no
+    //     QUÉ PREGUNTÓ el cliente: un "hola" devolvía el recibo
+    //     entero, la variación, la deuda y los seis ciclos.
+    //
+    //     Las intenciones que el motor resuelve solo no pasan
+    //     por el LLM: son deterministas, no gastan cuota y no
+    //     pueden alucinar porque sus montos salen del bloque.
+    // -------------------------------------------------------
+
+    const clasificacion = clasificarIntencion(mensajeTexto, {
+      intencionAnterior: session.context && session.context.intencionAnterior
+    });
+
+    updateContext(activeSessionId, { intencionAnterior: clasificacion.intencion });
+
+    const respuestaPorCapas = construirRespuesta(clasificacion, bloqueDeHechos, {
+      tieneCliente: Boolean(idBuscar),
+      nombreCliente: null
+    });
+
+    if (respuestaPorCapas) {
+      addMessage(activeSessionId, 'user', mensajeTexto);
+      addMessage(activeSessionId, 'assistant', respuestaPorCapas.texto);
+
+      console.log('[INTENCION] %s (confianza %s) → respuesta determinista',
+        clasificacion.intencion, clasificacion.confianza);
+
+      return {
+        reply: respuestaPorCapas.texto,
+        foundData: Boolean(bloqueDeHechos && bloqueDeHechos.encontrado),
+        sessionId: activeSessionId,
+        intencion: clasificacion.intencion,
+        sugerencias: respuestaPorCapas.sugerencias || [],
+        tarjeta: respuestaPorCapas.tarjeta || null,
+        sugerirHandoff: Boolean(respuestaPorCapas.sugerirHandoff),
+        cerrarInteraccion: Boolean(respuestaPorCapas.cerrarInteraccion)
+      };
+    }
+
+
     let contextoCliente = '';
 
     // Estos dos recorren TODOS los archivos de data/ (~139 MB) de forma
@@ -1460,24 +1563,13 @@ ${bloqueDeHechos ? construirBloqueParaPrompt(bloqueDeHechos) : 'No hay cliente i
 ${recortarPorRegistros(catalogoOfertasTexto || 'Catálogo no disponible.', 1500)}
 
 
---- CONTEXTO DE ARCHIVOS DE DATA ---
-
-${recortarPorRegistros(dataContextTexto || 'No hay archivos de datos disponibles para leer.', 1500)}
-
-
---- DATOS CRUZADOS DEL CLIENTE ---
-
-${contextoClientePorId || 'No hay coincidencias específicas para este identificador.'}
-
-
---- RESUMEN ESTRUCTURADO DE FACTURACIÓN ---
-
-${resumenFacturacion || 'No hay resumen estructurado disponible.'}
-
-
---- CONTEXTO DEL CLIENTE ---
-
-${contextoCliente}
+${construirContextoAuxiliar({
+  motorResolvio,
+  dataContextTexto,
+  contextoClientePorId,
+  resumenFacturacion,
+  contextoCliente
+})}
 `.trim();
 
 

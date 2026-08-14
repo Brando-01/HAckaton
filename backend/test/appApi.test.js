@@ -77,7 +77,7 @@ test(
 
 
 test(
-  'obtiene la experiencia de recibo de un cliente',
+  'obtiene la experiencia de recibo de un cliente autenticado',
   async (t) => {
     const app =
       createApp();
@@ -106,9 +106,18 @@ test(
     const port =
       server.address().port;
 
+    // La cuenta demo 987654321 corresponde a CLI000001.
+    const login = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: '987654321', password: 'Demo1234!' })
+    });
+    const { token } = await login.json();
+
     const response =
       await fetch(
-        `http://127.0.0.1:${port}/api/app/customers/CLI000001`
+        `http://127.0.0.1:${port}/api/app/customers/CLI000001`,
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
     assert.equal(
@@ -156,6 +165,35 @@ test(
 
 
 test(
+  'FUGA DE DATOS: sin sesión no se puede ver la ficha de un cliente',
+  async (t) => {
+    const server = createApp().listen(0);
+    await new Promise((resolve) => server.once('listening', resolve));
+    t.after(() => new Promise((resolve) => server.close(resolve)));
+
+    const port = server.address().port;
+
+    // Antes bastaba poner el ID en la URL para recibir el recibo completo.
+    const anonima = await fetch(`http://127.0.0.1:${port}/api/app/customers/CLI000001`);
+    assert.equal(anonima.status, 401);
+
+    // Y con sesión válida, tampoco se puede mirar la cuenta de otro.
+    const login = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: '987654321', password: 'Demo1234!' })
+    });
+    const { token } = await login.json();
+
+    const ajena = await fetch(`http://127.0.0.1:${port}/api/app/customers/CLI000002`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    assert.equal(ajena.status, 403);
+  }
+);
+
+
+test(
   'devuelve 404 para un cliente inexistente',
   async (t) => {
     const app =
@@ -185,9 +223,26 @@ test(
     const port =
       server.address().port;
 
+    // El 404 solo es alcanzable pidiendo la PROPIA cuenta: pedir la de otro
+    // corta antes con 403. Esta cuenta del dataset no está en el catálogo
+    // mock de Mi Movistar, así que su experiencia no existe.
+    const login = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: '900548096', password: 'Demo1234!' })
+    });
+
+    if (login.status !== 200) {
+      t.skip('faltan las cuentas del dataset (data/cuentas-demo.json)');
+      return;
+    }
+
+    const { token, user } = await login.json();
+
     const response =
       await fetch(
-        `http://127.0.0.1:${port}/api/app/customers/NO_EXISTE`
+        `http://127.0.0.1:${port}/api/app/customers/${user.customerId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
     assert.equal(
