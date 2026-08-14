@@ -15,6 +15,66 @@ function normalizarTexto(texto = '') {
     .trim();
 }
 
+/**
+ * El cliente pide explícitamente hablar con una persona.
+ *
+ * Antes solo se reconocían "asesor", "humano", "persona real" y "hablar con
+ * alguien". En Perú se pide de muchas más formas.
+ */
+const PIDE_HUMANO = [
+  /\basesor(a|es)?\b/,
+  /\bhumano\b/,
+  /\bpersona real\b/,
+  /\batencion humana\b/,
+  /\batencion al cliente\b/,
+  /\b(agente|ejecutivo|representante|operador|supervisor|teleoperador)\b/,
+  /\bhablar con (alguien|una persona|un(a)? \w+)\b/,
+  /\b(pasame|comunicame|derivame|transfiereme|conectame) con\b/,
+  /\bquiero (hablar|conversar) con\b/,
+  /\bnecesito (hablar|conversar) con\b/,
+  /\bme (pasas|pasa|puedes pasar)\b/,
+  /\bcentro de atencion\b/,
+  /\bcall center\b/
+];
+
+/**
+ * Disconformidad, reclamo o riesgo de fuga: casos donde el reto pide derivar
+ * aunque el cliente no nombre a un asesor.
+ *
+ * Incluye las vías de escalamiento peruanas (Osiptel, Indecopi, libro de
+ * reclamaciones): si el cliente las menciona, la conversación ya se pasó de
+ * lo que un bot debe manejar solo.
+ */
+const DISCONFORMIDAD = [
+  /\bno estoy de acuerdo\b/,
+  /\bno resolvio mi (problema|duda|consulta)\b/,
+  /\besto no me ayudo\b/,
+  /\bno me (cuadra|convence|parece justo)\b/,
+  /\besto esta mal\b/,
+  /\besta mal (el|mi) (cobro|recibo|monto|factura)\b/,
+  /\b(quiero|deseo|voy a|necesito) (hacer un |presentar un |poner un )?reclamo\b/,
+  /\breclamar\b/,
+  /\bme cobraron de mas\b/,
+  /\bcobro (indebido|injusto|excesivo)\b/,
+  /\b(es un|esto es un) (abuso|robo)\b/,
+  /\b(estafa|estafando|estafaron)\b/,
+  /\b(osiptel|indecopi|libro de reclamaciones)\b/,
+  /\b(dar de baja|darme de baja|cancelar (mi|el) servicio|anular (mi|el) servicio)\b/,
+  /\b(portabilidad|me quiero ir a|cambiarme de operador)\b/,
+  /\b(pesimo|malisimo|terrible) (servicio|atencion)\b/,
+  /\bsigo sin (entender|poder|recibir)\b/,
+  /\bya te (dije|explique)\b/,
+  /\bno me sirve\b/
+];
+
+/**
+ * ¿Hay que derivar a un asesor humano?
+ *
+ * Ojo con lo que NO deriva: "no entiendo", "explícame mejor" o "no me queda
+ * claro" son peticiones de explicación, y explicar es justo el trabajo del
+ * asistente. Derivarlas contaría como falso positivo en la precisión del
+ * hand-off y además arruina la experiencia.
+ */
 function esSolicitudAsesor(mensaje) {
   const texto = normalizarTexto(mensaje);
 
@@ -22,36 +82,48 @@ function esSolicitudAsesor(mensaje) {
     return false;
   }
 
-  const patrones = [
-    /\basesor\b/,
-    /\bhumano\b/,
-    /\bpersona real\b/,
-    /\batencion humana\b/,
-    /\bhablar con alguien\b/,
-    /\bno estoy de acuerdo\b/,
-    /\bno resolvio mi problema\b/,
-    /\bno resolvio mi duda\b/,
-    /\besto no me ayudo\b/
-  ];
-
-  return patrones.some((patron) =>
-    patron.test(texto)
-  );
+  return PIDE_HUMANO.some((patron) => patron.test(texto))
+    || DISCONFORMIDAD.some((patron) => patron.test(texto));
 }
 
+/**
+ * Motivo con el que se abre el caso.
+ *
+ * Los tres códigos son un conjunto cerrado que `metricsService` valida, así
+ * que las frases nuevas se reparten entre ellos en vez de inventar códigos.
+ */
 function determinarMotivoDerivacion(mensaje) {
   const texto = normalizarTexto(mensaje);
 
-  if (texto.includes('no estoy de acuerdo')) {
-    return 'CUSTOMER_DISAGREES';
+  const noResuelto = [
+    /\bno resolvio mi (problema|duda|consulta)\b/,
+    /\besto no me ayudo\b/,
+    /\bsigo sin (entender|poder|recibir)\b/,
+    /\bya te (dije|explique)\b/,
+    /\bno me sirve\b/
+  ];
+
+  if (noResuelto.some((patron) => patron.test(texto))) {
+    return 'NOT_RESOLVED';
   }
 
-  if (
-    texto.includes('no resolvio mi problema') ||
-    texto.includes('no resolvio mi duda') ||
-    texto.includes('esto no me ayudo')
-  ) {
-    return 'NOT_RESOLVED';
+  const enDesacuerdo = [
+    /\bno estoy de acuerdo\b/,
+    /\bno me (cuadra|convence|parece justo)\b/,
+    /\besto esta mal\b/,
+    /\besta mal (el|mi) (cobro|recibo|monto|factura)\b/,
+    /\b(quiero|deseo|voy a|necesito) (hacer un |presentar un |poner un )?reclamo\b/,
+    /\breclamar\b/,
+    /\bme cobraron de mas\b/,
+    /\bcobro (indebido|injusto|excesivo)\b/,
+    /\b(es un|esto es un) (abuso|robo)\b/,
+    /\b(estafa|estafando|estafaron)\b/,
+    /\b(osiptel|indecopi|libro de reclamaciones)\b/,
+    /\b(pesimo|malisimo|terrible) (servicio|atencion)\b/
+  ];
+
+  if (enDesacuerdo.some((patron) => patron.test(texto))) {
+    return 'CUSTOMER_DISAGREES';
   }
 
   return 'CLIENT_REQUEST';

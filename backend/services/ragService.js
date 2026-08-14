@@ -539,6 +539,49 @@ function extraerIdentificadorCliente(
 }
 
 
+/**
+ * Recorta un bloque de contexto por registros completos, nunca a medio texto.
+ *
+ * Con `slice(0, 1500)` el corte caía en cualquier carácter: podía dejar un
+ * "S/ 129" que en realidad era "S/ 129.90", o una fila de catálogo partida a
+ * la mitad. El modelo lee ese resto como un dato válido, y así una simple
+ * truncación se convierte en una cifra inventada.
+ *
+ * @param {string} texto
+ * @param {number} maxCaracteres
+ * @returns {string} Líneas enteras que caben, más un aviso si se recortó.
+ */
+function recortarPorRegistros(texto, maxCaracteres) {
+  const contenido = String(texto || '');
+
+  if (contenido.length <= maxCaracteres) {
+    return contenido;
+  }
+
+  const lineas = contenido.split('\n');
+  const conservadas = [];
+  let usados = 0;
+
+  for (const linea of lineas) {
+    // +1 por el salto de línea que se vuelve a unir.
+    if (usados + linea.length + 1 > maxCaracteres) {
+      break;
+    }
+    conservadas.push(linea);
+    usados += linea.length + 1;
+  }
+
+  if (conservadas.length === 0) {
+    // Ni una línea entera cabe: mejor no mandar nada que mandar un trozo.
+    return '(contexto omitido: no cabe ningún registro completo)';
+  }
+
+  const omitidas = lineas.length - conservadas.length;
+  conservadas.push(`(se omitieron ${omitidas} registros más por espacio)`);
+
+  return conservadas.join('\n');
+}
+
 const MESES = {
   enero: '01', febrero: '02', marzo: '03', abril: '04',
   mayo: '05', junio: '06', julio: '07', agosto: '08',
@@ -1414,12 +1457,12 @@ ${bloqueDeHechos ? construirBloqueParaPrompt(bloqueDeHechos) : 'No hay cliente i
 
 --- CATÁLOGO DE OFERTAS OFICIAL ---
 
-${(catalogoOfertasTexto || 'Catálogo no disponible.').slice(0, 1500)}
+${recortarPorRegistros(catalogoOfertasTexto || 'Catálogo no disponible.', 1500)}
 
 
 --- CONTEXTO DE ARCHIVOS DE DATA ---
 
-${(dataContextTexto || 'No hay archivos de datos disponibles para leer.').slice(0, 1500)}
+${recortarPorRegistros(dataContextTexto || 'No hay archivos de datos disponibles para leer.', 1500)}
 
 
 --- DATOS CRUZADOS DEL CLIENTE ---
@@ -1617,5 +1660,6 @@ module.exports = {
   procesarConsultaFactura,
   construirRespuestaFallback,
   resolverCicloPedido,
+  recortarPorRegistros,
   CICLO_FUERA_DE_RANGO
 };
