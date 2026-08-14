@@ -7,7 +7,7 @@ Esta carpeta es **solo local**. Los archivos entregados por Movistar no deben su
 Copia aquí, manteniendo exactamente estos nombres:
 
 - `PLANTA CLIENTES.csv`
-- `FACTURACION-CLIENTES_.csv`
+- `FACTURACION-CLIENTES.csv`
 - `Ordenes.csv` (también se acepta `Ordenes(1).csv` si Windows/navegador lo renombró al descargar)
 - `CATALOGO-OFERTAS.csv`
 - `BRAINY_DESCUENTOS_CUOTAS.csv`
@@ -48,7 +48,11 @@ npm run data:import:desafio1
 
 - Identificadores (`CUSTOMER_KEY`, `SUBSCRIBER_KEY`, cuentas, recibos, etc.) se guardan como texto.
 - Fechas se normalizan a `YYYY-MM-DD` y datetimes a `YYYY-MM-DD HH:MM:SS`.
-- El valor `00:00.0` de `PERIOD_START_DATE` / `PERIOD_END_DATE` se interpreta como dato no disponible (`NULL`), no como una fecha real.
+- `FACTURACION-CLIENTES.csv` v2 usa `,` como separador y corrige `PERIOD_START_DATE` / `PERIOD_END_DATE` para la mayoría de cargos.
+- En `FACTURACION-CLIENTES.csv`, `PERIOD_END_DATE = 2222-01-01` se interpreta como sentinel técnico de fin no aplicable y se normaliza a `NULL`; nunca se presenta como una fecha real.
+- `PRIMARY_RESOURCE_VALUE` se acepta como parte del layout v2 pero no se persiste ni se expone.
+- `SUBSCRIBER_KEY_1` se usa solo para validar que replique `SUBSCRIBER_KEY`; si difiere, la importación se detiene.
+- La versión v2 ya no incluye `DEUDA` ni `FECHA-VENCIMIENTO`. El prototipo no infiere estos datos a partir de importes, ciclos o periodos.
 - `PLANTA CLIENTES.ciclo` se guarda como día de ciclo (`billing_cycle_day`) porque los datos reales contienen valores como 5, 9, 15, 17, 23, etc.
 - Los tipos de renta `ADELANTADA` / `VENCIDA` y `RA` / `RV` se normalizan internamente a `RA` y `RV`.
 - `CATALOGO-OFERTAS.CHARGE CODE` **no se trata como clave única**: la entrega actual contiene códigos repetidos con distintas tarifas. Se conservan todas las filas para resolver esa ambigüedad en la Fase 2.

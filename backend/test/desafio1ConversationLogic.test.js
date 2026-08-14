@@ -8,6 +8,7 @@ const {
   classifyPersonalBillingIntents,
   needsBillingHistoryForIntents,
   buildGeneralBillingEducationReply,
+  buildSuspensionAdjustmentReply,
   buildPersonalBillingReply,
   buildPersonalBillingMultiReply
 } = require(
@@ -190,6 +191,47 @@ test(
   }
 );
 
+
+
+test(
+  'FACTURACION v2 distingue total del recibo de saldo pendiente al preguntar cuánto debo',
+  () => {
+    const result =
+      buildPersonalBillingReply(
+        {
+          currentBill: {
+            total: 62.89,
+            period:
+              'Ciclo 30/06/2026',
+            status:
+              'Estado no disponible'
+          },
+          financialExplanation: {
+            status: null,
+            coveragePercent: null
+          }
+        },
+        '¿Cuánto debo?'
+      );
+
+    assert.equal(
+      result.intent,
+      'CURRENT_TOTAL'
+    );
+    assert.match(
+      result.reply,
+      /total de tu recibo actual es S\/ 62\.89/i
+    );
+    assert.match(
+      result.reply,
+      /saldo pendiente verificable/i
+    );
+    assert.match(
+      result.reply,
+      /no puedo afirmar/i
+    );
+  }
+);
 
 test(
   'cuánto pago ahora también se reconoce como consulta personal natural',
@@ -946,6 +988,80 @@ test(
     assert.match(
       result.reply,
       /indique.*cu[aá]l cargo|qué cargo/i
+    );
+  }
+);
+
+
+test(
+  'Checkpoint 14B reconoce una consulta personal por días suspendidos',
+  () => {
+    assert.equal(
+      classifyPersonalBillingIntent(
+        '¿Me descontaron los días que estuve suspendido?'
+      ),
+      'SUSPENSION_ADJUSTMENT'
+    );
+
+    assert.equal(
+      requiresPersonalBillingAccess(
+        '¿Me descontaron los días que estuve suspendido?'
+      ),
+      true
+    );
+  }
+);
+
+test(
+  'Lucía presenta un ajuste de suspensión únicamente cuando llega como hallazgo verificado',
+  () => {
+    const experience = {
+      ...reconnectionExperience(),
+      findings: [
+        {
+          code: 'SUSPENSION_ADJUSTMENT',
+          description:
+            'Se verificó un ajuste de S/ 7.21 a tu favor por 3 días sin servicio.',
+          impact: 7.21,
+          evidenceLevel: 'HIGH'
+        }
+      ]
+    };
+
+    const result =
+      buildPersonalBillingReply(
+        experience,
+        '¿Me descontaron los días que estuve suspendido?'
+      );
+
+    assert.equal(
+      result.intent,
+      'SUSPENSION_ADJUSTMENT'
+    );
+    assert.match(result.reply, /S\/ 7\.21/i);
+    assert.match(result.reply, /3 días sin servicio/i);
+    assert.equal(
+      result.financialReasoningByLlm,
+      false
+    );
+  }
+);
+
+test(
+  'Lucía se abstiene de inferir un ajuste por suspensión desde un corte o reconexión aislados',
+  () => {
+    const reply =
+      buildSuspensionAdjustmentReply(
+        reconnectionExperience()
+      );
+
+    assert.match(
+      reply,
+      /no encontr[eé] un ajuste.*verificado/i
+    );
+    assert.match(
+      reply,
+      /no voy a inferirlo/i
     );
   }
 );

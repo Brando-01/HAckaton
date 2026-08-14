@@ -206,6 +206,30 @@ const CHECKS = [
       FROM d1_facturacion
     `,
     pass: () => true
+  },
+  {
+    key: 'facturacion_periodos_invertidos',
+    label: 'Filas de facturación con periodo de fin anterior al inicio',
+    severity: 'ERROR',
+    query: `
+      SELECT COUNT(*) AS value
+      FROM d1_facturacion
+      WHERE period_start_date IS NOT NULL
+        AND period_end_date IS NOT NULL
+        AND DATE(period_end_date) < DATE(period_start_date)
+    `,
+    pass: (value) => Number(value) === 0
+  },
+  {
+    key: 'facturacion_sentinel_periodo_persistido',
+    label: 'Sentinel 2222 persistido como fecha real de fin de periodo',
+    severity: 'ERROR',
+    query: `
+      SELECT COUNT(*) AS value
+      FROM d1_facturacion
+      WHERE period_end_date LIKE '2222-01-01%'
+    `,
+    pass: (value) => Number(value) === 0
   }
 ];
 

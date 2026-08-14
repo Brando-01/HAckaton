@@ -110,6 +110,21 @@ function normalizeDateTime(value) {
   return null;
 }
 
+function normalizeBillingPeriodEnd(value) {
+  const text = toText(value);
+
+  // FACTURACION v2 usa 2222-01-01 como sentinel técnico
+  // para cargos sin periodo de fin aplicable.
+  if (
+    text === null ||
+    /^2222-01-01(?:\s|$)/.test(text)
+  ) {
+    return null;
+  }
+
+  return normalizeDateTime(text);
+}
+
 function normalizeRentType(value) {
   const text = toText(value);
   if (text === null) return null;
@@ -132,6 +147,8 @@ function normalizeByType(type, rawValue) {
       return normalizeDate(rawValue);
     case 'datetime':
       return normalizeDateTime(rawValue);
+    case 'billingPeriodEnd':
+      return normalizeBillingPeriodEnd(rawValue);
     case 'rentType':
       return normalizeRentType(rawValue);
     default:
@@ -143,8 +160,40 @@ function shouldCountParseWarning(type, rawValue, normalizedValue) {
   const raw = toText(rawValue);
   if (raw === null) return false;
   if ((type === 'date' || type === 'datetime') && raw === '00:00.0') return false;
+  if (
+    type === 'billingPeriodEnd' &&
+    /^2222-01-01(?:\s|$)/.test(raw)
+  ) return false;
   if (type === 'text') return false;
   return normalizedValue === null;
+}
+
+
+function validateConsistencyChecks(row, checks = []) {
+  const errors = [];
+
+  for (const check of checks) {
+    const left = toText(row?.[check.left]);
+    const right = toText(row?.[check.right]);
+
+    if (check.required && (left === null || right === null)) {
+      errors.push(
+        `${check.label || `${check.left}/${check.right}`} requiere ambos valores`
+      );
+      continue;
+    }
+
+    if (left !== right) {
+      errors.push(
+        `${check.label || `${check.left}/${check.right}`} no coincide`
+      );
+    }
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors
+  };
 }
 
 function validateHeaders(actualHeaders, expectedHeaders) {
@@ -181,9 +230,11 @@ module.exports = {
   toNumber,
   normalizeDate,
   normalizeDateTime,
+  normalizeBillingPeriodEnd,
   normalizeRentType,
   normalizeByType,
   shouldCountParseWarning,
+  validateConsistencyChecks,
   validateHeaders,
   sha256File
 };

@@ -16,7 +16,9 @@ const SCENARIO_LABELS =
     PLAN_CHANGE:
       'Cambio de plan',
     PACKAGES:
-      'Paquetes adicionales'
+      'Paquetes adicionales',
+    SUSPENSION_ADJUSTMENT:
+      'Ajuste por suspensión'
   });
 
 const CAPABILITIES =

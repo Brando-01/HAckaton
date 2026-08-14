@@ -447,7 +447,7 @@ test(
 );
 
 test(
-  'la fecha de vencimiento se omite en Fase 5 por la inconsistencia conocida del dataset',
+  'la fecha de vencimiento permanece no disponible y no se infiere en FACTURACION v2',
   () => {
     const experience =
       buildOfficialDemoExperience({
@@ -625,6 +625,113 @@ test(
       historical.billingHistory
         .availableBills,
       3
+    );
+  }
+);
+
+test(
+  'FACTURACION v2 deja deuda y vencimiento como no disponibles sin inferirlos',
+  () => {
+    const explanation =
+      reconnectionExplanation();
+
+    delete explanation.currentBill
+      .debtStatuses;
+    delete explanation.previousBill
+      .debtStatuses;
+
+    const experience =
+      buildOfficialDemoExperience({
+        user: {
+          customerId: 'CLI000001',
+          name: 'Carlos Mendoza'
+        },
+        binding: {
+          scenario: 'RECONNECTION',
+          scenarioLabel: 'Reconexión'
+        },
+        explanation
+      });
+
+    assert.equal(
+      experience.currentBill.status,
+      'Estado no disponible'
+    );
+    assert.equal(
+      experience.currentBill.dueDate,
+      null
+    );
+    assert.equal(
+      experience.previousBill.status,
+      'Estado no disponible'
+    );
+    assert.equal(
+      experience.previousBill.dueDate,
+      null
+    );
+  }
+);
+
+test(
+  'Checkpoint 14B publica el ajuste de suspensión verificado como hallazgo seguro',
+  () => {
+    const explanation =
+      reconnectionExplanation();
+
+    explanation.interpretation
+      .currentBillFindings = [
+        {
+          code: 'SUSPENSION_ADJUSTMENT',
+          label: 'Ajuste por suspensión',
+          amount: 7.21,
+          suspendedDays: 3,
+          periodStartDate: '2026-05-05',
+          periodEndDate: '2026-05-07',
+          chargeCode: 'PLAN_RA',
+          evidenceLevel: 'HIGH',
+          causalImpact: false
+        }
+      ];
+
+    const experience =
+      buildOfficialDemoExperience({
+        user: {
+          customerId: 'CLI000001',
+          name: 'Carlos Mendoza'
+        },
+        binding: {
+          scenario: 'RECONNECTION',
+          scenarioLabel: 'Reconexión'
+        },
+        explanation
+      });
+
+    const finding =
+      experience.findings.find(
+        (item) =>
+          item.code ===
+          'SUSPENSION_ADJUSTMENT'
+      );
+
+    assert.ok(finding);
+    assert.equal(
+      finding.impactPresentation,
+      'VERIFIED_CREDIT_CONTEXT'
+    );
+    assert.equal(
+      finding.evidenceLevel,
+      'HIGH'
+    );
+    assert.match(
+      finding.description,
+      /3 días sin servicio/i
+    );
+
+    const serialized =
+      JSON.stringify(experience);
+    assert.doesNotMatch(
+      serialized,
+      /SECRET_SUBSCRIBER|SECRET_CUSTOMER/
     );
   }
 );

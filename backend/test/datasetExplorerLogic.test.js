@@ -209,3 +209,25 @@ test(
     );
   }
 );
+
+test(
+  'Checkpoint 14B permite filtrar perfiles con ajuste de suspensión verificado',
+  () => {
+    const query =
+      normalizeExplorerQuery({
+        scenario:
+          'suspension_adjustment'
+      });
+
+    assert.equal(
+      query.scenario,
+      'SUSPENSION_ADJUSTMENT'
+    );
+    assert.equal(
+      getScenarioLabel(
+        'SUSPENSION_ADJUSTMENT'
+      ),
+      'Ajuste por suspensión'
+    );
+  }
+);

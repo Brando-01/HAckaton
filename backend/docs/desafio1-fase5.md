@@ -1,5 +1,8 @@
 # Desafío 1 · Fase 5 · Integración de casos oficiales con Mi Movistar y Lucía
 
+> **Actualización posterior:** este documento conserva la decisión tomada con la primera entrega de FACTURACION. El Checkpoint 14A migra a `FACTURACION-CLIENTES.csv` v2: los periodos fueron corregidos y `DEUDA` / `FECHA-VENCIMIENTO` ya no forman parte de la fuente. La política vigente está documentada en `desafio1-checkpoint14a-facturacion-v2.md`.
+
+
 ## Objetivo
 
 Conectar las Fases 1–4 con la experiencia visible del prototipo sin crear cuentas para los 20 000 registros del dataset y sin publicar identificadores oficiales en Git.

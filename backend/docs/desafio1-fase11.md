@@ -11,7 +11,7 @@ No se fuerza que cada CSV produzca una causa visible en Lucía. Una fuente puede
 ## Las ocho fuentes tienen un rol explícito
 
 1. **PLANTA CLIENTES**: perfil del servicio, ciclo, fecha de activación, tipo de servicio y ancla de suscripción.
-2. **FACTURACION-CLIENTES**: recibos, conceptos, importes, deuda, producto y comparación entre ciclos.
+2. **FACTURACION-CLIENTES**: recibos, conceptos, importes, periodos de cargo, producto y comparación entre ciclos. La versión v2 ya no entrega `DEUDA` ni `FECHA-VENCIMIENTO`.
 3. **ORDENES**: eventos del servicio y evidencia de cambio de plan/suspensión.
 4. **CATALOGO-OFERTAS**: referencia de códigos, tarifa y tipo de renta.
 5. **DESCUENTOS Y CUOTAS**: evidencia de promociones y descuentos.
@@ -24,7 +24,9 @@ No se fuerza que cada CSV produzca una causa visible en Lucía. Una fuente puede
 - **Cruce canónico por suscripción**: `PLANTA.NUM_ANEXO` representa el subscriber y debe relacionarse con `SUBSCRIBER_KEY` en las fuentes que lo contienen. `COD_CLIENTE` puede agrupar varias suscripciones y por ello no debe usarse como llave principal para reconstruir un único servicio.
 - **Ciclo de PLANTA**: valores como 5, 9, 15 o 17 representan el día del ciclo/cierre.
 - **Producto**: `CHARGE_CODE_DESC` contiene la información del producto/concepto facturado. La interfaz puede limpiar un precio redundante para presentación, conservando el valor fuente y tomando el importe estructurado como monto visual.
-- **`PERIOD_START_DATE` / `PERIOD_END_DATE`**: el líder confirmó una incidencia en la entrega actual que será revisada. El prototipo no inventa esos periodos mientras la fuente no sea utilizable.
+- **`PERIOD_START_DATE` / `PERIOD_END_DATE`**: la versión corregida de `FACTURACION-CLIENTES.csv` reemplaza la entrega defectuosa y aporta periodos utilizables en la mayoría de cargos. `2222-01-01` se interpreta como sentinel técnico de “fin no aplicable” y se normaliza a `NULL`.
+- **Estado de deuda y vencimiento**: `FACTURACION-CLIENTES.csv` v2 ya no incluye `DEUDA` ni `FECHA-VENCIMIENTO`. El prototipo no deriva esos datos a partir del total, del ciclo ni de otros campos. Cuando el usuario pregunta por deuda, se abstiene si no existe otra fuente verificable.
+- **Duplicado de suscripción**: `SUBSCRIBER_KEY_1` se usa únicamente como control de consistencia durante la importación. Debe coincidir con `SUBSCRIBER_KEY` y no se persiste en SQLite ni se expone al frontend.
 - **Arquitectura financiera**: la elección entre SQL/reglas y RAG queda a criterio del equipo. El prototipo mantiene SQL + reglas deterministas para dinero/evidencia y reserva la IA para comprensión y conversación cuando corresponde.
 
 ## Escenarios consolidados
@@ -71,3 +73,9 @@ GET /api/demo/data-coverage
 ```
 
 Esto permite enseñar al comité que **8/8 fuentes están integradas** sin afirmar falsamente que todos los escenarios ya están completamente resueltos.
+
+## Revalidación posterior · Checkpoint 14B
+
+Con `FACTURACION-CLIENTES.csv` v2 y sus periodos corregidos se pudo resolver de forma segura **un subconjunto** del antiguo pendiente de suspensión. Para renta adelantada, una nota negativa `CRD` se reconoce como crédito por días suspendidos únicamente si su periodo coincide exactamente con corte → día anterior a reconexión y su monto reconcilia proporcionalmente contra `CHARGE_NET_AMOUNT` del periodo facturado.
+
+Esta capacidad se publica como `SUSPENSION_ADJUSTMENT` con evidencia alta y `causalImpact = false`. No se suma al delta mensual. La semántica general de las notas continúa como contexto y equipo financiado permanece pendiente de mapeo.

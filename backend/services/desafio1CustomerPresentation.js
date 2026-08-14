@@ -204,6 +204,40 @@ function activeDiscountCustomerDescription(finding) {
     : `Tienes un descuento de ${amount} aplicado en este recibo.`;
 }
 
+function suspensionAdjustmentCustomerDescription(
+  finding
+) {
+  const amount = formatMoney(
+    finding?.amount
+  );
+
+  const start = formatDateEs(
+    finding?.periodStartDate
+  );
+  const end = formatDateEs(
+    finding?.periodEndDate
+  );
+
+  const period =
+    start && end
+      ? ` del ${start} al ${end}`
+      : '';
+
+  const days = Number(
+    finding?.suspendedDays
+  );
+  const daysText =
+    Number.isInteger(days) &&
+    days > 0
+      ? ` por ${days} día${days === 1 ? '' : 's'} sin servicio`
+      : '';
+
+  return (
+    `Se verificó un ajuste de ${amount} a tu favor${daysText}${period}. ` +
+    'El periodo coincide con el corte y termina el día anterior a la reconexión. Este ajuste se presenta como información verificada y no se suma nuevamente al total del recibo.'
+  );
+}
+
 function buildCustomerCauseDescription(cause) {
   switch (cause?.code) {
     case 'RECONNECTION':
@@ -261,6 +295,11 @@ function buildCustomerFindingDescription(
         finding
       );
 
+    case 'SUSPENSION_ADJUSTMENT':
+      return suspensionAdjustmentCustomerDescription(
+        finding
+      );
+
     default:
       return sanitizeInternalTerms(
         finding?.explanation
@@ -275,6 +314,13 @@ function getImpactPresentation(item) {
 
   if (item?.code === 'ACTIVE_DISCOUNT') {
     return 'APPLIED_TO_TOTAL';
+  }
+
+  if (
+    item?.code ===
+      'SUSPENSION_ADJUSTMENT'
+  ) {
+    return 'VERIFIED_CREDIT_CONTEXT';
   }
 
   return 'VARIATION';
@@ -309,6 +355,11 @@ function buildVerification(item) {
     ACTIVE_DISCOUNT: [
       'Facturación',
       'Registro de promociones'
+    ],
+    SUSPENSION_ADJUSTMENT: [
+      'Facturación',
+      'Registro de notas',
+      'Registro de reconexión'
     ]
   };
 
@@ -425,6 +476,7 @@ module.exports = {
   formatDateEs,
   sanitizeInternalTerms,
   packageCustomerDescription,
+  suspensionAdjustmentCustomerDescription,
   buildCustomerCauseDescription,
   buildCustomerFindingDescription,
   getImpactPresentation,

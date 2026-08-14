@@ -483,3 +483,38 @@ test(
     );
   }
 );
+
+test(
+  'FACTURACION v2 se abstiene de inventar deuda cuando el estado ya no viene en la fuente',
+  () => {
+    const updatedExperience =
+      experience();
+
+    updatedExperience.currentBill = {
+      ...updatedExperience.currentBill,
+      status:
+        'Estado no disponible'
+    };
+
+    const reply =
+      buildCustomerProfileReply({
+        intent: 'DEBT_STATUS',
+        profile: profile(),
+        experience:
+          updatedExperience
+      });
+
+    assert.match(
+      reply,
+      /no tengo información verificable sobre tu estado de deuda/i
+    );
+    assert.match(
+      reply,
+      /no puedo confirmar/i
+    );
+    assert.doesNotMatch(
+      reply,
+      /sin deuda|pendiente/i
+    );
+  }
+);

@@ -360,6 +360,67 @@ function getPlanDisplay(experience) {
   );
 }
 
+function getDebtStatusPresentation(experience) {
+  const bill =
+    experience?.currentBill;
+
+  if (!bill) {
+    return {
+      available: false,
+      hasBill: false,
+      status: null
+    };
+  }
+
+  const status =
+    String(
+      bill.status || ''
+    ).trim();
+
+  const normalized =
+    normalizeText(status);
+
+  if (
+    !status ||
+    normalized ===
+      'estado no disponible'
+  ) {
+    return {
+      available: false,
+      hasBill: true,
+      status: null
+    };
+  }
+
+  return {
+    available: true,
+    hasBill: true,
+    status
+  };
+}
+
+function buildDebtStatusReply(
+  experience,
+  { concise = false } = {}
+) {
+  const debt =
+    getDebtStatusPresentation(
+      experience
+    );
+
+  if (!debt.hasBill) {
+    return 'No tengo un recibo actual disponible para consultar el estado de deuda.';
+  }
+
+  if (!debt.available) {
+    return concise
+      ? 'No tengo un estado de deuda verificable disponible, así que no puedo afirmar si tienes deuda.'
+      : 'No tengo información verificable sobre tu estado de deuda en este momento. Para no darte un dato incorrecto, no puedo confirmar si tienes deuda ni si estás al día.';
+  }
+
+  return `Tu recibo actual figura como ${debt.status.toLowerCase()}.`;
+}
+
 function serviceTypeLabel(lobType) {
   const code = String(
     lobType || ''
@@ -456,7 +517,18 @@ function buildProfileSummary({
 
   if (bill) {
     lines.push(
-      `• Recibo actual: ${formatMoney(bill.total)} · ${bill.status || 'estado no disponible'}`
+      `• Recibo actual: ${formatMoney(bill.total)}`
+    );
+
+    const debt =
+      getDebtStatusPresentation(
+        experience
+      );
+
+    lines.push(
+      debt.available
+        ? `• Estado de deuda: ${debt.status}`
+        : '• Estado de deuda: no disponible para verificación'
     );
   }
 
@@ -513,9 +585,10 @@ function buildCustomerProfileReply({
       return `El plan que aparece en tu recibo actual es “${getPlanDisplay(experience)}”.`;
 
     case 'DEBT_STATUS':
-      return experience?.currentBill
-        ? `Tu recibo actual figura como ${String(experience.currentBill.status || 'estado no disponible').toLowerCase()}.`
-        : 'No tengo un recibo actual disponible para consultar el estado de deuda.';
+      return buildDebtStatusReply(
+        experience,
+        { concise }
+      );
 
     case 'CURRENT_CHARGES': {
       const charges =
@@ -695,9 +768,10 @@ function buildCustomerProfileRepairReply({
 
   if (debtRequested) {
     sentences.push(
-      bill
-        ? `Actualmente figuras ${String(bill.status || 'con estado no disponible').toLowerCase()}.`
-        : 'No tengo un recibo actual para consultar tu estado de deuda.'
+      buildDebtStatusReply(
+        experience,
+        { concise: true }
+      )
     );
   }
 

@@ -279,10 +279,8 @@ function transformBill(invoice) {
       Number(invoice.total) || 0,
     status:
       deriveBillStatus(invoice),
-    // El dataset no permite asumir que FECHA-VENCIMIENTO
-    // sea coherente con ciclo como una fecha de emisión.
-    // No la mostramos en esta integración hasta tener
-    // una regla de negocio confirmada.
+    // FACTURACION v2 ya no entrega FECHA-VENCIMIENTO.
+    // No se infiere a partir del ciclo ni de los periodos del cargo.
     dueDate: null,
     items:
       visibleInvoiceItems(
@@ -358,7 +356,8 @@ function buildOfficialDemoExperience({
         (finding) =>
           [
             'PRORATION',
-            'ACTIVE_DISCOUNT'
+            'ACTIVE_DISCOUNT',
+            'SUSPENSION_ADJUSTMENT'
           ].includes(
             finding.code
           )

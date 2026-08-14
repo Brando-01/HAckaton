@@ -16,7 +16,7 @@ La ventana está limitada a:
 - hasta 5 recibos previos.
 - máximo 6 recibos en total.
 
-`PERIOD_START_DATE` y `PERIOD_END_DATE` continúan fuera del razonamiento porque la entrega actual contiene la incidencia confirmada. Para ordenar el histórico se utiliza el ciclo disponible de FACTURACION, sin presentarlo como fecha de emisión.
+`FACTURACION-CLIENTES.csv` v2 corrige `PERIOD_START_DATE` y `PERIOD_END_DATE` para la mayoría de cargos. La migración los conserva como evidencia estructurada y normaliza `2222-01-01` a dato no disponible. Sin embargo, Fase 14 **no cambia su regla de ordenamiento ni convierte periodos en causas**: el histórico sigue ordenándose por `ciclo` y los periodos se reservan para auditorías posteriores de negocio.
 
 ## Capacidades nuevas
 
@@ -65,3 +65,7 @@ No se exponen:
 ## Límite de interpretación
 
 La Fase 14 calcula tendencias, máximos, mínimos, diferencias y recurrencia. No convierte correlaciones históricas en causas. Las causas financieras siguen perteneciendo al motor causal verificado de Fases 3 y 13.
+
+## Continuación posterior · Checkpoint 14B
+
+Los periodos corregidos que Fase 14 conservó sin reinterpretar se reutilizan en Checkpoint 14B para una regla determinista de crédito por días suspendidos en renta adelantada. Esta extensión no modifica la ventana histórica ni convierte el histórico en razonamiento causal: el ajuste se publica como hallazgo verificable separado y no altera la suma de causas del cambio entre recibos.

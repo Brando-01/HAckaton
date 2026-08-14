@@ -44,12 +44,12 @@ function fakeValueForSql(sql) {
     normalized.includes(
       'period_start_date is not null'
     )
-  ) return 0;
+  ) return 95.23;
   if (
     normalized.includes(
       'period_end_date is not null'
     )
-  ) return 0;
+  ) return 95.23;
   if (
     normalized.includes(
       'd1_catalogo_ofertas c'
@@ -135,6 +135,14 @@ test(
     assert.equal(
       report.diagnostics.facturationSubscribers,
       18450
+    );
+    assert.equal(
+      report.diagnostics.periodStartAvailabilityPct,
+      95.23
+    );
+    assert.equal(
+      report.diagnostics.periodEndAvailabilityPct,
+      95.23
     );
     assert.doesNotMatch(
       JSON.stringify(report),

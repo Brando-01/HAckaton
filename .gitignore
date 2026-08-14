@@ -33,6 +33,7 @@ Thumbs.db
 # Nombres de archivos entregados por Movistar: evitar commits accidentales
 PLANTA CLIENTES.csv
 FACTURACION-CLIENTES_.csv
+FACTURACION-CLIENTES.csv
 REGISTROS_CLIENTES_20MIL.csv
 Cargos_FacturadosV2.csv
 Ordenes.csv

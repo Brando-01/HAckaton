@@ -1551,7 +1551,7 @@ function createApp(options = {}) {
                 profile:
                   'PLANTA CLIENTES.csv',
                 billing:
-                  'FACTURACION-CLIENTES_.csv',
+                  'FACTURACION-CLIENTES.csv',
                 generatedByLlm: false
               }
             });

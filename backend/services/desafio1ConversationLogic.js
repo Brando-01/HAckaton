@@ -465,6 +465,38 @@ function classifyPersonalBillingIntents(
     add('DISCOUNT');
   }
 
+  const suspensionAdjustmentQuestion =
+    hasAny(
+      text,
+      [
+        'suspension',
+        'suspendido',
+        'suspendida',
+        'dias sin servicio',
+        'dia sin servicio',
+        'nota de credito',
+        'ajuste por corte'
+      ]
+    ) &&
+    hasAny(
+      text,
+      [
+        'ajuste',
+        'descuento',
+        'devolv',
+        'credito',
+        'recibo',
+        'factura',
+        'cobr',
+        'dias',
+        'servicio'
+      ]
+    );
+
+  if (suspensionAdjustmentQuestion) {
+    add('SUSPENSION_ADJUSTMENT');
+  }
+
   const mentionsPackage =
     hasAny(
       text,
@@ -681,8 +713,28 @@ function buildVariationReply(
   return lines.join('\n\n');
 }
 
+function isOutstandingDebtQuestion(
+  message
+) {
+  const text =
+    normalizeText(message);
+
+  return hasAny(
+    text,
+    [
+      'cuanto debo',
+      'deuda pendiente',
+      'saldo pendiente',
+      'cuanto me falta pagar'
+    ]
+  );
+}
+
 function buildCurrentTotalReply(
-  experience
+  experience,
+  {
+    debtQuestion = false
+  } = {}
 ) {
   const bill =
     experience?.currentBill;
@@ -690,6 +742,13 @@ function buildCurrentTotalReply(
   if (!bill) {
     return (
       'No tengo un recibo actual disponible para este perfil demo.'
+    );
+  }
+
+  if (debtQuestion) {
+    return (
+      `El total de tu recibo actual es ${formatMoney(bill.total)} y corresponde a ${bill.period}. ` +
+      'No tengo un saldo pendiente verificable separado del total del recibo, así que no puedo afirmar que ese importe sea exactamente lo que adeudas.'
     );
   }
 
@@ -826,6 +885,26 @@ function buildPackageReply(
 
   return sanitizeInternalTerms(
     cause.description
+  );
+}
+
+function buildSuspensionAdjustmentReply(
+  experience
+) {
+  const finding =
+    findFinding(
+      experience,
+      'SUSPENSION_ADJUSTMENT'
+    );
+
+  if (!finding) {
+    return (
+      'No encontré un ajuste por días de suspensión verificado en el recibo actual de este perfil. No voy a inferirlo solo porque exista un corte o una reconexión.'
+    );
+  }
+
+  return sanitizeInternalTerms(
+    finding.description
   );
 }
 
@@ -1211,16 +1290,32 @@ function buildPersonalBillingReplyForIntent(
     case 'CURRENT_TOTAL': {
       if (!concise) {
         return buildCurrentTotalReply(
-          experience
+          experience,
+          {
+            debtQuestion:
+              isOutstandingDebtQuestion(
+                message
+              )
+          }
         );
       }
 
       const bill =
         experience?.currentBill;
 
-      return bill
-        ? `Recibo actual: ${formatMoney(bill.total)}${bill.status ? ` · ${bill.status}` : ''}.`
-        : 'No tengo un recibo actual disponible.';
+      if (!bill) {
+        return 'No tengo un recibo actual disponible.';
+      }
+
+      if (
+        isOutstandingDebtQuestion(
+          message
+        )
+      ) {
+        return `Recibo actual: ${formatMoney(bill.total)}. No tengo un saldo pendiente verificable separado del total.`;
+      }
+
+      return `Recibo actual: ${formatMoney(bill.total)}${bill.status && bill.status !== 'Estado no disponible' ? ` · ${bill.status}` : ''}.`;
     }
 
     case 'PREVIOUS_BILL': {
@@ -1274,6 +1369,11 @@ function buildPersonalBillingReplyForIntent(
 
     case 'PACKAGE_CHARGE':
       return buildPackageReply(
+        experience
+      );
+
+    case 'SUSPENSION_ADJUSTMENT':
+      return buildSuspensionAdjustmentReply(
         experience
       );
 
@@ -1501,6 +1601,7 @@ module.exports = {
   buildLatestIncreaseReply,
   buildChargeRecurrenceReply,
   buildPackageReply,
+  buildSuspensionAdjustmentReply,
   buildPersonalBillingReply,
   buildPersonalBillingReplyForIntent,
   buildPersonalBillingMultiReply,

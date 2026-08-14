@@ -37,6 +37,7 @@ async function collectScenarioMappingDiagnostics(
     additionalPatterns,
     suspensionSummary,
     suspensionNearby,
+    suspensionVerifiedCredits,
     noteSummary,
     noteMatches
   ] = await Promise.all([
@@ -509,6 +510,123 @@ async function collectScenarioMappingDiagnostics(
     numericRow(
       repository,
       `
+        WITH unambiguous_ra_codes AS (
+          SELECT charge_code
+          FROM d1_catalogo_ofertas
+          WHERE rent_type IS NOT NULL
+          GROUP BY charge_code
+          HAVING COUNT(DISTINCT rent_type) = 1
+             AND MAX(rent_type) = 'RA'
+        ),
+        reconnection_windows AS (
+          SELECT DISTINCT
+            f.subscriber_key AS subscriber_key,
+            r.billing_arrangement AS billing_arrangement,
+            f.billing_cycle_date AS billing_cycle_date,
+            r.cut_date AS cut_date,
+            r.reconnection_date AS reconnection_date
+          FROM d1_reconexiones r
+          INNER JOIN d1_facturacion f
+            ON f.legal_invoice_number = r.invoice_number
+           AND f.billing_arrangement_key = r.billing_arrangement
+          WHERE r.cut_date IS NOT NULL
+            AND r.reconnection_date IS NOT NULL
+            AND DATE(r.reconnection_date) > DATE(r.cut_date)
+        ),
+        timeline_notes AS (
+          SELECT DISTINCT
+            n.service_receiver_id AS subscriber_key,
+            n.billing_arrangement AS billing_arrangement,
+            n.charge_code AS charge_code,
+            n.cancel_charge_type AS cancel_charge_type,
+            n.amount AS amount,
+            n.period_start_date AS period_start_date,
+            n.period_end_date AS period_end_date,
+            n.billing_cycle_date AS billing_cycle_date
+          FROM d1_notas_credito n
+          INNER JOIN reconnection_windows w
+            ON w.subscriber_key = n.service_receiver_id
+           AND w.billing_arrangement = n.billing_arrangement
+           AND w.billing_cycle_date = n.billing_cycle_date
+          WHERE n.amount < 0
+            AND UPPER(COALESCE(n.cancel_charge_type, '')) = 'CRD'
+            AND DATE(n.period_start_date) = DATE(w.cut_date)
+            AND DATE(n.period_end_date) = DATE(w.reconnection_date, '-1 day')
+        ),
+        ra_notes AS (
+          SELECT t.*
+          FROM timeline_notes t
+          INNER JOIN unambiguous_ra_codes ra
+            ON ra.charge_code = t.charge_code
+        ),
+        verified AS (
+          SELECT DISTINCT
+            t.subscriber_key,
+            t.billing_arrangement,
+            t.charge_code,
+            t.cancel_charge_type,
+            t.amount,
+            t.period_start_date,
+            t.period_end_date,
+            t.billing_cycle_date
+          FROM ra_notes t
+          INNER JOIN d1_facturacion f
+            ON f.subscriber_key = t.subscriber_key
+           AND f.charge_code_id = t.charge_code
+          WHERE f.period_start_date IS NOT NULL
+            AND f.period_end_date IS NOT NULL
+            AND f.billing_cycle_date = (
+              SELECT MAX(f_previous.billing_cycle_date)
+              FROM d1_facturacion f_previous
+              WHERE f_previous.subscriber_key = t.subscriber_key
+                AND f_previous.billing_cycle_date < t.billing_cycle_date
+            )
+            AND DATE(t.period_start_date) >= DATE(f.period_start_date)
+            AND DATE(t.period_end_date) <= DATE(f.period_end_date)
+            AND f.charge_net_amount > 0
+            AND ABS(
+              ROUND(ABS(t.amount), 2) -
+              ROUND(
+                ABS(f.charge_net_amount) *
+                (
+                  julianday(t.period_end_date) -
+                  julianday(t.period_start_date) + 1
+                ) /
+                (
+                  julianday(f.period_end_date) -
+                  julianday(f.period_start_date) + 1
+                ),
+                2
+              )
+            ) < 0.011
+        )
+        SELECT
+          (
+            SELECT COUNT(*)
+            FROM timeline_notes
+          ) AS suspensionExactTimelineNegativeNoteRows,
+          (
+            SELECT COUNT(*)
+            FROM ra_notes
+          ) AS suspensionRaCreditCandidateRows,
+          (
+            SELECT COUNT(*)
+            FROM verified
+          ) AS suspensionVerifiedCreditRows,
+          (
+            SELECT COUNT(DISTINCT subscriber_key)
+            FROM verified
+          ) AS suspensionVerifiedCreditSubscribers,
+          (
+            SELECT COUNT(*) FROM ra_notes
+          ) - (
+            SELECT COUNT(*) FROM verified
+          ) AS suspensionUnreconciledRaRows
+      `
+    ),
+    numericRow(
+      repository,
+      `
         SELECT
           COUNT(*) AS adjustmentNoteRows,
           SUM(
@@ -609,6 +727,7 @@ async function collectScenarioMappingDiagnostics(
       additionalPatterns,
     ...suspensionSummary,
     ...suspensionNearby,
+    ...suspensionVerifiedCredits,
     ...noteSummary,
     ...noteMatches
   };

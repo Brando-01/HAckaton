@@ -8,6 +8,7 @@ const {
   normalizeHeader,
   normalizeByType,
   shouldCountParseWarning,
+  validateConsistencyChecks,
   validateHeaders,
   sha256File
 } = require('./desafio1/importUtils');
@@ -77,10 +78,25 @@ function getInsertSql(dataset) {
 }
 
 function expectedHeaders(dataset) {
-  return dataset.columns.map((column) => column.source);
+  return [
+    ...dataset.columns.map((column) => column.source),
+    ...(dataset.ignoredHeaders || [])
+  ];
 }
 
 function mapRow(dataset, row, sourceRow, warningCounter) {
+  const consistency =
+    validateConsistencyChecks(
+      row,
+      dataset.consistencyChecks || []
+    );
+
+  if (!consistency.ok) {
+    throw new Error(
+      consistency.errors.join('; ')
+    );
+  }
+
   const mapped = dataset.columns.map((column) => {
     const rawValue = row[column.source];
     const normalized = normalizeByType(column.type, rawValue);

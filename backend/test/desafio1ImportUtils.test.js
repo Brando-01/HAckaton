@@ -7,8 +7,10 @@ const {
   toNumber,
   normalizeDate,
   normalizeDateTime,
+  normalizeBillingPeriodEnd,
   normalizeRentType,
   shouldCountParseWarning,
+  validateConsistencyChecks,
   validateHeaders
 } = require('../scripts/desafio1/importUtils');
 
@@ -68,4 +70,67 @@ test('detecta cambios de estructura del CSV', () => {
   assert.equal(result.ok, false);
   assert.deepEqual(result.missing, ['D']);
   assert.deepEqual(result.unexpected, ['C']);
+});
+
+test('FACTURACION v2 trata 2222-01-01 como sentinel y no como fecha real', () => {
+  assert.equal(
+    normalizeBillingPeriodEnd('2222-01-01'),
+    null
+  );
+  assert.equal(
+    shouldCountParseWarning(
+      'billingPeriodEnd',
+      '2222-01-01',
+      null
+    ),
+    false
+  );
+  assert.equal(
+    normalizeBillingPeriodEnd('2222-01-01 00:00:00'),
+    null
+  );
+  assert.equal(
+    normalizeBillingPeriodEnd('2026-06-30'),
+    '2026-06-30 00:00:00'
+  );
+});
+
+test('FACTURACION v2 valida que SUBSCRIBER_KEY_1 replique la llave canónica', () => {
+  const checks = [
+    {
+      left: 'SUBSCRIBER_KEY',
+      right: 'SUBSCRIBER_KEY_1',
+      required: true,
+      label: 'SUBSCRIBER_KEY duplicado'
+    }
+  ];
+
+  assert.deepEqual(
+    validateConsistencyChecks(
+      {
+        SUBSCRIBER_KEY: '123',
+        SUBSCRIBER_KEY_1: '123'
+      },
+      checks
+    ),
+    {
+      ok: true,
+      errors: []
+    }
+  );
+
+  const mismatch =
+    validateConsistencyChecks(
+      {
+        SUBSCRIBER_KEY: '123',
+        SUBSCRIBER_KEY_1: '456'
+      },
+      checks
+    );
+
+  assert.equal(mismatch.ok, false);
+  assert.match(
+    mismatch.errors[0],
+    /no coincide/i
+  );
 });

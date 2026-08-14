@@ -157,7 +157,7 @@ test(
     );
     assert.match(
       suspension.rationale,
-      /no demuestra por sí sola/i
+      /sin una nota negativa|no se afirma/i
     );
   }
 );
@@ -198,6 +198,89 @@ test(
     assert.equal(
       notes.canPromoteToCause,
       false
+    );
+  }
+);
+
+
+test(
+  'Checkpoint 14B mapea suspensión con confianza HIGH sin convertir el crédito en causa del delta',
+  () => {
+    const report =
+      buildScenarioMappingReport({
+        suspensionOrderRows: 16379,
+        suspensionSubscribers: 6800,
+        explicitSuspensionChargeRows: 0,
+        suspensionNearbyProportionalInvoices: 9898,
+        suspensionExactTimelineNegativeNoteRows: 793,
+        suspensionRaCreditCandidateRows: 731,
+        suspensionVerifiedCreditRows: 678,
+        suspensionVerifiedCreditSubscribers: 523,
+        suspensionUnreconciledRaRows: 53,
+        adjustmentNoteRows: 8861,
+        adjustmentCrdRows: 8154,
+        adjustmentDscRows: 707,
+        adjustmentCrdNegativeRows: 8154,
+        adjustmentDscPositiveRows: 707,
+        adjustmentMatchedSubscriberCodeRows: 8861,
+        adjustmentMatchedSameCycleRows: 7335
+      });
+
+    const suspension =
+      report.mappings.find(
+        (mapping) =>
+          mapping.id ===
+          'SUSPENSION_ADJUSTMENT'
+      );
+    const notes =
+      report.mappings.find(
+        (mapping) =>
+          mapping.id ===
+          'ADJUSTMENT_NOTES'
+      );
+
+    assert.equal(suspension.status, 'MAPPED');
+    assert.equal(suspension.confidence, 'HIGH');
+    assert.equal(
+      suspension.canPromoteToCause,
+      false
+    );
+    assert.equal(
+      suspension.evidence.verifiedCreditRows,
+      678
+    );
+    assert.equal(
+      suspension.evidence.verifiedCreditSubscribers,
+      523
+    );
+    assert.equal(
+      suspension.evidence.unreconciledRaRows,
+      53
+    );
+    assert.match(
+      suspension.rationale,
+      /hallazgo/i
+    );
+
+    assert.equal(
+      notes.status,
+      'SEMANTICS_PENDING'
+    );
+    assert.equal(
+      notes.evidence.verifiedSuspensionCreditRows,
+      678
+    );
+    assert.match(
+      notes.rationale,
+      /subconjunto/i
+    );
+    assert.equal(
+      report.summary.mapped,
+      1
+    );
+    assert.equal(
+      report.summary.promotableNow,
+      0
     );
   }
 );

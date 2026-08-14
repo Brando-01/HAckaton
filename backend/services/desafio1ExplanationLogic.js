@@ -101,6 +101,83 @@ function compareDateStrings(
     : 1;
 }
 
+function daysInclusive(
+  startValue,
+  endValue
+) {
+  const start = dateOnly(startValue);
+  const end = dateOnly(endValue);
+
+  if (!start || !end) {
+    return null;
+  }
+
+  const startMs = Date.parse(
+    `${start}T00:00:00.000Z`
+  );
+  const endMs = Date.parse(
+    `${end}T00:00:00.000Z`
+  );
+
+  if (
+    !Number.isFinite(startMs) ||
+    !Number.isFinite(endMs) ||
+    endMs < startMs
+  ) {
+    return null;
+  }
+
+  return Math.floor(
+    (endMs - startMs) / 86400000
+  ) + 1;
+}
+
+function previousDate(value) {
+  const normalized = dateOnly(value);
+
+  if (!normalized) {
+    return null;
+  }
+
+  const milliseconds = Date.parse(
+    `${normalized}T00:00:00.000Z`
+  );
+
+  if (!Number.isFinite(milliseconds)) {
+    return null;
+  }
+
+  return new Date(
+    milliseconds - 86400000
+  ).toISOString().slice(0, 10);
+}
+
+function periodContains(
+  outerStart,
+  outerEnd,
+  innerStart,
+  innerEnd
+) {
+  const outerStartDate = dateOnly(outerStart);
+  const outerEndDate = dateOnly(outerEnd);
+  const innerStartDate = dateOnly(innerStart);
+  const innerEndDate = dateOnly(innerEnd);
+
+  if (
+    !outerStartDate ||
+    !outerEndDate ||
+    !innerStartDate ||
+    !innerEndDate
+  ) {
+    return false;
+  }
+
+  return (
+    outerStartDate <= innerStartDate &&
+    outerEndDate >= innerEndDate
+  );
+}
+
 function formatDateEs(value) {
   const normalized =
     dateOnly(value);
@@ -1619,13 +1696,270 @@ function matchActiveDiscountFindings({
   return findings;
 }
 
-function buildAdjustmentFindings({
-  invoiceEvidence
+function matchSuspensionAdjustmentFindings({
+  analysis
 }) {
+  const notes =
+    analysis?.evidence
+      ?.current
+      ?.creditDebitNotes || [];
+
+  const reconnections =
+    analysis?.evidence
+      ?.current
+      ?.reconnection || [];
+
+  if (
+    !notes.length ||
+    !reconnections.length
+  ) {
+    return [];
+  }
+
+  const invoices = [
+    analysis?.previousBill,
+    analysis?.currentBill
+  ].filter(Boolean);
+
+  const findings = [];
+  const usedNoteRows = new Set();
+
+  for (const note of notes) {
+    const noteAmount = Number(
+      note?.amount
+    );
+
+    const noteStart = dateOnly(
+      note?.periodStartDate
+    );
+    const noteEnd = dateOnly(
+      note?.periodEndDate
+    );
+
+    if (
+      !Number.isFinite(noteAmount) ||
+      noteAmount >= -MONEY_EPSILON ||
+      String(
+        note?.cancelChargeType || ''
+      ).toUpperCase() !== 'CRD' ||
+      !note?.chargeCode ||
+      !noteStart ||
+      !noteEnd
+    ) {
+      continue;
+    }
+
+    const reconnection =
+      reconnections.find(
+        (candidate) => {
+          const cutDate = dateOnly(
+            candidate?.cutDate
+          );
+          const reconnectionDate =
+            dateOnly(
+              candidate
+                ?.reconnectionDate
+            );
+
+          return (
+            cutDate &&
+            reconnectionDate &&
+            noteStart === cutDate &&
+            noteEnd ===
+              previousDate(
+                reconnectionDate
+              )
+          );
+        }
+      );
+
+    if (!reconnection) {
+      continue;
+    }
+
+    const candidates = [];
+
+    for (const invoice of invoices) {
+      const item =
+        (invoice.items || []).find(
+          (candidate) =>
+            candidate.chargeCode ===
+              note.chargeCode &&
+            candidate.rentType === 'RA'
+        );
+
+      if (!item) {
+        continue;
+      }
+
+      for (const component of
+        item.components || []) {
+        const netAmount = Number(
+          component?.netAmount
+        );
+
+        if (
+          !Number.isFinite(netAmount) ||
+          netAmount <= MONEY_EPSILON ||
+          !periodContains(
+            component.periodStartDate,
+            component.periodEndDate,
+            noteStart,
+            noteEnd
+          )
+        ) {
+          continue;
+        }
+
+        const suspendedDays =
+          daysInclusive(
+            noteStart,
+            noteEnd
+          );
+        const billedDays =
+          daysInclusive(
+            component.periodStartDate,
+            component.periodEndDate
+          );
+
+        if (
+          !suspendedDays ||
+          !billedDays
+        ) {
+          continue;
+        }
+
+        const expectedCredit =
+          Math.abs(netAmount) *
+          suspendedDays /
+          billedDays;
+
+        if (
+          !moneyMatches(
+            Math.abs(noteAmount),
+            expectedCredit
+          )
+        ) {
+          continue;
+        }
+
+        candidates.push({
+          item,
+          component,
+          suspendedDays,
+          billedDays,
+          expectedCredit,
+          difference:
+            Math.abs(
+              Math.abs(noteAmount) -
+              expectedCredit
+            )
+        });
+      }
+    }
+
+    if (!candidates.length) {
+      continue;
+    }
+
+    candidates.sort(
+      (left, right) =>
+        left.difference -
+        right.difference
+    );
+
+    const match = candidates[0];
+    const noteRows =
+      note.sourceRows || [];
+
+    if (
+      noteRows.some(
+        (row) =>
+          usedNoteRows.has(row)
+      )
+    ) {
+      continue;
+    }
+
+    noteRows.forEach(
+      (row) =>
+        usedNoteRows.add(row)
+    );
+
+    findings.push({
+      code: 'SUSPENSION_ADJUSTMENT',
+      label:
+        'Ajuste por días de suspensión',
+      amount:
+        roundMoney(
+          Math.abs(noteAmount)
+        ),
+      evidenceLevel: 'HIGH',
+      ruleId:
+        'SUSPENSION_RA_NOTE_EXACT_PERIOD_NET_PRORATION',
+      chargeCode:
+        note.chargeCode,
+      chargeDescription:
+        match.item.description || null,
+      periodStartDate:
+        noteStart,
+      periodEndDate:
+        noteEnd,
+      cutDate:
+        dateOnly(
+          reconnection.cutDate
+        ),
+      reconnectionDate:
+        dateOnly(
+          reconnection
+            .reconnectionDate
+        ),
+      rentType: 'RA',
+      suspendedDays:
+        match.suspendedDays,
+      billedPeriodDays:
+        match.billedDays,
+      causalImpact: false,
+      sourceRows: {
+        facturacion: [
+          match.component.sourceRow
+        ].filter(
+          (value) =>
+            value !== null &&
+            value !== undefined
+        ),
+        note: noteRows,
+        reconnection:
+          reconnection.sourceRows || []
+      },
+      explanation:
+        `Se verificó un ajuste de ${formatMoney(Math.abs(noteAmount))} a favor por ${match.suspendedDays} día${match.suspendedDays === 1 ? '' : 's'} sin servicio, del ${formatDateEs(noteStart)} al ${formatDateEs(noteEnd)}. El periodo coincide con el corte y termina el día anterior a la reconexión; además, el importe se reconcilia proporcionalmente con el cargo neto de renta adelantada. Este ajuste se conserva como hallazgo verificable y no se suma otra vez como causa del cambio entre recibos.`
+    });
+  }
+
+  return findings;
+}
+
+function buildAdjustmentFindings({
+  invoiceEvidence,
+  excludedSourceRows = []
+}) {
+  const excluded = new Set(
+    excludedSourceRows
+  );
   return (
     invoiceEvidence
       ?.creditDebitNotes || []
-  ).map(
+  )
+    .filter(
+      (evidence) =>
+        !(evidence.sourceRows || [])
+          .some(
+            (row) =>
+              excluded.has(row)
+          )
+    )
+    .map(
     (evidence) => ({
       code:
         'ADJUSTMENT_NOTE_CONTEXT',
@@ -1939,16 +2273,30 @@ function interpretBillingAnalysis(
           ?.current
     });
 
+  const suspensionAdjustments =
+    matchSuspensionAdjustmentFindings({
+      analysis
+    });
+
+  const suspensionNoteRows =
+    suspensionAdjustments.flatMap(
+      (finding) =>
+        finding.sourceRows?.note || []
+    );
+
   const adjustments =
     buildAdjustmentFindings({
       invoiceEvidence:
         analysis.evidence
-          ?.current
+          ?.current,
+      excludedSourceRows:
+        suspensionNoteRows
     });
 
   const currentBillFindings = [
     ...proration.findings,
     ...activeDiscounts,
+    ...suspensionAdjustments,
     ...adjustments
   ];
 
@@ -2107,6 +2455,10 @@ function interpretBillingAnalysis(
         false,
       notesAddedAsCausesAutomatically:
         false,
+      suspensionCreditsRequireExactTimelineAndNetProration:
+        true,
+      suspensionCreditsAddedAsVariationCauses:
+        false,
       packageCausesRequireStructuredMarker:
         true,
       packageCauseAmountsDerivedFromChargeDelta:
@@ -2125,6 +2477,9 @@ module.exports = {
   normalizeText,
   moneyMatches,
   dateOnly,
+  daysInclusive,
+  previousDate,
+  periodContains,
   formatDateEs,
   formatMoney,
   isPlanItem,
@@ -2141,6 +2496,7 @@ module.exports = {
   buildPackageCauses,
   buildProrationVariationCauses,
   matchActiveDiscountFindings,
+  matchSuspensionAdjustmentFindings,
   buildAdjustmentFindings,
   calculateCoverage,
   interpretBillingAnalysis

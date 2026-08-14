@@ -1,5 +1,8 @@
 # Desafío 1 · Fase 3 — causas financieras verificables
 
+> **Actualización posterior:** este documento conserva la decisión tomada con la primera entrega de FACTURACION. El Checkpoint 14A migra a `FACTURACION-CLIENTES.csv` v2: los periodos fueron corregidos y `DEUDA` / `FECHA-VENCIMIENTO` ya no forman parte de la fuente. La política vigente está documentada en `desafio1-checkpoint14a-facturacion-v2.md`.
+
+
 Esta fase se monta **encima de Fase 2**. Su objetivo es pasar de:
 
 ```text

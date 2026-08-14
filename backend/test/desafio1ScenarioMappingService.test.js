@@ -98,6 +98,20 @@ function fakeRow(sql) {
 
   if (
     normalized.includes(
+      'suspensionverifiedcreditrows'
+    )
+  ) {
+    return {
+      suspensionExactTimelineNegativeNoteRows: 793,
+      suspensionRaCreditCandidateRows: 731,
+      suspensionVerifiedCreditRows: 678,
+      suspensionVerifiedCreditSubscribers: 523,
+      suspensionUnreconciledRaRows: 53
+    };
+  }
+
+  if (
+    normalized.includes(
       'adjustmentnoterows'
     )
   ) {
@@ -187,6 +201,21 @@ test(
     assert.equal(
       report.summary.targets,
       5
+    );
+    const suspension =
+      report.mappings.find(
+        (mapping) =>
+          mapping.id ===
+          'SUSPENSION_ADJUSTMENT'
+      );
+    assert.equal(
+      suspension.status,
+      'MAPPED'
+    );
+    assert.equal(
+      suspension.evidence
+        .verifiedCreditRows,
+      678
     );
     assert.doesNotMatch(
       JSON.stringify(report),

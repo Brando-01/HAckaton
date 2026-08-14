@@ -6,6 +6,7 @@ const {
   moneyMatches,
   buildRentContext,
   matchProrationFindings,
+  matchSuspensionAdjustmentFindings,
   interpretBillingAnalysis
 } = require(
   '../services/desafio1ExplanationLogic'
@@ -2244,6 +2245,185 @@ test(
     assert.equal(
       result.interpretation.unexplainedAmount,
       0
+    );
+  }
+);
+
+
+function verifiedSuspensionAnalysis({
+  rentType = 'RA',
+  noteAmount = -7.20871,
+  noteStart = '2026-05-05 00:00:00',
+  noteEnd = '2026-05-07 00:00:00',
+  reconnectionDate = '2026-05-08 00:00:00'
+} = {}) {
+  const planComponent = {
+    amount: 87.9,
+    netAmount: 74.49,
+    description: 'Plan Hogar',
+    classification: 'Cargo Recurrente De Plan',
+    group: 'CARGO FIJO ADELANTADO',
+    subgroup: 'CARGO FIJO ADELANTADO',
+    subscriberKey: 'SUB-1',
+    periodStartDate: '2026-05-01 00:00:00',
+    periodEndDate: '2026-05-31 00:00:00',
+    sourceRow: 501
+  };
+
+  const current = invoice({
+    number: 'INV-NEW',
+    cycle: '2026-05-31',
+    total: 87.9,
+    items: [
+      item({
+        code: 'PLAN_RA',
+        description: 'Plan Hogar',
+        amount: 87.9,
+        rentType,
+        group: 'CARGO FIJO ADELANTADO',
+        components: [planComponent]
+      })
+    ]
+  });
+
+  const previous = invoice({
+    number: 'INV-OLD',
+    cycle: '2026-04-30',
+    total: 87.9,
+    items: []
+  });
+
+  return analysis({
+    currentBill: current,
+    previousBill: previous,
+    comparison: comparison({
+      previousTotal: 87.9,
+      currentTotal: 87.9,
+      chargeChanges: []
+    }),
+    currentEvidence: evidence({
+      invoiceNumber: 'INV-NEW',
+      cycleDate: '2026-05-31',
+      observedRentTypes: [rentType],
+      reconnection: [
+        {
+          cutDate: '2026-05-05 00:00:00',
+          reconnectionDate,
+          amount: 4.58,
+          sourceRows: [801]
+        }
+      ],
+      creditDebitNotes: [
+        {
+          chargeCode: 'PLAN_RA',
+          cancelChargeType: 'CRD',
+          amount: noteAmount,
+          periodStartDate: noteStart,
+          periodEndDate: noteEnd,
+          matchedChargeCode: true,
+          sourceRows: [701]
+        }
+      ]
+    })
+  });
+}
+
+test(
+  'Checkpoint 14B verifica un crédito RA cuando línea de tiempo y prorrateo neto coinciden',
+  () => {
+    const findings =
+      matchSuspensionAdjustmentFindings({
+        analysis: verifiedSuspensionAnalysis()
+      });
+
+    assert.equal(findings.length, 1);
+    assert.equal(
+      findings[0].code,
+      'SUSPENSION_ADJUSTMENT'
+    );
+    assert.equal(findings[0].evidenceLevel, 'HIGH');
+    assert.equal(findings[0].rentType, 'RA');
+    assert.equal(findings[0].suspendedDays, 3);
+    assert.equal(findings[0].amount, 7.21);
+    assert.equal(findings[0].causalImpact, false);
+    assert.equal(
+      findings[0].ruleId,
+      'SUSPENSION_RA_NOTE_EXACT_PERIOD_NET_PRORATION'
+    );
+  }
+);
+
+test(
+  'Checkpoint 14B no verifica suspensión si la nota no termina el día previo a la reconexión',
+  () => {
+    const findings =
+      matchSuspensionAdjustmentFindings({
+        analysis: verifiedSuspensionAnalysis({
+          noteEnd: '2026-05-06 00:00:00'
+        })
+      });
+
+    assert.equal(findings.length, 0);
+  }
+);
+
+test(
+  'Checkpoint 14B no extrapola la regla de crédito RA a renta vencida',
+  () => {
+    const findings =
+      matchSuspensionAdjustmentFindings({
+        analysis: verifiedSuspensionAnalysis({
+          rentType: 'RV'
+        })
+      });
+
+    assert.equal(findings.length, 0);
+  }
+);
+
+test(
+  'Checkpoint 14B exige conciliación monetaria del crédito y no solo coincidencia temporal',
+  () => {
+    const findings =
+      matchSuspensionAdjustmentFindings({
+        analysis: verifiedSuspensionAnalysis({
+          noteAmount: -12.34
+        })
+      });
+
+    assert.equal(findings.length, 0);
+  }
+);
+
+test(
+  'una nota de suspensión verificada queda como hallazgo único y nunca como causa del delta',
+  () => {
+    const result =
+      interpretBillingAnalysis(
+        verifiedSuspensionAnalysis()
+      );
+
+    const findings =
+      result.interpretation
+        .currentBillFindings;
+
+    assert.deepEqual(
+      findings.map((finding) => finding.code),
+      ['SUSPENSION_ADJUSTMENT']
+    );
+    assert.equal(
+      result.interpretation.causes.length,
+      0
+    );
+    assert.equal(
+      result.safeguards
+        .suspensionCreditsAddedAsVariationCauses,
+      false
+    );
+    assert.equal(
+      result.safeguards
+        .notesAddedAsCausesAutomatically,
+      false
     );
   }
 );

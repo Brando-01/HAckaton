@@ -110,7 +110,7 @@ test(
 );
 
 test(
-  'las decisiones confirmadas preservan subscriber como llave canónica y el error conocido de periodos',
+  'las decisiones confirmadas preservan subscriber y registran la migración segura de FACTURACION v2',
   () => {
     const serialized =
       JSON.stringify(
@@ -135,7 +135,34 @@ test(
     );
     assert.match(
       serialized,
-      /incidencia/i
+      /2222-01-01/
+    );
+    assert.match(
+      serialized,
+      /no incluye DEUDA ni FECHA-VENCIMIENTO/i
+    );
+    assert.match(
+      serialized,
+      /SUBSCRIBER_KEY_1/
+    );
+
+    const billingSource =
+      SOURCE_DEFINITIONS.find(
+        (source) =>
+          source.key ===
+          'facturacion_clientes'
+      );
+
+    assert.ok(
+      billingSource.capabilities.includes(
+        'CHARGE_PERIOD'
+      )
+    );
+    assert.equal(
+      billingSource.capabilities.includes(
+        'DEBT'
+      ),
+      false
     );
   }
 );
@@ -174,7 +201,7 @@ test(
 );
 
 test(
-  'Fase 13 incorpora paquetes adicionales como capacidad consolidada sin promover equipo o suspensión',
+  'Checkpoint 14B conserva paquetes y consolida el hallazgo verificable de suspensión sin promover equipo',
   () => {
     const report =
       buildFunctionalCoverageReport({
@@ -214,11 +241,66 @@ test(
     );
     assert.equal(
       suspension.status,
-      'PARTIAL'
+      'READY'
+    );
+    assert.match(
+      suspension.detail,
+      /hallazgo verificable/i
     );
     assert.equal(
       equipment.status,
       'PENDING_MAPPING'
     );
+  }
+);
+
+
+test(
+  'Checkpoint 14B registra la regla de crédito RA y mantiene las notas generales como contexto',
+  () => {
+    const report =
+      buildFunctionalCoverageReport({
+        importMetadata: buildMetadata(),
+        diagnostics: {
+          adjustmentNoteCount: 8861,
+          suspensionOrderCount: 16379
+        }
+      });
+
+    const suspension =
+      report.scenarios.find(
+        (scenario) =>
+          scenario.id ===
+          'SUSPENSION_ADJUSTMENT'
+      );
+    const notes =
+      report.scenarios.find(
+        (scenario) =>
+          scenario.id ===
+          'ADJUSTMENT_NOTES'
+      );
+
+    assert.equal(suspension.status, 'READY');
+    assert.deepEqual(
+      suspension.sourceKeys,
+      [
+        'facturacion_clientes',
+        'catalogo_ofertas',
+        'brainy_reconexiones',
+        'notas_credito'
+      ]
+    );
+    assert.equal(notes.status, 'CONTEXT_ONLY');
+    assert.match(notes.detail, /subconjunto/i);
+
+    const rule =
+      CONFIRMED_DATA_RULES.find(
+        (item) =>
+          item.id ===
+          'SUSPENSION_RA_CREDIT_RECONCILIATION'
+      );
+
+    assert.ok(rule);
+    assert.match(rule.detail, /no se suma al delta/i);
   }
 );

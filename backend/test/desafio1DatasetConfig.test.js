@@ -11,7 +11,7 @@ test('la Fase 1 contempla exactamente las ocho fuentes CSV actuales', () => {
     'BRAINY_PRORRATEO_ALTASV3.csv',
     'BRAINY_RECONEXIONESV3.csv',
     'CATALOGO-OFERTAS.csv',
-    'FACTURACION-CLIENTES_.csv',
+    'FACTURACION-CLIENTES.csv',
     'NOTAS_CREDITO.csv',
     'Ordenes.csv',
     'PLANTA CLIENTES.csv'
@@ -44,4 +44,61 @@ test('se definen índices para las relaciones principales de la Fase 2', () => {
   assert.match(sql, /d1_ordenes\(subscriber_key, completion_date\)/);
   assert.match(sql, /d1_prorrateos\(invoice_number\)/);
   assert.match(sql, /d1_reconexiones\(invoice_number\)/);
+});
+
+test('FACTURACION v2 usa el CSV corregido y conserva solo campos persistibles', () => {
+  const dataset = DATASETS.find(
+    (item) => item.key === 'facturacion_clientes'
+  );
+
+  assert.ok(dataset);
+  assert.equal(dataset.fileName, 'FACTURACION-CLIENTES.csv');
+  assert.equal(dataset.delimiter, ',');
+
+  const sources = dataset.columns.map(
+    (column) => column.source
+  );
+  const targets = dataset.columns.map(
+    (column) => column.target
+  );
+
+  assert.ok(sources.includes('PERIOD_START_DATE'));
+  assert.ok(sources.includes('PERIOD_END_DATE'));
+  assert.ok(!sources.includes('FECHA-VENCIMIENTO'));
+  assert.ok(!sources.includes('DEUDA'));
+  assert.ok(!targets.includes('due_date'));
+  assert.ok(!targets.includes('debt_status'));
+
+  assert.deepEqual(
+    dataset.ignoredHeaders,
+    [
+      'PRIMARY_RESOURCE_VALUE',
+      'SUBSCRIBER_KEY_1'
+    ]
+  );
+
+  assert.deepEqual(
+    dataset.consistencyChecks,
+    [
+      {
+        left: 'SUBSCRIBER_KEY',
+        right: 'SUBSCRIBER_KEY_1',
+        required: true,
+        label: 'SUBSCRIBER_KEY duplicado'
+      }
+    ]
+  );
+
+  assert.match(
+    dataset.createTableSql,
+    /period_start_date TEXT/
+  );
+  assert.match(
+    dataset.createTableSql,
+    /period_end_date TEXT/
+  );
+  assert.doesNotMatch(
+    dataset.createTableSql,
+    /due_date|debt_status/
+  );
 });

@@ -279,7 +279,7 @@ function createFakeRepository() {
           datasetKey:
             'facturacion_clientes',
           fileName:
-            'FACTURACION-CLIENTES_.csv',
+            'FACTURACION-CLIENTES.csv',
           sha256:
             'abc',
           importedRows:

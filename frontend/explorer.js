@@ -61,7 +61,8 @@
       DISCOUNT_ENDED: 'Fin de descuento/promoción',
       DISCOUNT_REMOVED: 'Descuento retirado',
       PLAN_CHANGE: 'Cambio de plan',
-      PACKAGES: 'Paquetes adicionales'
+      PACKAGES: 'Paquetes adicionales',
+      SUSPENSION_ADJUSTMENT: 'Ajuste por suspensión'
     };
 
     return labels[code] ||

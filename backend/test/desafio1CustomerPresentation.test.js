@@ -335,3 +335,42 @@ test(
     );
   }
 );
+
+test(
+  'Checkpoint 14B presenta el crédito por suspensión como hallazgo verificado y no como variación',
+  () => {
+    const finding = {
+      code: 'SUSPENSION_ADJUSTMENT',
+      amount: 7.21,
+      suspendedDays: 3,
+      periodStartDate: '2026-05-05',
+      periodEndDate: '2026-05-07',
+      evidenceLevel: 'HIGH'
+    };
+
+    const text =
+      buildCustomerFindingDescription(
+        finding
+      );
+
+    assert.match(text, /S\/ 7\.21/i);
+    assert.match(text, /3 días sin servicio/i);
+    assert.match(text, /a tu favor/i);
+    assert.match(text, /día anterior a la reconexión/i);
+    assert.doesNotMatch(text, /Brainy|SUBSCRIBER|CRD/i);
+
+    assert.equal(
+      getImpactPresentation(finding),
+      'VERIFIED_CREDIT_CONTEXT'
+    );
+
+    assert.deepEqual(
+      buildVerification(finding).sources,
+      [
+        'Facturación',
+        'Registro de notas',
+        'Registro de reconexión'
+      ]
+    );
+  }
+);

@@ -121,7 +121,7 @@ test(
 );
 
 test(
-  'Fase 11 registra histórico como capacidad consolidada sin cambiar los pendientes financieros',
+  'Fase 14 mantiene histórico consolidado y no altera el pendiente de equipo financiado',
   () => {
     const logic =
       read(
@@ -142,7 +142,7 @@ test(
     );
     assert.match(
       logic,
-      /SUSPENSION_ADJUSTMENT[\s\S]*PARTIAL/
+      /id: 'SUSPENSION_ADJUSTMENT'/
     );
   }
 );

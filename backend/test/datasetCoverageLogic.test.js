@@ -451,3 +451,54 @@ test(
     );
   }
 );
+
+test(
+  'Checkpoint 14B cuenta un ajuste de suspensión HIGH como hallazgo explicable pero no demo premium',
+  () => {
+    const explanation =
+      reconnectionExplanation();
+
+    explanation.interpretation.causes = [];
+    explanation.interpretation.status =
+      'NO_VARIATION';
+    explanation.interpretation
+      .coveragePercent = 100;
+    explanation.interpretation
+      .unexplainedAmount = 0;
+    explanation.comparison.difference = 0;
+    explanation.interpretation
+      .currentBillFindings = [
+        {
+          code: 'SUSPENSION_ADJUSTMENT',
+          label: 'Ajuste por suspensión',
+          amount: 7.21,
+          evidenceLevel: 'HIGH',
+          causalImpact: false
+        }
+      ];
+
+    const recognized =
+      getRecognizedItems(explanation);
+
+    assert.equal(recognized.causes.length, 0);
+    assert.equal(recognized.findings.length, 1);
+
+    const profile =
+      buildCoverageProfile({
+        seed: seed('SUB-SUSP', 2),
+        explanation
+      });
+
+    assert.equal(profile.explainable, true);
+    assert.equal(profile.highConfidence, true);
+    assert.deepEqual(
+      profile.scenarioCodes,
+      ['SUSPENSION_ADJUSTMENT']
+    );
+    assert.equal(
+      profile.primaryScenario,
+      'SUSPENSION_ADJUSTMENT'
+    );
+    assert.equal(profile.demoPremium, false);
+  }
+);

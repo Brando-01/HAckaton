@@ -19,14 +19,14 @@ const SOURCE_DEFINITIONS = Object.freeze([
   {
     key: 'facturacion_clientes',
     label: 'FACTURACION-CLIENTES',
-    role: 'Recibos, conceptos, importes, deuda y producto',
+    role: 'Recibos, conceptos, importes, periodos y producto',
     usage: 'CORE',
     capabilities: [
       'BILLING',
       'PRODUCT',
       'COMPARISON',
       'BILLING_HISTORY',
-      'DEBT',
+      'CHARGE_PERIOD',
       'PACKAGE_CHARGE'
     ]
   },
@@ -39,6 +39,7 @@ const SOURCE_DEFINITIONS = Object.freeze([
       'PLAN_CHANGE',
       'SERVICE_EVENTS',
       'SUSPENSION_CONTEXT',
+      'SUSPENSION_EVENT',
       'PACKAGE_ORDER'
     ]
   },
@@ -78,16 +79,18 @@ const SOURCE_DEFINITIONS = Object.freeze([
     role: 'Evidencia de corte, reconexión y cargo asociado',
     usage: 'EVIDENCE',
     capabilities: [
-      'RECONNECTION'
+      'RECONNECTION',
+      'SUSPENSION_WINDOW'
     ]
   },
   {
     key: 'notas_credito',
     label: 'NOTAS DE CRÉDITO/DÉBITO',
-    role: 'Contexto de ajustes financieros',
-    usage: 'CONTEXT',
+    role: 'Notas financieras y créditos verificables de suspensión',
+    usage: 'EVIDENCE',
     capabilities: [
-      'ADJUSTMENT_NOTE_CONTEXT'
+      'ADJUSTMENT_NOTE_CONTEXT',
+      'SUSPENSION_ADJUSTMENT'
     ]
   }
 ]);
@@ -112,10 +115,28 @@ const CONFIRMED_DATA_RULES = Object.freeze([
       'CHARGE_CODE_DESC contiene la información del producto/concepto facturado y se conserva como dato fuente.'
   },
   {
-    id: 'PERIOD_FIELDS_SOURCE_ISSUE',
+    id: 'BILLING_PERIOD_FIELDS_V2',
     label: 'Periodo de FACTURACION',
     detail:
-      'PERIOD_START_DATE y PERIOD_END_DATE presentan una incidencia en la entrega actual; no se usan para inventar periodos hasta recibir una fuente corregida.'
+      'La versión corregida de FACTURACION aporta PERIOD_START_DATE y PERIOD_END_DATE utilizables en la mayoría de cargos. El valor 2222-01-01 se trata como sentinel técnico y se normaliza a no disponible.'
+  },
+  {
+    id: 'BILLING_DEBT_FIELD_UNAVAILABLE_V2',
+    label: 'Estado de deuda no disponible en FACTURACION v2',
+    detail:
+      'La versión actualizada ya no incluye DEUDA ni FECHA-VENCIMIENTO. El prototipo no infiere deuda ni vencimiento a partir de montos, ciclos u otros campos.'
+  },
+  {
+    id: 'BILLING_SUBSCRIBER_DUPLICATE_CHECK_V2',
+    label: 'Validación de suscripción duplicada',
+    detail:
+      'SUBSCRIBER_KEY_1 se usa solo como control de consistencia durante la importación y debe coincidir con SUBSCRIBER_KEY; no se persiste ni se expone.'
+  },
+  {
+    id: 'SUSPENSION_RA_CREDIT_RECONCILIATION',
+    label: 'Crédito verificable por suspensión en RA',
+    detail:
+      'Checkpoint 14B reconoce un ajuste solo cuando una nota negativa de renta adelantada empieza el día del corte, termina el día anterior a la reconexión y su importe reconcilia por días contra CHARGE_NET_AMOUNT del periodo facturado. Se publica como hallazgo y no se suma al delta entre recibos.'
   }
 ]);
 
@@ -227,18 +248,20 @@ const SCENARIO_DEFINITIONS = Object.freeze([
     ],
     status: 'CONTEXT_ONLY',
     detail:
-      'Las notas ya se cruzan y preservan como contexto, pero no se convierten automáticamente en causa hasta confirmar su semántica financiera.'
+      'Las notas se preservan como contexto. Checkpoint 14B solo resuelve el subconjunto negativo RA conciliado con una suspensión; la semántica general de CRD/DSC permanece pendiente y no se convierte automáticamente en causa.'
   },
   {
     id: 'SUSPENSION_ADJUSTMENT',
     label: 'Ajuste por suspensión',
     sourceKeys: [
-      'ordenes',
-      'facturacion_clientes'
+      'facturacion_clientes',
+      'catalogo_ofertas',
+      'brainy_reconexiones',
+      'notas_credito'
     ],
-    status: 'PARTIAL',
+    status: 'READY',
     detail:
-      'Existen eventos de servicio utilizables como contexto, pero falta una regla confirmada para reconciliar el efecto monetario de una suspensión.'
+      'Checkpoint 14B verifica únicamente créditos de renta adelantada cuya nota negativa coincide exactamente con corte→día anterior a reconexión y cuyo importe reconcilia por días contra el cargo neto facturado. Se muestra como hallazgo verificable y nunca se suma automáticamente como causa de la variación.'
   },
   {
     id: 'FINANCED_EQUIPMENT',

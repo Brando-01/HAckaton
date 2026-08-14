@@ -31,8 +31,8 @@ const DATASETS = [
   },
   {
     key: 'facturacion_clientes',
-    fileName: 'FACTURACION-CLIENTES_.csv',
-    delimiter: ';',
+    fileName: 'FACTURACION-CLIENTES.csv',
+    delimiter: ',',
     tableName: 'd1_facturacion',
     createTableSql: `
       CREATE TABLE d1_facturacion (
@@ -53,8 +53,6 @@ const DATASETS = [
         billing_cycle_date TEXT NOT NULL,
         charge_group TEXT,
         charge_subgroup TEXT,
-        due_date TEXT,
-        debt_status TEXT,
         source_row INTEGER NOT NULL
       )
     `,
@@ -71,12 +69,22 @@ const DATASETS = [
       { source: 'CHARGE_CODE_CLASSIFICATION', target: 'charge_code_classification', type: 'text' },
       { source: 'SUBSCRIBER_KEY', target: 'subscriber_key', type: 'text' },
       { source: 'PERIOD_START_DATE', target: 'period_start_date', type: 'datetime' },
-      { source: 'PERIOD_END_DATE', target: 'period_end_date', type: 'datetime' },
+      { source: 'PERIOD_END_DATE', target: 'period_end_date', type: 'billingPeriodEnd' },
       { source: 'ciclo', target: 'billing_cycle_date', type: 'date' },
       { source: 'GRUPO', target: 'charge_group', type: 'text' },
-      { source: 'SUB_GRUPO', target: 'charge_subgroup', type: 'text' },
-      { source: 'FECHA-VENCIMIENTO', target: 'due_date', type: 'date' },
-      { source: 'DEUDA', target: 'debt_status', type: 'text' }
+      { source: 'SUB_GRUPO', target: 'charge_subgroup', type: 'text' }
+    ],
+    ignoredHeaders: [
+      'PRIMARY_RESOURCE_VALUE',
+      'SUBSCRIBER_KEY_1'
+    ],
+    consistencyChecks: [
+      {
+        left: 'SUBSCRIBER_KEY',
+        right: 'SUBSCRIBER_KEY_1',
+        required: true,
+        label: 'SUBSCRIBER_KEY duplicado'
+      }
     ]
   },
   {

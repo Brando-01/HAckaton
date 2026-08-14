@@ -91,3 +91,11 @@ Fase 13 solo debe convertir un mapeo en nueva causa cuando se cumplan las dos co
 2. el impacto monetario se reconcilia con la diferencia observada entre recibos o con el recibo actual cuando no existe histórico.
 
 Esto preserva la política de 0% de invenciones financieras y evita mejorar la “cobertura” a costa de precisión.
+
+## Revalidación posterior · Checkpoint 14B
+
+La actualización de `FACTURACION-CLIENTES` corrigió los periodos de cargo y permitió volver a evaluar suspensión con una regla más fuerte que la coocurrencia usada originalmente en Fase 12.
+
+El escenario `SUSPENSION_ADJUSTMENT` pasa a `MAPPED · HIGH` **como hallazgo verificable**, no como causa del cambio entre recibos. La regla exige simultáneamente renta adelantada inequívoca, nota negativa `CRD`, periodo exacto corte → día anterior a reconexión y conciliación del monto por días contra el cargo neto facturado.
+
+La semántica general de `ADJUSTMENT_NOTES` permanece `SEMANTICS_PENDING`: resolver el subconjunto de suspensión no autoriza a interpretar automáticamente todas las notas `CRD`/`DSC`.

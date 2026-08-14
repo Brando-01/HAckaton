@@ -290,8 +290,7 @@ class Desafio1Repository {
           billing_arrangement_key AS billingArrangement,
           customer_key AS customerKey,
           financial_account_key AS financialAccount,
-          billing_cycle_date AS cycleDate,
-          due_date AS dueDate
+          billing_cycle_date AS cycleDate
         FROM d1_facturacion
         WHERE subscriber_key = ?
         GROUP BY
@@ -299,8 +298,7 @@ class Desafio1Repository {
           billing_arrangement_key,
           customer_key,
           financial_account_key,
-          billing_cycle_date,
-          due_date
+          billing_cycle_date
         ORDER BY
           billing_cycle_date DESC,
           legal_invoice_number DESC
@@ -364,8 +362,6 @@ class Desafio1Repository {
           billing_cycle_date AS cycleDate,
           charge_group AS "group",
           charge_subgroup AS subgroup,
-          due_date AS dueDate,
-          debt_status AS debtStatus,
           source_row AS sourceRow
         FROM d1_facturacion
         WHERE legal_invoice_number = ?
@@ -1023,8 +1019,7 @@ class Desafio1Repository {
             billing_arrangement_key,
             customer_key,
             financial_account_key,
-            billing_cycle_date,
-            due_date
+            billing_cycle_date
           FROM d1_facturacion
           WHERE subscriber_key IS NOT NULL
             AND TRIM(subscriber_key) <> ''
@@ -1035,8 +1030,7 @@ class Desafio1Repository {
             billing_arrangement_key,
             customer_key,
             financial_account_key,
-            billing_cycle_date,
-            due_date
+            billing_cycle_date
         ),
         invoice_counts AS (
           SELECT

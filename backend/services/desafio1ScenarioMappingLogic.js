@@ -39,12 +39,13 @@ const TARGET_DEFINITIONS = Object.freeze([
     id: 'SUSPENSION_ADJUSTMENT',
     label: 'Ajuste por suspensión',
     expectedSources: [
-      'ordenes',
       'facturacion_clientes',
-      'brainy_prorrateo'
+      'catalogo_ofertas',
+      'brainy_reconexiones',
+      'notas_credito'
     ],
     objective:
-      'Medir la evidencia disponible de suspensión y su cercanía con cargos proporcionales sin asumir causalidad.'
+      'Verificar créditos por días suspendidos únicamente cuando línea de tiempo, renta adelantada y monto proporcional reconcilian.'
   },
   {
     id: 'ADJUSTMENT_NOTES',
@@ -329,37 +330,71 @@ function suspensionMapping(
       diagnostics
         .suspensionNearbyProportionalInvoices
     );
+  const exactTimelineNegativeNoteRows =
+    asCount(
+      diagnostics
+        .suspensionExactTimelineNegativeNoteRows
+    );
+  const raCreditCandidateRows =
+    asCount(
+      diagnostics
+        .suspensionRaCreditCandidateRows
+    );
+  const verifiedCreditRows =
+    asCount(
+      diagnostics
+        .suspensionVerifiedCreditRows
+    );
+  const verifiedCreditSubscribers =
+    asCount(
+      diagnostics
+        .suspensionVerifiedCreditSubscribers
+    );
+  const unreconciledRaRows =
+    asCount(
+      diagnostics
+        .suspensionUnreconciledRaRows
+    );
 
-  const mapped =
-    explicitSuspensionChargeRows > 0;
+  const verified =
+    verifiedCreditRows > 0;
 
   return {
     id: 'SUSPENSION_ADJUSTMENT',
     label: 'Ajuste por suspensión',
     status:
-      mapped
+      verified
         ? 'MAPPED'
         : suspensionOrderRows > 0
           ? 'PARTIAL'
           : 'NOT_MAPPABLE',
     confidence:
-      mapped
-        ? 'MEDIUM'
+      verified
+        ? 'HIGH'
         : suspensionOrderRows > 0
           ? 'LOW'
           : 'NONE',
+    // Una nota verificada demuestra un crédito por días sin servicio,
+    // pero no demuestra que ese importe forme parte del delta entre
+    // los totales reconstruidos de FACTURACION. Se publica como
+    // hallazgo, no como causa de variación.
     canPromoteToCause: false,
     evidence: {
       suspensionOrderRows,
       suspensionSubscribers,
       explicitSuspensionChargeRows,
-      nearbyProportionalInvoices
+      nearbyProportionalInvoices,
+      exactTimelineNegativeNoteRows,
+      raCreditCandidateRows,
+      verifiedCreditRows,
+      verifiedCreditSubscribers,
+      unreconciledRaRows
     },
     rationale:
-      mapped
-        ? 'Existe un cargo explícitamente marcado como ajuste por suspensión, pero todavía debe reconciliarse temporal y monetariamente antes de usarlo como causa.'
+      verified
+        ? 'Checkpoint 14B confirmó un subconjunto verificable en renta adelantada: la nota negativa empieza el día del corte, termina el día anterior a la reconexión y su importe reconcilia por días contra el cargo neto del periodo facturado. Se habilita como hallazgo de ajuste por suspensión; no se suma automáticamente como causa del cambio entre recibos.'
         : suspensionOrderRows > 0
-          ? 'ORDENES confirma eventos de suspensión/corte y existen recibos con proporcionales cercanos en algunos casos, pero la coexistencia temporal no demuestra por sí sola que el proporcional sea un ajuste por días suspendidos.'
+          ? 'ORDENES confirma eventos de suspensión/corte y existen recibos con proporcionales cercanos en algunos casos, pero sin una nota negativa con línea de tiempo exacta y conciliación monetaria no se afirma un ajuste por días suspendidos.'
           : 'No se encontraron eventos suficientes para mapear suspensión.',
     patterns: []
   };
@@ -396,6 +431,10 @@ function adjustmentNotesMapping(
   const matchedSameCycleRows =
     asCount(
       diagnostics.adjustmentMatchedSameCycleRows
+    );
+  const verifiedSuspensionCreditRows =
+    asCount(
+      diagnostics.suspensionVerifiedCreditRows
     );
 
   const crdNegativePct =
@@ -435,6 +474,7 @@ function adjustmentNotesMapping(
         ),
       matchedSubscriberCodeRows,
       matchedSameCycleRows,
+      verifiedSuspensionCreditRows,
       matchedSameCyclePct:
         totalRows
           ? Number(
@@ -448,7 +488,7 @@ function adjustmentNotesMapping(
     },
     rationale:
       totalRows > 0
-        ? 'El dataset presenta patrones de signo muy consistentes por tipo y puede cruzarse con facturación, pero CRD/DSC no se convierten en una semántica financiera asumida. La definición de negocio debe confirmarse antes de usar una nota como causa.'
+        ? 'El dataset presenta patrones de signo muy consistentes por tipo. Checkpoint 14B resolvió únicamente el subconjunto de notas negativas RA que reconcilia exactamente con días de suspensión; la semántica general de CRD/DSC permanece pendiente y ninguna nota se convierte automáticamente en causa del delta del recibo.'
         : 'No hay notas disponibles para caracterizar.',
     patterns: []
   };
@@ -517,7 +557,9 @@ function buildScenarioMappingReport(
       'El mapeo usa únicamente consultas agregadas sobre desafio1.db.',
       'Ningún resultado público incluye SUBSCRIBER_KEY, NUM_ANEXO, CUSTOMER_KEY, cuentas financieras, teléfonos o documentos.',
       'Una coincidencia de texto o una coocurrencia temporal no se convierte automáticamente en causa financiera.',
-      'Fase 13 solo podrá promover un mapeo cuando el delta monetario pueda reconciliarse y la semántica sea inequívoca.'
+      'Checkpoint 14B solo verifica créditos por suspensión cuando coinciden línea de tiempo, renta adelantada y prorrateo monetario del cargo neto.',
+      'Una nota de suspensión verificada se conserva como hallazgo y no se suma al delta entre recibos.',
+      'La semántica general de CRD/DSC permanece pendiente; no se extrapola desde el subconjunto verificado.'
     ]
   };
 }
