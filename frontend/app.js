@@ -139,6 +139,16 @@
       'nextActions'
     );
 
+  const benefitsSection =
+    document.getElementById(
+      'benefitsSection'
+    );
+
+  const existingBenefits =
+    document.getElementById(
+      'existingBenefits'
+    );
+
   let activeCustomerId = null;
   let activeAuthMode = null;
 
@@ -473,6 +483,68 @@
     );
   }
 
+  function renderExistingBenefits(
+    commercialExperience
+  ) {
+    if (
+      !benefitsSection ||
+      !existingBenefits
+    ) {
+      return;
+    }
+
+    existingBenefits.innerHTML = '';
+
+    const benefit =
+      commercialExperience
+        ?.existingBenefit;
+
+    const visible =
+      benefit?.available === true &&
+      benefit?.existingBenefit === true &&
+      benefit?.newAddition === false;
+
+    benefitsSection.hidden = !visible;
+
+    if (!visible) {
+      return;
+    }
+
+    const card =
+      createElement(
+        'article',
+        'existing-benefit-card'
+      );
+
+    card.appendChild(
+      createElement(
+        'span',
+        'existing-benefit-label',
+        'Beneficio vigente'
+      )
+    );
+
+    card.appendChild(
+      createElement(
+        'strong',
+        null,
+        benefit.title ||
+          'Ya cuentas con este beneficio'
+      )
+    );
+
+    card.appendChild(
+      createElement(
+        'p',
+        null,
+        benefit.description || ''
+      )
+    );
+
+    existingBenefits.appendChild(card);
+  }
+
+
   function renderExperience(data) {
     customerName.textContent =
       data.customer.name;
@@ -574,6 +646,10 @@
       ),
       ...(data.findings || [])
     ]);
+
+    renderExistingBenefits(
+      data.commercialExperience
+    );
 
     renderActions(
       data.nextActions

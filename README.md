@@ -101,3 +101,11 @@ npm run audit:b2c-matrix:desafio1
 recorre por defecto toda la población de `PLANTA CLIENTES` y construye una matriz basada en las dimensiones oficiales `negocio` y `lob_type`, cruzadas con renta adelantada (`RA`) y renta vencida (`RV`). Una celda se marca `VERIFIED` solo cuando existe al menos un caso observado con evidencia `HIGH` y renta resuelta por reglas deterministas.
 
 La matriz mantiene `FINANCED_EQUIPMENT` como `PENDING_MAPPING` mientras las fuentes disponibles no permitan distinguir inequívocamente una cuota de equipo financiado de otras señales de financiamiento/equipamiento. `--limit` sirve solo para una prueba rápida y produce `SAMPLE_ONLY`; no autoriza afirmar cobertura total. `--details` muestra además el desglose granular `negocio + lob_type × RA/RV`, y `--write` guarda un JSON agregado local ignorado por Git.
+
+## Política comercial restrictiva y Efecto Efervescente
+
+Desde Fase 18, Lucía mantiene la recomendación comercial separada del motor financiero. El cross-selling solo se evalúa después de un turno `RESOLVED`, con las guardas financieras activas y una regla explícita sobre la capa comercial sintética existente (`dataset_clientes.csv`, `catalogo_ofertas_entrega.csv` e `historial_campanias.csv`). No existe una oferta genérica de fallback y esta capa no modifica montos ni causas del Desafío 1.
+
+El *Efecto Efervescente* reutiliza únicamente beneficios `ACTIVE_DISCOUNT` con evidencia `HIGH` que ya están aplicados al cliente; se muestran como beneficios existentes y nunca como altas nuevas. Mi Movistar puede recordar esos beneficios, pero no realiza cross-selling por abrir la vista. Las ofertas mostradas son referenciales y no ejecutan contratación ni cambios de servicio.
+
+Las reglas, supresiones, separación de fuentes y limitaciones están documentadas en `backend/docs/desafio1-fase18.md`.

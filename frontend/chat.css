@@ -684,3 +684,69 @@ body {
 .resolution-action-button:active {
     transform: scale(0.98);
 }
+
+/* FASE 18 · POLÍTICA COMERCIAL RESTRICTIVA */
+.commercial-experience {
+    align-self: flex-start;
+    width: min(520px, 85%);
+    display: grid;
+    gap: 10px;
+    margin-top: 2px;
+    animation: fadeIn 0.25s ease-out;
+}
+
+.commercial-card {
+    display: grid;
+    gap: 7px;
+    padding: 14px 16px;
+    border: 1px solid #dbe7ed;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 3px 12px rgba(17, 53, 72, 0.06);
+}
+
+.commercial-card-eyebrow {
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.commercial-card strong {
+    color: var(--movistar-blue-dark);
+    font-size: 14px;
+}
+
+.commercial-card p {
+    margin: 0;
+    color: #4f636f;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.existing-benefit-card {
+    background: #f5fbfe;
+}
+
+.cross-sell-card {
+    border-style: dashed;
+}
+
+.commercial-card-action {
+    justify-self: start;
+    border: 1px solid rgba(0, 169, 224, 0.4);
+    border-radius: 999px;
+    background: #ffffff;
+    color: var(--movistar-blue-dark);
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.commercial-card-action:hover,
+.commercial-card-action:focus-visible {
+    background: #eaf8fd;
+    outline: none;
+}

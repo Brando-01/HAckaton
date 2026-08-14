@@ -579,6 +579,160 @@
   }
 
 
+  function appendCommercialExperience(
+    commercialExperience
+  ) {
+    if (chatMessages) {
+      chatMessages
+        .querySelectorAll(
+          '.commercial-experience'
+        )
+        .forEach(
+          (element) =>
+            element.remove()
+        );
+    }
+
+    if (
+      !chatMessages ||
+      !commercialExperience
+    ) {
+      return;
+    }
+
+    const benefit =
+      commercialExperience
+        .existingBenefit;
+
+    const crossSell =
+      commercialExperience
+        .crossSell;
+
+    const showBenefit =
+      benefit?.available === true &&
+      benefit?.existingBenefit === true &&
+      benefit?.newAddition === false;
+
+    const showOffer =
+      crossSell?.offered === true &&
+      crossSell?.offer?.name &&
+      crossSell?.action?.type === 'CHAT' &&
+      crossSell?.action?.prompt;
+
+    if (!showBenefit && !showOffer) {
+      return;
+    }
+
+    const wrapper =
+      document.createElement('div');
+
+    wrapper.className =
+      'commercial-experience';
+
+    if (showBenefit) {
+      const card =
+        document.createElement('article');
+
+      card.className =
+        'commercial-card existing-benefit-card';
+
+      const eyebrow =
+        document.createElement('span');
+      eyebrow.className =
+        'commercial-card-eyebrow';
+      eyebrow.textContent =
+        'Beneficio vigente';
+
+      const title =
+        document.createElement('strong');
+      title.textContent =
+        benefit.title ||
+        'Ya cuentas con este beneficio';
+
+      const description =
+        document.createElement('p');
+      description.textContent =
+        benefit.description || '';
+
+      card.append(
+        eyebrow,
+        title,
+        description
+      );
+      wrapper.appendChild(card);
+    }
+
+    if (showOffer) {
+      const card =
+        document.createElement('article');
+
+      card.className =
+        'commercial-card cross-sell-card';
+
+      const eyebrow =
+        document.createElement('span');
+      eyebrow.className =
+        'commercial-card-eyebrow';
+      eyebrow.textContent =
+        'Opción para ti';
+
+      const title =
+        document.createElement('strong');
+      title.textContent =
+        crossSell.offer.name;
+
+      const details =
+        document.createElement('p');
+
+      const price = Number(
+        crossSell.offer.monthlyPrice
+      );
+
+      details.textContent =
+        Number.isFinite(price)
+          ? `Precio referencial: S/ ${price.toFixed(2)} al mes en el catálogo comercial simulado.`
+          : 'Opción referencial del catálogo comercial simulado.';
+
+      const button =
+        document.createElement('button');
+      button.type = 'button';
+      button.className =
+        'commercial-card-action';
+      button.textContent =
+        crossSell.action.label ||
+        'Conocer esta opción';
+
+      button.addEventListener(
+        'click',
+        () => {
+          if (
+            interactionFinished ||
+            sendingMessage ||
+            !userInput
+          ) {
+            return;
+          }
+
+          userInput.value =
+            crossSell.action.prompt;
+          sendMessage();
+        }
+      );
+
+      card.append(
+        eyebrow,
+        title,
+        details,
+        button
+      );
+      wrapper.appendChild(card);
+    }
+
+    chatMessages.appendChild(wrapper);
+    scrollToBottom();
+  }
+
+
   // =========================================================
   // ESTADO DEL COMPOSITOR
   // =========================================================
@@ -1150,6 +1304,13 @@
         )
           ? data.nextActions
           : []
+      );
+
+      appendCommercialExperience(
+        !data.requiresAuth &&
+        !data.handoff
+          ? data.commercialExperience
+          : null
       );
 
 

@@ -337,7 +337,7 @@ function buildResolutionGuards() {
     commercialActionOffered:
       false,
     commercialActionReason:
-      'DEFERRED_TO_RESTRICTIVE_COMMERCIAL_POLICY'
+      'HANDLED_BY_PHASE18_SEPARATE_COMMERCIAL_POLICY'
   };
 }
 

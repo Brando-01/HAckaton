@@ -83,6 +83,15 @@ const {
 } = require('./services/desafio1ResolutionLogic');
 
 const {
+  createDesafio1CommercialPolicyService
+} = require('./services/desafio1CommercialPolicyService');
+
+const {
+  isCommercialFollowUp,
+  buildCommercialOfferReply
+} = require('./services/desafio1CommercialPolicyLogic');
+
+const {
   esSolicitudAsesor,
   determinarMotivoDerivacion,
   obtenerConsultaOriginal,
@@ -308,6 +317,10 @@ function createApp(options = {}) {
     options.scenarioMappingService ||
     createDesafio1ScenarioMappingService();
 
+  const commercialPolicyService =
+    options.commercialPolicyService ||
+    createDesafio1CommercialPolicyService();
+
   const datasetExplorerService =
     options.datasetExplorerService ||
     createDatasetExplorerService();
@@ -405,6 +418,25 @@ function createApp(options = {}) {
         }
       };
     }
+  }
+
+  async function evaluateCommercialTurn({
+    user,
+    experience,
+    resolution,
+    sessionId
+  }) {
+    const session =
+      getOrCreateSession(sessionId);
+
+    return commercialPolicyService
+      .evaluateTurn({
+        user,
+        experience,
+        resolution,
+        sessionContext:
+          session.context || {}
+      });
   }
 
 
@@ -752,9 +784,14 @@ function createApp(options = {}) {
             req.auth.session.user
           );
 
-        return res.json(
-          experience
-        );
+        return res.json({
+          ...experience,
+          commercialExperience:
+            commercialPolicyService
+              .buildAppExperience({
+                experience
+              })
+        });
       } catch (error) {
         console.error(
           '[APP] No se pudo cargar el caso demo oficial:',
@@ -1204,6 +1241,74 @@ function createApp(options = {}) {
 
 
         // =====================================================
+        // FASE 18 · SEGUIMIENTO COMERCIAL DETERMINISTA
+        // Solo puede continuar una opción que el mismo backend
+        // mostró previamente en esta sesión autenticada.
+        // =====================================================
+
+        if (
+          requestAuth &&
+          isCommercialFollowUp(cleanMessage)
+        ) {
+          const commercialSession =
+            getOrCreateSession(
+              activeSessionId
+            );
+
+          const previousOffer =
+            commercialSession.context
+              .lastCommercialOffer ||
+            null;
+
+          const reply =
+            buildCommercialOfferReply(
+              previousOffer
+            );
+
+          addMessage(
+            activeSessionId,
+            'user',
+            cleanMessage
+          );
+          addMessage(
+            activeSessionId,
+            'assistant',
+            reply
+          );
+          registerMessage(
+            activeSessionId,
+            'assistant'
+          );
+
+          updateContext(
+            activeSessionId,
+            {
+              lastConversationDomain:
+                'COMMERCIAL',
+              lastCommercialFollowUp:
+                Boolean(previousOffer)
+            }
+          );
+
+          return res.json({
+            reply,
+            source:
+              'DESAFIO1_COMMERCIAL_DETERMINISTIC',
+            foundData:
+              Boolean(previousOffer),
+            authenticated: true,
+            sessionId:
+              activeSessionId,
+            financialReasoningByLlm:
+              false,
+            commercialReasoningByLlm:
+              false,
+            nextActions: [],
+            commercialExperience: null
+          });
+        }
+
+        // =====================================================
         // CALIDAD CONVERSACIONAL · FASE 10
         // Multi-intent, reparación y cambios de tema.
         // =====================================================
@@ -1356,6 +1461,18 @@ function createApp(options = {}) {
                 }
               );
 
+            const commercialTurn =
+              await evaluateCommercialTurn({
+                user:
+                  requestAuth.session.user,
+                experience:
+                  personalExperience,
+                resolution:
+                  turnResolution,
+                sessionId:
+                  activeSessionId
+              });
+
             addMessage(
               activeSessionId,
               'user',
@@ -1417,7 +1534,9 @@ function createApp(options = {}) {
                     .lastResolutionReason ||
                   null,
                 lastFinancialTrace:
-                  financialTrace
+                  financialTrace,
+                ...commercialTurn
+                  .contextPatch
               }
             );
 
@@ -1464,6 +1583,9 @@ function createApp(options = {}) {
                 turnResolution
                   ?.nextActions || [],
               financialTrace,
+              commercialExperience:
+                commercialTurn
+                  .publicExperience,
               conversation: {
                 multiIntent: true,
                 intentCount:
@@ -1974,6 +2096,18 @@ function createApp(options = {}) {
                 }
               );
 
+            const commercialTurn =
+              await evaluateCommercialTurn({
+                user:
+                  requestAuth.session.user,
+                experience:
+                  officialExperience,
+                resolution:
+                  personalReply.resolution,
+                sessionId:
+                  activeSessionId
+              });
+
             updateContext(
               activeSessionId,
               {
@@ -2000,7 +2134,9 @@ function createApp(options = {}) {
                     ?.reasonCode ||
                   null,
                 lastFinancialTrace:
-                  financialTrace
+                  financialTrace,
+                ...commercialTurn
+                  .contextPatch
               }
             );
 
@@ -2034,6 +2170,9 @@ function createApp(options = {}) {
             return res.json({
               ...personalReply,
               financialTrace,
+              commercialExperience:
+                commercialTurn
+                  .publicExperience,
               foundData: true,
               sessionId:
                 activeSessionId,
