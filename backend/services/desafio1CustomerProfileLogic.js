@@ -151,6 +151,13 @@ const PROFILE_INTENT_RULES = [
 const REPAIR_MARKERS = [
   'no entendi',
   'no lo entendi',
+  'sigo sin entender',
+  'sigo sin entenderlo',
+  'todavia no entiendo',
+  'aun no entiendo',
+  'sigo sin comprender',
+  'no me quedo claro',
+  'explicamelo',
   'explicamelo mejor',
   'explicamelo mas facil',
   'mas facil',

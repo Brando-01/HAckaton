@@ -78,14 +78,15 @@ Estas cuentas son exclusivamente para el prototipo. El sistema de autenticación
 
 Métricas calculadas durante la ejecución local:
 
-- resolución digital **proxy**: interacciones finalizadas por el cliente sin derivación / interacciones finalizadas;
+- **resolución verificada**: cierres sin handoff cuyo último estado medible es `RESOLVED` / cierres sin handoff con estado de resolución medible;
 - tasa de derivación y motivos de handoff;
+- reformulaciones e interacciones que alcanzan el umbral de incomprensión;
 - satisfacción media, porcentaje de valoraciones positivas y tasa de respuesta a la encuesta;
-- finalizadas sin valoración como **proxy** de ausencia de respuesta post-explicación;
+- **silencio post-explicación**: cierre inmediato después de un turno `RESOLVED`, sin una nueva pregunta;
 - contactos repetidos **proxy** por cliente identificado dentro de la misma ejecución;
 - duración, cierre, mensajes y trazabilidad de las interacciones.
 
-El dashboard no inventa valores para métricas que todavía no están instrumentadas. Desde Fase 16, `Retrieval Accuracy` y la tasa de alucinación financiera **detectable** se miden mediante `npm run audit:financial:desafio1`, contrastando las afirmaciones estructuradas contra filas SQLite crudas e invariantes deterministas. La precisión del handoff continúa pendiente porque requiere decisiones esperadas/casos etiquetados; el KPI histórico de resolución digital del dashboard sigue identificado como proxy.
+El dashboard no inventa valores para métricas que todavía no están instrumentadas. Desde Fase 16, `Retrieval Accuracy` y la tasa de alucinación financiera **detectable** se miden mediante `npm run audit:financial:desafio1`, contrastando las afirmaciones estructuradas contra filas SQLite crudas e invariantes deterministas. Desde Fase 19, la lógica de handoff se contrasta con casos etiquetados mediante `npm run audit:handoff:desafio1`; el resultado demuestra consistencia de la política implementada y no se presenta como precisión productiva sobre tráfico real.
 
 Las métricas se mantienen en memoria para el MVP y se reinician al reiniciar el servidor.
 
@@ -109,3 +110,16 @@ Desde Fase 18, Lucía mantiene la recomendación comercial separada del motor fi
 El *Efecto Efervescente* reutiliza únicamente beneficios `ACTIVE_DISCOUNT` con evidencia `HIGH` que ya están aplicados al cliente; se muestran como beneficios existentes y nunca como altas nuevas. Mi Movistar puede recordar esos beneficios, pero no realiza cross-selling por abrir la vista. Las ofertas mostradas son referenciales y no ejecutan contratación ni cambios de servicio.
 
 Las reglas, supresiones, separación de fuentes y limitaciones están documentadas en `backend/docs/desafio1-fase18.md`.
+
+## Handoff inteligente y métricas conversacionales
+
+Desde Fase 19, la derivación deja de depender solo de frases explícitas. La política determinista transfiere inmediatamente cuando el cliente solicita un humano, declara desacuerdo/no resolución, plantea una consulta inequívocamente fuera del alcance de facturación o alcanza dos reformulaciones consecutivas dentro de un contexto personal de facturación/perfil. Una sola reformulación intenta reparar la explicación; `PARTIALLY_RESOLVED` y `UNRESOLVED` ofrecen asesor sin forzar la transferencia.
+
+El comando:
+
+```bash
+cd backend
+npm run audit:handoff:desafio1 -- --details
+```
+
+mide la exactitud lógica contra casos etiquetados y reporta precisión, recall y falsos positivos/negativos. El dashboard registra además el estado de resolución por turno, reformulaciones y una señal específica de silencio post-explicación, separada de la respuesta a la encuesta. Los detalles y limitaciones están documentados en `backend/docs/desafio1-fase19.md`.

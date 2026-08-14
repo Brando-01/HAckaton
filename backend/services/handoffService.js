@@ -477,6 +477,17 @@ function crearResumenAsesor({
   } else if (reason === 'NOT_RESOLVED') {
     outcome =
       'El cliente indicó que la consulta no quedó resuelta y solicitó atención humana.';
+  } else if (
+    reason === 'OUT_OF_BILLING_SCOPE'
+  ) {
+    outcome =
+      'La consulta salió del alcance de facturación de Lucía y fue derivada mediante la política determinista de handoff.';
+  } else if (
+    reason ===
+    'REPEATED_UNDERSTANDING_FAILURE'
+  ) {
+    outcome =
+      'El cliente pidió aclaraciones repetidas y se alcanzó el umbral de incomprensión definido para derivar a un asesor.';
   } else if (assistantMessages.length) {
     outcome =
       'Después de conversar con Lucía, el cliente solicitó continuar con un asesor humano.';
@@ -492,6 +503,41 @@ function crearResumenAsesor({
   };
 }
 
+function normalizarPoliticaHandoff(
+  policyContext
+) {
+  if (!policyContext) {
+    return null;
+  }
+
+  return {
+    decision:
+      policyContext.decision || null,
+    reasonCode:
+      policyContext.reasonCode || null,
+    ruleId:
+      policyContext.ruleId || null,
+    trigger:
+      policyContext.trigger || null,
+    threshold:
+      Number.isInteger(
+        policyContext.threshold
+      )
+        ? policyContext.threshold
+        : null,
+    observedRepairCount:
+      Number.isInteger(
+        policyContext.observedRepairCount
+      )
+        ? policyContext.observedRepairCount
+        : 0,
+    resolutionStatusAtDecision:
+      policyContext
+        .resolutionStatusAtDecision ||
+      null
+  };
+}
+
 function crearCaso({
   sessionId,
   customerIdentifier = null,
@@ -500,7 +546,8 @@ function crearCaso({
   conversation = [],
   reason = 'CLIENT_REQUEST',
   customerContext = null,
-  billingContext = null
+  billingContext = null,
+  policyContext = null
 }) {
   const ahora =
     new Date().toISOString();
@@ -519,6 +566,11 @@ function crearCaso({
   const billing =
     normalizarContextoFacturacion(
       billingContext
+    );
+
+  const handoffPolicy =
+    normalizarPoliticaHandoff(
+      policyContext
     );
 
   const safeConversation =
@@ -540,6 +592,7 @@ function crearCaso({
     handoffMessage:
       handoffMessage || null,
     reason,
+    handoffPolicy,
     status: 'PENDING',
 
     advisorSummary:
@@ -617,6 +670,7 @@ function resetHandoffCases() {
 
 module.exports = {
   adaptarDescripcionParaAsesor,
+  normalizarPoliticaHandoff,
   esSolicitudAsesor,
   determinarMotivoDerivacion,
   obtenerConsultaOriginal,

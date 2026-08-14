@@ -22,7 +22,11 @@ test(
 
     assert.match(
       server,
-      /const wantsHandoff\s*=\s*esSolicitudAsesor/
+      /const preHandoffPolicy[\s\S]{0,180}evaluatePreTurnHandoffPolicy/
+    );
+    assert.match(
+      server,
+      /const wantsHandoff\s*=\s*preHandoffPolicy\.decision\s*===\s*HANDOFF_DECISIONS\.TRANSFER_NOW/
     );
     assert.match(
       server,

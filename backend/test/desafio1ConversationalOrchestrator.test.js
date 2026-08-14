@@ -301,3 +301,25 @@ test(
     assert.equal(billingOnly.domain, 'BILLING');
   }
 );
+
+test(
+  'Fase 19 conserva dominio BILLING en una segunda reformulación natural',
+  () => {
+    const plan =
+      planCustomerConversationTurn(
+        'Sigo sin entender, explícamelo otra vez',
+        {
+          lastBillingIntent: 'EXPLANATION',
+          lastConversationDomain: 'BILLING',
+          hasPersonalBillingContext: true
+        }
+      );
+
+    assert.equal(plan.repair, true);
+    assert.equal(plan.domain, 'BILLING');
+    assert.deepEqual(
+      plan.billingIntents,
+      ['EXPLANATION']
+    );
+  }
+);

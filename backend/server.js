@@ -92,7 +92,6 @@ const {
 } = require('./services/desafio1CommercialPolicyLogic');
 
 const {
-  esSolicitudAsesor,
   determinarMotivoDerivacion,
   obtenerConsultaOriginal,
   crearCaso,
@@ -102,8 +101,19 @@ const {
 } = require('./services/handoffService');
 
 const {
+  HANDOFF_DECISIONS,
+  buildRepairState,
+  evaluatePreTurnHandoffPolicy,
+  evaluatePostTurnHandoffPolicy,
+  buildSafeHandoffPolicySnapshot
+} = require('./services/desafio1HandoffPolicyLogic');
+
+const {
   registerInteractionContext,
   registerMessage,
+  registerTurnSignal,
+  registerTurnOutcome,
+  registerHandoffPolicyDecision,
   registerHandoff,
   endInteraction,
   registerSatisfaction,
@@ -282,6 +292,74 @@ function buildTurnFinancialTrace(
         resolution?.reasonCode || null
     }
   };
+}
+
+function trackResolutionOutcome(
+  sessionId,
+  resolution,
+  domain
+) {
+  const resolutionStatus =
+    resolution?.status || null;
+
+  if (resolutionStatus) {
+    registerTurnOutcome(
+      sessionId,
+      {
+        resolutionStatus,
+        resolutionReason:
+          resolution?.reasonCode || null,
+        domain: domain || null
+      }
+    );
+  }
+
+  const policy =
+    evaluatePostTurnHandoffPolicy({
+      resolutionStatus
+    });
+
+  if (
+    policy.decision !==
+    HANDOFF_DECISIONS.NONE
+  ) {
+    registerHandoffPolicyDecision(
+      sessionId,
+      policy
+    );
+  }
+
+  return policy;
+}
+
+function buildHandoffReply(
+  caseId,
+  reasonCode
+) {
+  if (
+    reasonCode ===
+    'OUT_OF_BILLING_SCOPE'
+  ) {
+    return (
+      'Esta consulta sale del alcance de facturación de Lucía. ' +
+      `Generé el caso ${caseId} para que un asesor continúe con el contexto de la conversación.`
+    );
+  }
+
+  if (
+    reasonCode ===
+    'REPEATED_UNDERSTANDING_FAILURE'
+  ) {
+    return (
+      'Como ya intentamos aclarar esta consulta más de una vez y todavía necesitas ayuda, ' +
+      `generé el caso ${caseId}. El asesor recibirá el contexto para que no tengas que repetirlo.`
+    );
+  }
+
+  return (
+    `Listo. Generé el caso ${caseId}. ` +
+    'Un asesor podrá revisar el contexto de esta conversación para que no tengas que explicar todo nuevamente.'
+  );
 }
 
 function isDemoMappingError(error) {
@@ -1280,6 +1358,21 @@ function createApp(options = {}) {
             'assistant'
           );
 
+          registerTurnOutcome(
+            activeSessionId,
+            {
+              resolutionStatus:
+                previousOffer
+                  ? 'RESOLVED'
+                  : 'UNRESOLVED',
+              resolutionReason:
+                previousOffer
+                  ? 'COMMERCIAL_FOLLOW_UP_ANSWERED'
+                  : 'COMMERCIAL_CONTEXT_MISSING',
+              domain: 'COMMERCIAL'
+            }
+          );
+
           updateContext(
             activeSessionId,
             {
@@ -1337,10 +1430,67 @@ function createApp(options = {}) {
             }
           );
 
+        const repairState =
+          buildRepairState({
+            repair:
+              conversationPlan.repair,
+            previousRepairCount:
+              metricsSession.context
+                .handoffRepairCount || 0,
+            lastConversationDomain:
+              metricsSession.context
+                .lastConversationDomain ||
+              null
+          });
+
+        const preHandoffPolicy =
+          evaluatePreTurnHandoffPolicy({
+            message:
+              cleanMessage,
+            repair:
+              conversationPlan.repair,
+            previousRepairCount:
+              metricsSession.context
+                .handoffRepairCount || 0,
+            lastConversationDomain:
+              metricsSession.context
+                .lastConversationDomain ||
+              null
+          });
+
+        registerTurnSignal(
+          activeSessionId,
+          {
+            // La métrica cuenta toda reformulación detectada.
+            // El umbral de transferencia sigue limitado a los
+            // dominios elegibles dentro de buildRepairState().
+            repair:
+              conversationPlan.repair
+          }
+        );
+
+        registerHandoffPolicyDecision(
+          activeSessionId,
+          preHandoffPolicy
+        );
+
+        updateContext(
+          activeSessionId,
+          {
+            handoffRepairCount:
+              repairState.currentRepairCount,
+            lastHandoffPolicyDecision:
+              preHandoffPolicy.decision,
+            lastHandoffPolicyReason:
+              preHandoffPolicy.reasonCode,
+            lastHandoffPolicyRuleId:
+              preHandoffPolicy.ruleId
+          }
+        );
+
         const wantsHandoff =
-          esSolicitudAsesor(
-            cleanMessage
-          );
+          preHandoffPolicy.decision ===
+          HANDOFF_DECISIONS.TRANSFER_NOW;
 
         // Si el usuario mezcla varias preguntas en un solo
         // turno, resolvemos todas con una sola carga del perfil
@@ -1448,6 +1598,13 @@ function createApp(options = {}) {
                   null
               });
 
+            const postHandoffPolicy =
+              trackResolutionOutcome(
+                activeSessionId,
+                turnResolution,
+                conversationPlan.domain
+              );
+
             const financialTrace =
               buildTurnFinancialTrace(
                 personalExperience
@@ -1535,6 +1692,12 @@ function createApp(options = {}) {
                   null,
                 lastFinancialTrace:
                   financialTrace,
+                lastHandoffPolicyDecision:
+                  postHandoffPolicy.decision,
+                lastHandoffPolicyReason:
+                  postHandoffPolicy.reasonCode,
+                lastHandoffPolicyRuleId:
+                  postHandoffPolicy.ruleId,
                 ...commercialTurn
                   .contextPatch
               }
@@ -1707,6 +1870,13 @@ function createApp(options = {}) {
                   cleanMessage
               });
 
+            const postHandoffPolicy =
+              trackResolutionOutcome(
+                activeSessionId,
+                profileResolution,
+                'PROFILE'
+              );
+
             addMessage(
               activeSessionId,
               'user',
@@ -1738,7 +1908,13 @@ function createApp(options = {}) {
                     ?.status || null,
                 lastResolutionReason:
                   profileResolution
-                    ?.reasonCode || null
+                    ?.reasonCode || null,
+                lastHandoffPolicyDecision:
+                  postHandoffPolicy.decision,
+                lastHandoffPolicyReason:
+                  postHandoffPolicy.reasonCode,
+                lastHandoffPolicyRuleId:
+                  postHandoffPolicy.ruleId
               }
             );
 
@@ -1815,11 +1991,7 @@ function createApp(options = {}) {
         // Persona 2
         // =====================================================
 
-        if (
-          esSolicitudAsesor(
-            cleanMessage
-          )
-        ) {
+        if (wantsHandoff) {
           const session =
             getOrCreateSession(
               activeSessionId
@@ -1895,8 +2067,20 @@ function createApp(options = {}) {
               conversation,
 
               reason:
+                preHandoffPolicy.reasonCode ||
                 determinarMotivoDerivacion(
                   cleanMessage
+                ),
+
+              policyContext:
+                buildSafeHandoffPolicySnapshot(
+                  preHandoffPolicy,
+                  {
+                    resolutionStatusAtDecision:
+                      session.context
+                        .lastResolutionStatus ||
+                      null
+                  }
                 ),
 
               // Transferimos un snapshot de los datos que el bot
@@ -1934,8 +2118,10 @@ function createApp(options = {}) {
 
 
           const reply =
-            `Listo. Generé el caso ${caso.caseId}. ` +
-            'Un asesor podrá revisar el contexto de esta conversación para que no tengas que explicar todo nuevamente.';
+            buildHandoffReply(
+              caso.caseId,
+              caso.reason
+            );
 
 
           // Persona 1:
@@ -2082,6 +2268,13 @@ function createApp(options = {}) {
                 }
               );
 
+            const postHandoffPolicy =
+              trackResolutionOutcome(
+                activeSessionId,
+                personalReply.resolution,
+                'BILLING'
+              );
+
             const financialTrace =
               buildTurnFinancialTrace(
                 officialExperience
@@ -2135,6 +2328,12 @@ function createApp(options = {}) {
                   null,
                 lastFinancialTrace:
                   financialTrace,
+                lastHandoffPolicyDecision:
+                  postHandoffPolicy.decision,
+                lastHandoffPolicyReason:
+                  postHandoffPolicy.reasonCode,
+                lastHandoffPolicyRuleId:
+                  postHandoffPolicy.ruleId,
                 ...commercialTurn
                   .contextPatch
               }
@@ -2239,11 +2438,26 @@ function createApp(options = {}) {
             'assistant'
           );
 
+          registerTurnOutcome(
+            activeSessionId,
+            {
+              resolutionStatus:
+                'RESOLVED',
+              resolutionReason:
+                'GENERAL_EDUCATION_ANSWERED',
+              domain: 'GENERAL'
+            }
+          );
+
           updateContext(
             activeSessionId,
             {
               lastConversationDomain:
-                'GENERAL'
+                'GENERAL',
+              lastResolutionStatus:
+                'RESOLVED',
+              lastResolutionReason:
+                'GENERAL_EDUCATION_ANSWERED'
             }
           );
 
@@ -2667,30 +2881,55 @@ function createApp(options = {}) {
           .customerIdentifier ||
         null;
 
+      const identityChanged =
+        Boolean(
+          previousCustomerId &&
+          previousCustomerId !==
+            customerId
+        );
+
       // Si el navegador cambia de perfil demo pero conserva el
       // chatSessionId, no reutilizamos el transcript del cliente
       // anterior. Entregamos un sessionId nuevo y el frontend lo
       // adopta antes de enviar la siguiente consulta.
-      if (
-        previousCustomerId &&
-        previousCustomerId !==
-          customerId
-      ) {
+      if (identityChanged) {
         targetSessionId =
           `s_${randomUUID()}`;
       }
 
+      // chat.js revalida la cookie antes de CADA mensaje.
+      // Reasociar la misma identidad debe ser idempotente: si
+      // borráramos hasOfficialBillingContext/lastBillingIntent
+      // aquí, una reformulación como "No entendí" perdería la
+      // explicación financiera inmediatamente anterior y caería
+      // al RAG general. Solo inicializamos el contexto cuando la
+      // sesión todavía no tenía cliente o cuando hubo rotación
+      // real de identidad.
+      const initializeConversationContext =
+        !previousCustomerId ||
+        identityChanged;
+
+      const associationPatch = {
+        customerIdentifier:
+          customerId,
+        identityLocked: true
+      };
+
+      if (initializeConversationContext) {
+        Object.assign(
+          associationPatch,
+          {
+            hasOfficialBillingContext:
+              false,
+            lastBillingIntent: null,
+            demoScenario: null
+          }
+        );
+      }
+
       updateContext(
         targetSessionId,
-        {
-          customerIdentifier:
-            customerId,
-          identityLocked: true,
-          hasOfficialBillingContext:
-            false,
-          lastBillingIntent: null,
-          demoScenario: null
-        }
+        associationPatch
       );
 
       return res.json({
@@ -2700,7 +2939,9 @@ function createApp(options = {}) {
         customerId,
         identitySessionRotated:
           targetSessionId !==
-          req.params.sessionId
+          req.params.sessionId,
+        conversationContextPreserved:
+          !initializeConversationContext
       });
     }
   );

@@ -518,3 +518,24 @@ test(
     );
   }
 );
+
+test(
+  'Fase 19 reconoce sigo sin entender como reparación de perfil',
+  () => {
+    assert.deepEqual(
+      resolveCustomerProfileIntents(
+        'Sigo sin entender, explícamelo otra vez',
+        {
+          lastIntents: [
+            'CURRENT_PLAN',
+            'DEBT_STATUS'
+          ]
+        }
+      ),
+      [
+        'CURRENT_PLAN',
+        'DEBT_STATUS'
+      ]
+    );
+  }
+);

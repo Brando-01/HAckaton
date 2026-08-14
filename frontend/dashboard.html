@@ -66,10 +66,10 @@
 
             <div class="primary-metrics-grid">
                 <article class="metric-card metric-card-primary">
-                    <span class="metric-label">Resolución digital <span class="proxy-pill">proxy</span></span>
-                    <strong class="metric-value" id="digitalResolutionRate">0%</strong>
-                    <span class="metric-secondary" id="digitalResolutionDetail">0 finalizadas sin derivación</span>
-                    <span class="metric-definition">Finalizadas por el cliente sin handoff / finalizadas.</span>
+                    <span class="metric-label">Resolución verificada</span>
+                    <strong class="metric-value" id="verifiedResolutionRate">0%</strong>
+                    <span class="metric-secondary" id="verifiedResolutionDetail">0 de 0 cierres medibles</span>
+                    <span class="metric-definition">Último turno RESOLVED y cierre sin handoff / cierres con estado de resolución medible.</span>
                 </article>
 
                 <article class="metric-card">
@@ -77,6 +77,13 @@
                     <strong class="metric-value" id="handoffRate">0%</strong>
                     <span class="metric-secondary" id="handoffInteractions">0 derivaciones</span>
                     <span class="metric-definition">Interacciones que necesitaron atención humana.</span>
+                </article>
+
+                <article class="metric-card">
+                    <span class="metric-label">Precisión de handoff <span class="proxy-pill">benchmark</span></span>
+                    <strong class="metric-value" id="handoffAccuracy">0%</strong>
+                    <span class="metric-secondary" id="handoffAccuracyDetail">0 de 0 casos</span>
+                    <span class="metric-definition">Casos etiquetados de la política determinista F19; no equivale a precisión productiva.</span>
                 </article>
 
                 <article class="metric-card">
@@ -90,14 +97,21 @@
                     <span class="metric-label">Respuesta a encuesta</span>
                     <strong class="metric-value" id="satisfactionResponseRate">0%</strong>
                     <span class="metric-secondary" id="surveyResponseDetail">0 de 0 finalizadas</span>
-                    <span class="metric-definition">Permite separar satisfacción medida de ausencia de respuesta.</span>
+                    <span class="metric-definition">Permite separar satisfacción medida de ausencia de valoración.</span>
                 </article>
 
                 <article class="metric-card">
-                    <span class="metric-label">Sin respuesta <span class="proxy-pill">proxy</span></span>
-                    <strong class="metric-value" id="unratedEndedRate">0%</strong>
-                    <span class="metric-secondary" id="unratedEndedDetail">0 interacciones</span>
-                    <span class="metric-definition">Aproxima la “tasa de silencio” hasta instrumentar una señal específica.</span>
+                    <span class="metric-label">Silencio post-explicación</span>
+                    <strong class="metric-value" id="postExplanationSilenceRate">0%</strong>
+                    <span class="metric-secondary" id="postExplanationSilenceDetail">0 cierres tras explicación resuelta</span>
+                    <span class="metric-definition">El cliente cerró la sesión inmediatamente después de un turno RESOLVED, sin una nueva pregunta.</span>
+                </article>
+
+                <article class="metric-card">
+                    <span class="metric-label">Reformulaciones</span>
+                    <strong class="metric-value" id="repairInteractionRate">0%</strong>
+                    <span class="metric-secondary" id="repairInteractionDetail">0 interacciones</span>
+                    <span class="metric-definition">Interacciones con “no entendí” o reparación equivalente; dos seguidas activan el umbral de handoff.</span>
                 </article>
 
                 <article class="metric-card">
@@ -384,8 +398,8 @@
                 </table>
             </div>
             <p class="table-note">
-                “Resolución digital” es un proxy de demo: significa que el cliente finalizó sin handoff;
-                no demuestra por sí solo que la consulta haya quedado resuelta.
+                Fase 19 usa el estado RESOLVED/PARTIALLY_RESOLVED/UNRESOLVED registrado por turno para medir cierres.
+                El contacto repetido sigue siendo un proxy local porque las métricas viven en memoria y no representan una ventana productiva.
             </p>
         </section>
 

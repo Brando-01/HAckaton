@@ -243,8 +243,13 @@ function requiresPersonalBillingAccess(
 
   if (
     hasPersonalBillingContext &&
-    isPersonalBillingFollowup(
-      text
+    (
+      isPersonalBillingFollowup(
+        text
+      ) ||
+      isBillingRepairRequest(
+        text
+      )
     )
   ) {
     return true;
@@ -307,6 +312,12 @@ function isBillingRepairRequest(
   return [
     'no entendi',
     'no lo entendi',
+    'sigo sin entender',
+    'sigo sin entenderlo',
+    'todavia no entiendo',
+    'aun no entiendo',
+    'sigo sin comprender',
+    'no me quedo claro',
     'explicamelo',
     'explicamelo mejor',
     'explicamelo mas facil',

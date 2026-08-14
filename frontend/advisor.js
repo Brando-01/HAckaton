@@ -46,7 +46,13 @@
         'Cliente no está de acuerdo',
 
       NOT_RESOLVED:
-        'Consulta no resuelta'
+        'Consulta no resuelta',
+
+      OUT_OF_BILLING_SCOPE:
+        'Fuera del alcance de facturación',
+
+      REPEATED_UNDERSTANDING_FAILURE:
+        'Umbral de incomprensión alcanzado'
     };
 
     return (
@@ -909,6 +915,28 @@
         caso.reason
       )
     );
+
+    if (caso.handoffPolicy) {
+      agregarDato(
+        grid,
+        'Regla aplicada',
+        caso.handoffPolicy.ruleId ||
+          'Regla no disponible'
+      );
+
+      if (
+        Number.isInteger(
+          caso.handoffPolicy.threshold
+        )
+      ) {
+        agregarDato(
+          grid,
+          'Umbral de incomprensión',
+          `${caso.handoffPolicy.observedRepairCount || 0}/${caso.handoffPolicy.threshold}`
+        );
+      }
+    }
+
 
     agregarDato(
       grid,

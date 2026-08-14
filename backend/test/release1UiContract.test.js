@@ -68,18 +68,22 @@ test('el dashboard reemplaza estados Pendiente de calidad por controles del pref
   );
 });
 
-test('el dashboard conserva explícitamente que los KPIs operativos son proxies cuando corresponde', () => {
+test('el dashboard usa resolución instrumentada y conserva proxy solo donde corresponde', () => {
   const html = read(
     'frontend/dashboard.html'
   );
 
   assert.match(
     html,
-    /Resolución digital[\s\S]*proxy/i
+    /Resolución verificada/i
   );
   assert.match(
     html,
-    /no demuestra por sí solo que la consulta haya quedado resuelta/i
+    /Silencio post-explicación/i
+  );
+  assert.match(
+    html,
+    /Contactos repetidos[\s\S]*proxy/i
   );
 });
 

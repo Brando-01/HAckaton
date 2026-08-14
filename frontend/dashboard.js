@@ -8,10 +8,14 @@
       document.getElementById('activeInteractions'),
     completionRate:
       document.getElementById('completionRate'),
-    digitalResolutionRate:
-      document.getElementById('digitalResolutionRate'),
-    digitalResolutionDetail:
-      document.getElementById('digitalResolutionDetail'),
+    verifiedResolutionRate:
+      document.getElementById('verifiedResolutionRate'),
+    verifiedResolutionDetail:
+      document.getElementById('verifiedResolutionDetail'),
+    handoffAccuracy:
+      document.getElementById('handoffAccuracy'),
+    handoffAccuracyDetail:
+      document.getElementById('handoffAccuracyDetail'),
     averageSatisfaction:
       document.getElementById('averageSatisfaction'),
     ratedInteractions:
@@ -22,10 +26,14 @@
       document.getElementById('satisfactionResponseRate'),
     surveyResponseDetail:
       document.getElementById('surveyResponseDetail'),
-    unratedEndedRate:
-      document.getElementById('unratedEndedRate'),
-    unratedEndedDetail:
-      document.getElementById('unratedEndedDetail'),
+    postExplanationSilenceRate:
+      document.getElementById('postExplanationSilenceRate'),
+    postExplanationSilenceDetail:
+      document.getElementById('postExplanationSilenceDetail'),
+    repairInteractionRate:
+      document.getElementById('repairInteractionRate'),
+    repairInteractionDetail:
+      document.getElementById('repairInteractionDetail'),
     repeatContactRate:
       document.getElementById('repeatContactRate'),
     repeatContactDetail:
@@ -202,9 +210,27 @@
       return td;
     }
 
-    if (interaction.endReason === 'USER_ENDED') {
+    if (
+      interaction.closure?.resolutionStatusAtClose ===
+      'RESOLVED'
+    ) {
       td.appendChild(
-        createBadge('Resolución digital*', 'resolved')
+        createBadge('Resuelta', 'resolved')
+      );
+      return td;
+    }
+
+    if (
+      [
+        'PARTIALLY_RESOLVED',
+        'UNRESOLVED'
+      ].includes(
+        interaction.closure
+          ?.resolutionStatusAtClose
+      )
+    ) {
+      td.appendChild(
+        createBadge('Cierre no resuelto', 'warning')
       );
       return td;
     }
@@ -391,9 +417,15 @@
     elements.activeInteractions.textContent = data.activeInteractions ?? 0;
     elements.completionRate.textContent = `${data.completionRate ?? 0}% de cierre`;
 
-    elements.digitalResolutionRate.textContent = `${data.digitalResolutionRate ?? 0}%`;
-    elements.digitalResolutionDetail.textContent =
-      `${data.digitalResolutionInteractions ?? 0} de ${ended} finalizadas sin derivación`;
+    elements.verifiedResolutionRate.textContent = `${data.verifiedResolutionRate ?? 0}%`;
+    elements.verifiedResolutionDetail.textContent =
+      `${data.verifiedResolutionInteractions ?? 0} de ${data.measurableResolutionInteractions ?? 0} cierres medibles`;
+
+    const handoffBenchmark = data.handoffAccuracyBenchmark || {};
+    elements.handoffAccuracy.textContent =
+      `${handoffBenchmark.decisionAccuracy ?? 0}%`;
+    elements.handoffAccuracyDetail.textContent =
+      `${handoffBenchmark.correctCases ?? 0} de ${handoffBenchmark.totalCases ?? 0} casos etiquetados`;
 
     elements.handoffRate.textContent = `${data.handoffRate ?? 0}%`;
     elements.handoffInteractions.textContent =
@@ -415,9 +447,15 @@
     elements.surveyResponseDetail.textContent =
       `${ratedEnded} de ${ended} finalizadas con valoración`;
 
-    elements.unratedEndedRate.textContent = `${data.unratedEndedRate ?? 0}%`;
-    elements.unratedEndedDetail.textContent =
-      `${data.unratedEndedInteractions ?? 0} finalizadas sin valoración`;
+    elements.postExplanationSilenceRate.textContent =
+      `${data.postExplanationSilenceRate ?? 0}%`;
+    elements.postExplanationSilenceDetail.textContent =
+      `${data.postExplanationSilenceInteractions ?? 0} cierres directos tras RESOLVED`;
+
+    elements.repairInteractionRate.textContent =
+      `${data.repairInteractionRate ?? 0}%`;
+    elements.repairInteractionDetail.textContent =
+      `${data.repairInteractions ?? 0} interacciones · ${data.repeatedRepairInteractions ?? 0} alcanzaron 2 reformulaciones`;
 
     elements.repeatContactRate.textContent = `${data.repeatContactRate ?? 0}%`;
     elements.repeatContactDetail.textContent =

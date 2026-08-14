@@ -1,3 +1,7 @@
+const {
+  runHandoffPolicyBenchmark
+} = require('./desafio1HandoffAuditLogic');
+
 const interactions = new Map();
 
 const VALID_END_REASONS = new Set([
@@ -7,10 +11,18 @@ const VALID_END_REASONS = new Set([
   'HANDOFF'
 ]);
 
+const RESOLUTION_STATUSES = new Set([
+  'RESOLVED',
+  'PARTIALLY_RESOLVED',
+  'UNRESOLVED'
+]);
+
 const HANDOFF_REASONS = [
   'CLIENT_REQUEST',
   'CUSTOMER_DISAGREES',
-  'NOT_RESOLVED'
+  'NOT_RESOLVED',
+  'OUT_OF_BILLING_SCOPE',
+  'REPEATED_UNDERSTANDING_FAILURE'
 ];
 
 function clone(value) {
@@ -58,7 +70,36 @@ function ensureInteraction(sessionId) {
       handoffCaseId: null,
       handoffReason: null,
 
-      satisfaction: null
+      satisfaction: null,
+
+      resolution: {
+        measuredTurns: 0,
+        resolvedTurns: 0,
+        partiallyResolvedTurns: 0,
+        unresolvedTurns: 0,
+        lastStatus: null,
+        lastReason: null,
+        lastDomain: null,
+        awaitingPostExplanationOutcome: false,
+        followUpsAfterResolved: 0
+      },
+
+      repairs: {
+        turns: 0,
+        consecutive: 0,
+        maxConsecutive: 0
+      },
+
+      handoffPolicy: {
+        evaluations: 0,
+        offers: 0,
+        transferDecisions: 0,
+        lastDecision: null,
+        lastReasonCode: null,
+        lastRuleId: null
+      },
+
+      closure: null
     };
 
     interactions.set(
@@ -124,11 +165,148 @@ function registerMessage(
   }
 
   if (role === 'user') {
+    if (
+      interaction.resolution
+        .awaitingPostExplanationOutcome
+    ) {
+      interaction.resolution
+        .followUpsAfterResolved += 1;
+      interaction.resolution
+        .awaitingPostExplanationOutcome = false;
+    }
+
     interaction.userMessages += 1;
   }
 
   if (role === 'assistant') {
     interaction.assistantMessages += 1;
+  }
+
+  interaction.lastActivityAt =
+    new Date().toISOString();
+
+  return clone(interaction);
+}
+
+function registerTurnSignal(
+  sessionId,
+  {
+    repair = false
+  } = {}
+) {
+  const interaction =
+    ensureInteraction(sessionId);
+
+  if (interaction.status === 'ENDED') {
+    return clone(interaction);
+  }
+
+  if (repair) {
+    interaction.repairs.turns += 1;
+    interaction.repairs.consecutive += 1;
+    interaction.repairs.maxConsecutive =
+      Math.max(
+        interaction.repairs.maxConsecutive,
+        interaction.repairs.consecutive
+      );
+  } else {
+    interaction.repairs.consecutive = 0;
+  }
+
+  interaction.lastActivityAt =
+    new Date().toISOString();
+
+  return clone(interaction);
+}
+
+function registerTurnOutcome(
+  sessionId,
+  {
+    resolutionStatus = null,
+    resolutionReason = null,
+    domain = null
+  } = {}
+) {
+  const interaction =
+    ensureInteraction(sessionId);
+
+  if (
+    interaction.status === 'ENDED' ||
+    !RESOLUTION_STATUSES.has(
+      resolutionStatus
+    )
+  ) {
+    return clone(interaction);
+  }
+
+  interaction.resolution.measuredTurns += 1;
+  interaction.resolution.lastStatus =
+    resolutionStatus;
+  interaction.resolution.lastReason =
+    resolutionReason || null;
+  interaction.resolution.lastDomain =
+    domain || null;
+
+  if (resolutionStatus === 'RESOLVED') {
+    interaction.resolution.resolvedTurns += 1;
+    interaction.resolution
+      .awaitingPostExplanationOutcome = true;
+  } else {
+    interaction.resolution
+      .awaitingPostExplanationOutcome = false;
+
+    if (
+      resolutionStatus ===
+      'PARTIALLY_RESOLVED'
+    ) {
+      interaction.resolution
+        .partiallyResolvedTurns += 1;
+    }
+
+    if (
+      resolutionStatus === 'UNRESOLVED'
+    ) {
+      interaction.resolution
+        .unresolvedTurns += 1;
+    }
+  }
+
+  interaction.lastActivityAt =
+    new Date().toISOString();
+
+  return clone(interaction);
+}
+
+function registerHandoffPolicyDecision(
+  sessionId,
+  policy = null
+) {
+  const interaction =
+    ensureInteraction(sessionId);
+
+  if (!policy || !policy.decision) {
+    return clone(interaction);
+  }
+
+  interaction.handoffPolicy.evaluations += 1;
+  interaction.handoffPolicy.lastDecision =
+    policy.decision;
+  interaction.handoffPolicy.lastReasonCode =
+    policy.reasonCode || null;
+  interaction.handoffPolicy.lastRuleId =
+    policy.ruleId || null;
+
+  if (
+    policy.decision === 'OFFER_ADVISOR'
+  ) {
+    interaction.handoffPolicy.offers += 1;
+  }
+
+  if (
+    policy.decision === 'TRANSFER_NOW'
+  ) {
+    interaction.handoffPolicy
+      .transferDecisions += 1;
   }
 
   interaction.lastActivityAt =
@@ -151,10 +329,74 @@ function registerHandoff(
   interaction.handoffReason =
     reason || null;
 
+  interaction.resolution
+    .awaitingPostExplanationOutcome = false;
+
   interaction.lastActivityAt =
     new Date().toISOString();
 
   return clone(interaction);
+}
+
+function buildClosure(
+  interaction,
+  reason
+) {
+  const resolutionStatus =
+    interaction.resolution.lastStatus;
+
+  const postExplanationSilence =
+    reason === 'USER_ENDED' &&
+    !interaction.handoff &&
+    resolutionStatus === 'RESOLVED' &&
+    interaction.resolution
+      .awaitingPostExplanationOutcome;
+
+  let classification =
+    'UNCLASSIFIED_EXIT';
+
+  if (reason === 'HANDOFF') {
+    classification = 'HANDOFF';
+  } else if (postExplanationSilence) {
+    classification =
+      'RESOLVED_POST_EXPLANATION_SILENCE';
+  } else if (
+    reason === 'USER_ENDED' &&
+    resolutionStatus === 'RESOLVED'
+  ) {
+    classification = 'RESOLVED_EXIT';
+  } else if (
+    reason === 'USER_ENDED' &&
+    [
+      'PARTIALLY_RESOLVED',
+      'UNRESOLVED'
+    ].includes(resolutionStatus)
+  ) {
+    classification = 'UNRESOLVED_EXIT';
+  } else if (
+    reason === 'NEW_CHAT' &&
+    resolutionStatus === 'RESOLVED'
+  ) {
+    classification =
+      'NEW_CHAT_AFTER_RESOLUTION';
+  }
+
+  return {
+    classification,
+    resolutionStatusAtClose:
+      resolutionStatus || null,
+    resolutionReasonAtClose:
+      interaction.resolution.lastReason ||
+      null,
+    postExplanationSilence,
+    followUpsAfterResolved:
+      interaction.resolution
+        .followUpsAfterResolved,
+    measured:
+      RESOLUTION_STATUSES.has(
+        resolutionStatus
+      )
+  };
 }
 
 function endInteraction(
@@ -187,6 +429,15 @@ function endInteraction(
 
   interaction.endReason =
     reason;
+
+  interaction.closure =
+    buildClosure(
+      interaction,
+      reason
+    );
+
+  interaction.resolution
+    .awaitingPostExplanationOutcome = false;
 
   const startDate =
     new Date(
@@ -339,7 +590,11 @@ function buildHandoffReasonBreakdown(
     CUSTOMER_DISAGREES:
       'Cliente no está de acuerdo',
     NOT_RESOLVED:
-      'Consulta no resuelta'
+      'Cliente declara no resuelto',
+    OUT_OF_BILLING_SCOPE:
+      'Fuera del alcance de facturación',
+    REPEATED_UNDERSTANDING_FAILURE:
+      'Umbral de incomprensión alcanzado'
   };
 
   const handoffs =
@@ -463,6 +718,59 @@ function getDashboardSummary() {
         item.endReason === 'USER_ENDED'
     ).length;
 
+  const measurableEndedWithoutHandoff =
+    endedInteractions.filter(
+      (item) =>
+        !item.handoff &&
+        item.closure?.measured
+    );
+
+  const verifiedResolutionInteractions =
+    measurableEndedWithoutHandoff.filter(
+      (item) =>
+        item.closure
+          ?.resolutionStatusAtClose ===
+        'RESOLVED'
+    ).length;
+
+  const unresolvedExitInteractions =
+    measurableEndedWithoutHandoff.filter(
+      (item) =>
+        [
+          'PARTIALLY_RESOLVED',
+          'UNRESOLVED'
+        ].includes(
+          item.closure
+            ?.resolutionStatusAtClose
+        )
+    ).length;
+
+  const postExplanationSilenceInteractions =
+    endedInteractions.filter(
+      (item) =>
+        item.closure
+          ?.postExplanationSilence === true
+    ).length;
+
+  const repairInteractions =
+    all.filter(
+      (item) =>
+        item.repairs?.turns > 0
+    ).length;
+
+  const repeatedRepairInteractions =
+    all.filter(
+      (item) =>
+        item.repairs?.maxConsecutive >= 2
+    ).length;
+
+  const totalRepairTurns =
+    all.reduce(
+      (sum, item) =>
+        sum + (item.repairs?.turns || 0),
+      0
+    );
+
   const unratedEndedInteractions =
     endedInteractions.filter(
       (item) =>
@@ -538,6 +846,24 @@ function getDashboardSummary() {
       endedInteractions.length
     );
 
+  const verifiedResolutionRate =
+    percentage(
+      verifiedResolutionInteractions,
+      measurableEndedWithoutHandoff.length
+    );
+
+  const postExplanationSilenceRate =
+    percentage(
+      postExplanationSilenceInteractions,
+      measurableEndedWithoutHandoff.length
+    );
+
+  const repairInteractionRate =
+    percentage(
+      repairInteractions,
+      totalInteractions
+    );
+
   const satisfactionResponseRate =
     percentage(
       ratedEndedInteractions.length,
@@ -568,6 +894,9 @@ function getDashboardSummary() {
   const repeatContacts =
     buildRepeatContactMetrics(all);
 
+  const handoffBenchmark =
+    runHandoffPolicyBenchmark();
+
   return {
     totalInteractions,
 
@@ -585,6 +914,41 @@ function getDashboardSummary() {
     digitalResolutionInteractions,
 
     digitalResolutionRate,
+
+    measurableResolutionInteractions:
+      measurableEndedWithoutHandoff.length,
+    verifiedResolutionInteractions,
+    verifiedResolutionRate,
+    unresolvedExitInteractions,
+
+    postExplanationSilenceInteractions,
+    postExplanationSilenceRate,
+
+    repairInteractions,
+    repeatedRepairInteractions,
+    repairInteractionRate,
+    totalRepairTurns,
+
+    handoffAccuracyBenchmark: {
+      status:
+        handoffBenchmark.status,
+      totalCases:
+        handoffBenchmark.totalCases,
+      correctCases:
+        handoffBenchmark.correctCases,
+      decisionAccuracy:
+        handoffBenchmark.decisionAccuracy,
+      transferPrecision:
+        handoffBenchmark.transferPrecision,
+      transferRecall:
+        handoffBenchmark.transferRecall,
+      falsePositiveTransfers:
+        handoffBenchmark.falsePositiveTransfers,
+      falseNegativeTransfers:
+        handoffBenchmark.falseNegativeTransfers,
+      scope:
+        handoffBenchmark.scope
+    },
 
     ratedInteractions:
       ratedInteractions.length,
@@ -635,6 +999,9 @@ module.exports = {
   ensureInteraction,
   registerInteractionContext,
   registerMessage,
+  registerTurnSignal,
+  registerTurnOutcome,
+  registerHandoffPolicyDecision,
   registerHandoff,
   endInteraction,
   registerSatisfaction,

@@ -168,6 +168,34 @@ test(
 
 
 test(
+  'una reformulación conserva acceso a facturación personal cuando ya existe contexto oficial',
+  () => {
+    assert.equal(
+      requiresPersonalBillingAccess(
+        'No entendí, explícamelo más fácil',
+        {
+          hasPersonalBillingContext:
+            true
+        }
+      ),
+      true
+    );
+
+    assert.equal(
+      requiresPersonalBillingAccess(
+        'Sigo sin entender, explícamelo otra vez',
+        {
+          hasPersonalBillingContext:
+            true
+        }
+      ),
+      true
+    );
+  }
+);
+
+
+test(
   'por qué subió mi recibo requiere autenticación',
   () => {
     assert.equal(
@@ -1082,6 +1110,22 @@ test(
     assert.match(
       reply,
       /no voy a inferirlo/i
+    );
+  }
+);
+
+test(
+  'Fase 19 reconoce una reformulación persistente como reparación financiera',
+  () => {
+    assert.equal(
+      classifyPersonalBillingIntent(
+        'Sigo sin entender, explícamelo otra vez',
+        {
+          hasPersonalBillingContext: true,
+          lastBillingIntent: 'CURRENT_TOTAL'
+        }
+      ),
+      'CURRENT_TOTAL'
     );
   }
 );
