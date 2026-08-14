@@ -812,6 +812,21 @@
   // ENVÍO DE MENSAJES
   // =========================================================
 
+  /**
+   * Envía un texto como si el usuario lo hubiera escrito.
+   *
+   * Lo usan los chips de seguimiento: `sendMessage` lee del input, así que se
+   * rellena y se dispara el mismo camino, sin duplicar la lógica de envío.
+   */
+  function enviarTextoComoUsuario(texto) {
+    if (!userInput || sendingMessage) {
+      return;
+    }
+
+    userInput.value = texto;
+    sendMessage();
+  }
+
   async function sendMessage() {
     if (sendingMessage) {
       return;
@@ -823,6 +838,12 @@
 
     if (!text) {
       return;
+    }
+
+    // Los chips de la respuesta anterior ya no aplican: dejarlos invita a
+    // hacer clic sobre una sugerencia fuera de contexto.
+    if (window.Interaccion) {
+      window.Interaccion.limpiarChips();
     }
 
 
@@ -953,6 +974,15 @@
           data.reply,
           'bot'
         );
+
+        // Tarjeta de recibo y chips de seguimiento. Sus datos vienen del
+        // bloque de hechos del backend, así que la vista no calcula ningún
+        // monto por su cuenta.
+        if (window.Interaccion) {
+          window.Interaccion.renderizarRespuesta(data, (textoDelChip) => {
+            enviarTextoComoUsuario(textoDelChip);
+          });
+        }
       } else {
         appendMessage(
           'No se recibió respuesta del servidor.',
@@ -1198,6 +1228,11 @@
     const loginBtn = document.getElementById('loginButton');
     const userProfileBtn = document.getElementById('userProfileButton');
     const badgeText = document.getElementById('userProfileBadgeText');
+
+    // Nivel de identidad en el encabezado: "Modo general" o "Verificado".
+    if (window.Interaccion) {
+      window.Interaccion.actualizarBadgeIdentidad(user);
+    }
 
     if (user) {
       if (loginBtn) loginBtn.classList.add('hidden');

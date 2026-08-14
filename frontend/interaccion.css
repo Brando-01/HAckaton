@@ -1,0 +1,209 @@
+/*
+ * Chips de seguimiento, tarjeta de recibo y badge de identidad.
+ *
+ * Usa la paleta que ya define chat.css (--movistar-blue sobre --movistar-navy).
+ * No rediseña nada: el reto se juega en la conversación, no en la estética.
+ */
+
+/* ── Chips de seguimiento ─────────────────────────────────────────────── */
+
+.chips-seguimiento {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 4px 0 14px 0;
+    padding: 0 4px;
+    animation: chips-entrada 180ms ease-out;
+}
+
+.chip {
+    font: inherit;
+    font-size: 0.85rem;
+    line-height: 1.2;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--movistar-blue, #00A9E0);
+    background: var(--bg-card, #FFFFFF);
+    color: var(--movistar-blue-dark, #0081C9);
+    cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+
+.chip:hover,
+.chip:focus-visible {
+    background: var(--movistar-blue, #00A9E0);
+    color: #FFFFFF;
+}
+
+.chip:focus-visible {
+    outline: 2px solid var(--movistar-navy, #0B2739);
+    outline-offset: 2px;
+}
+
+@keyframes chips-entrada {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Tarjeta de recibo ────────────────────────────────────────────────── */
+
+.tarjeta-recibo {
+    background: var(--bg-card, #FFFFFF);
+    border: 1px solid var(--border-color, #E2E8F0);
+    border-left: 4px solid var(--movistar-blue, #00A9E0);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin: 6px 0 14px 0;
+    max-width: 420px;
+    box-shadow: 0 2px 8px rgba(11, 39, 57, 0.06);
+    animation: chips-entrada 200ms ease-out;
+}
+
+.tarjeta-cabecera {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.tarjeta-periodo {
+    font-size: 0.82rem;
+    color: var(--text-muted, #627180);
+}
+
+.tarjeta-total {
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: var(--text-primary, #1C2833);
+    white-space: nowrap;
+}
+
+.tarjeta-estado {
+    margin: 6px 0 0 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.tarjeta-estado.pendiente { color: #C2410C; }
+.tarjeta-estado.pagado    { color: #15803D; }
+
+.tarjeta-variacion {
+    margin: 10px 0 0 0;
+    font-size: 0.86rem;
+    font-weight: 600;
+}
+
+.tarjeta-variacion.sube { color: #C2410C; }
+.tarjeta-variacion.baja { color: #15803D; }
+
+/* Causas */
+
+.tarjeta-causas {
+    list-style: none;
+    margin: 12px 0 0 0;
+    padding: 12px 0 0 0;
+    border-top: 1px solid var(--border-color, #E2E8F0);
+}
+
+.tarjeta-causa {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 3px 0;
+    font-size: 0.84rem;
+}
+
+.tarjeta-causa-titulo { color: var(--text-primary, #1C2833); }
+
+.tarjeta-causa-impacto {
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.tarjeta-causa-impacto.sube { color: #C2410C; }
+.tarjeta-causa-impacto.baja { color: #15803D; }
+
+/* Mini-serie del historial */
+
+.tarjeta-serie {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 46px;
+    margin-top: 14px;
+}
+
+.tarjeta-serie-col {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+}
+
+.tarjeta-serie-barra {
+    width: 100%;
+    border-radius: 3px 3px 0 0;
+    background: #CBD5E1;
+    transition: background-color 140ms ease;
+}
+
+.tarjeta-serie-barra.actual { background: var(--movistar-blue, #00A9E0); }
+
+.tarjeta-serie-col:hover .tarjeta-serie-barra {
+    background: var(--movistar-blue-dark, #0081C9);
+}
+
+.tarjeta-pie {
+    margin: 6px 0 0 0;
+    font-size: 0.74rem;
+    color: var(--text-muted, #627180);
+    text-align: right;
+}
+
+/* ── Badge de nivel de identidad ──────────────────────────────────────── */
+
+.badge-identidad {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.badge-identidad.general {
+    background: rgba(98, 113, 128, 0.12);
+    color: var(--text-muted, #627180);
+}
+
+.badge-identidad.general::before { content: '○'; }
+
+.badge-identidad.verificado {
+    background: rgba(21, 128, 61, 0.12);
+    color: #15803D;
+}
+
+.badge-identidad.verificado::before { content: '🛡️'; }
+
+/* ── Responsive y accesibilidad ───────────────────────────────────────── */
+
+@media (max-width: 640px) {
+    .tarjeta-recibo { max-width: 100%; }
+    .tarjeta-total  { font-size: 1.25rem; }
+    .chip           { font-size: 0.8rem; padding: 7px 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .chips-seguimiento,
+    .tarjeta-recibo {
+        animation: none;
+    }
+
+    .chip,
+    .tarjeta-serie-barra {
+        transition: none;
+    }
+}

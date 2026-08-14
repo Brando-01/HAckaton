@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Asistente Virtual | Movistar Perú</title>
     <link rel="stylesheet" href="./chat.css">
+    <link rel="stylesheet" href="./interaccion.css">
     <!-- demo-nav.css removed; chat-only UI -->
 </head>
 <body>
@@ -66,11 +67,13 @@
                 </div>
             </div>
             <div class="topbar-right">
+                <!-- Nivel de identidad: nunca muestra el documento completo -->
+                <span id="badgeIdentidad" class="badge-identidad general">Modo general · sin datos personales</span>
                 <button id="userProfileButton" class="user-profile-badge hidden" title="Ver mi perfil">
                     <span class="user-badge-dot"></span>
                     <span id="userProfileBadgeText">Cargando...</span>
                 </button>
-                <button id="loginButton" class="btn-login-topbar">🔑 Iniciar sesión</button>
+                <button id="loginButton" class="btn-login-topbar">🛡️ Verificar identidad</button>
             </div>
         </header>
 
@@ -324,6 +327,8 @@
                 </div>
             </div>
         </div>
+    <!-- interaccion.js expone window.Interaccion; chat.js lo consume -->
+    <script src="./interaccion.js"></script>
     <script src="./chat.js"></script>
 </body>
 </html>
