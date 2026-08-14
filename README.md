@@ -88,3 +88,16 @@ Métricas calculadas durante la ejecución local:
 El dashboard no inventa valores para métricas que todavía no están instrumentadas. Desde Fase 16, `Retrieval Accuracy` y la tasa de alucinación financiera **detectable** se miden mediante `npm run audit:financial:desafio1`, contrastando las afirmaciones estructuradas contra filas SQLite crudas e invariantes deterministas. La precisión del handoff continúa pendiente porque requiere decisiones esperadas/casos etiquetados; el KPI histórico de resolución digital del dashboard sigue identificado como proxy.
 
 Las métricas se mantienen en memoria para el MVP y se reinician al reiniciar el servidor.
+
+## Matriz B2C RA/RV del Desafío 1
+
+Desde Fase 17 la cobertura de escenarios críticos no se declara por diseño teórico. El comando:
+
+```bash
+cd backend
+npm run audit:b2c-matrix:desafio1
+```
+
+recorre por defecto toda la población de `PLANTA CLIENTES` y construye una matriz basada en las dimensiones oficiales `negocio` y `lob_type`, cruzadas con renta adelantada (`RA`) y renta vencida (`RV`). Una celda se marca `VERIFIED` solo cuando existe al menos un caso observado con evidencia `HIGH` y renta resuelta por reglas deterministas.
+
+La matriz mantiene `FINANCED_EQUIPMENT` como `PENDING_MAPPING` mientras las fuentes disponibles no permitan distinguir inequívocamente una cuota de equipo financiado de otras señales de financiamiento/equipamiento. `--limit` sirve solo para una prueba rápida y produce `SAMPLE_ONLY`; no autoriza afirmar cobertura total. `--details` muestra además el desglose granular `negocio + lob_type × RA/RV`, y `--write` guarda un JSON agregado local ignorado por Git.

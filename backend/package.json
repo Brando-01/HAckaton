@@ -20,7 +20,8 @@
     "demo:coverage:summary:desafio1": "node scripts/resumirCoberturaDesafio1.js",
     "data:functional-coverage:desafio1": "node scripts/auditarCoberturaFuncionalDesafio1.js",
     "data:scenario-mapping:desafio1": "node scripts/auditarMapeoEscenariosDesafio1.js",
-    "audit:financial:desafio1": "node scripts/auditarPrecisionFinancieraDesafio1.js"
+    "audit:financial:desafio1": "node scripts/auditarPrecisionFinancieraDesafio1.js",
+    "audit:b2c-matrix:desafio1": "node scripts/auditarMatrizB2CDesafio1.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

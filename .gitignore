@@ -48,3 +48,7 @@ Alta y porta.mp4
 Explicación de recibo.mp4
 Planta.mp4
 /backend/data/phase16-financial-audit.local.json
+/backend/data/phase17-b2c-matrix.local.json
+
+# Parches locales usados para aplicar checkpoints; no forman parte del producto
+/*.patch
