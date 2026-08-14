@@ -11,11 +11,22 @@ function toFiniteNumber(value, fallback = 0) {
 
 function roundMoney(value) {
   const number = toFiniteNumber(value, 0);
+  const factor =
+    10 ** MONEY_PRECISION;
+  const sign =
+    number < 0 ? -1 : 1;
+  const roundedMagnitude =
+    Math.round(
+      (Math.abs(number) +
+        Number.EPSILON) *
+      factor
+    ) / factor;
+  const result =
+    sign * roundedMagnitude;
 
-  return Math.round(
-    (number + Number.EPSILON) *
-    10 ** MONEY_PRECISION
-  ) / 10 ** MONEY_PRECISION;
+  return Object.is(result, -0)
+    ? 0
+    : result;
 }
 
 function sumMoney(values) {

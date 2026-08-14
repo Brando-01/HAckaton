@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  formatMoney,
   sanitizeInternalTerms,
   buildCustomerCauseDescription,
   buildCustomerFindingDescription,
@@ -10,6 +11,21 @@ const {
   buildCustomerFacing
 } = require(
   '../services/desafio1CustomerPresentation'
+);
+
+
+test(
+  'formatea créditos con el mismo redondeo al centavo que los cargos positivos',
+  () => {
+    assert.equal(
+      formatMoney(5.635),
+      'S/ 5.64'
+    );
+    assert.equal(
+      formatMoney(-5.635),
+      '-S/ 5.64'
+    );
+  }
 );
 
 test(

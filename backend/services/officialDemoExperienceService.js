@@ -30,6 +30,12 @@ const {
 );
 
 const {
+  buildSafeFinancialResponseTrace
+} = require(
+  './desafio1FinancialAuditLogic'
+);
+
+const {
   buildCustomerCauseDescription,
   buildCustomerFindingDescription,
   getImpactPresentation,
@@ -421,6 +427,10 @@ function buildOfficialDemoExperience({
     billingHistory,
     comparison,
     findings,
+    financialTrace:
+      buildSafeFinancialResponseTrace(
+        explanation
+      ),
     financialExplanation: {
       status:
         interpretation.status,

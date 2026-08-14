@@ -1,0 +1,447 @@
+diff --git a/backend/docs/desafio1-fase16.md b/backend/docs/desafio1-fase16.md
+index 6181118..6d32943 100644
+--- a/backend/docs/desafio1-fase16.md
++++ b/backend/docs/desafio1-fase16.md
+@@ -36,6 +36,10 @@ assertions RETRIEVAL aprobadas / assertions RETRIEVAL evaluables
+ 
+ No se calcula sobre similitud textual ni sobre una autoevaluación generativa.
+ 
++### Semántica de cambios estructurales
++
++La comparación no interpreta `delta = 0` como sinónimo de “no hubo ningún cambio estructural”. Un `CHARGE_CODE` que aparece por primera vez o desaparece del recibo forma parte de `chargeChanges` aunque su importe sea `S/ 0.00`. El auditor reproduce esa misma semántica de presencia actual/anterior y no genera un falso fallo únicamente porque el movimiento monetario sea cero.
++
+ ## 2. Qué verifica la auditoría
+ 
+ ### Retrieval
+@@ -87,6 +91,17 @@ suspensionCreditsAddedAsVariationCauses = false
+ 
+ Una guarda ausente se considera un fallo; no se interpreta silenciosamente como valor seguro.
+ 
++### Redondeo financiero simétrico
++
++Los importes se redondean a centavos sobre su magnitud y luego se restaura el signo. Esto evita la asimetría de `Math.round` para empates negativos. Por contrato:
++
++```text
++ 5.635 →  5.64
++-5.635 → -5.64
++```
++
++Esta regla es relevante para créditos y descuentos negativos: la magnitud de un crédito no puede perder un centavo únicamente por haber sido representada con signo negativo.
++
+ ## 4. Tasa de alucinación financiera detectable
+ 
+ Fase 16 publica:
+@@ -178,6 +193,8 @@ También publica salvaguardas explícitas:
+ 
+ ```text
+ benchmarkGroundTruth = RAW_SQLITE_ROWS_AND_DETERMINISTIC_INVARIANTS
++monetaryRounding = SYMMETRIC_HALF_AWAY_FROM_ZERO_TO_CENTS
++structuralZeroAmountChangesIncluded = true
+ llmUsedForScoring = false
+ identifiersPrinted = false
+ ```
+diff --git a/backend/services/desafio1BillingHistoryLogic.js b/backend/services/desafio1BillingHistoryLogic.js
+index cd422e2..8795ff5 100644
+--- a/backend/services/desafio1BillingHistoryLogic.js
++++ b/backend/services/desafio1BillingHistoryLogic.js
+@@ -9,9 +9,19 @@ function roundMoney(value) {
+     return 0;
+   }
+ 
+-  return Math.round(
+-    (number + Number.EPSILON) * 100
+-  ) / 100;
++  const sign =
++    number < 0 ? -1 : 1;
++  const roundedMagnitude =
++    Math.round(
++      (Math.abs(number) +
++        Number.EPSILON) * 100
++    ) / 100;
++  const result =
++    sign * roundedMagnitude;
++
++  return Object.is(result, -0)
++    ? 0
++    : result;
+ }
+ 
+ function normalizeText(value) {
+diff --git a/backend/services/desafio1BillingLogic.js b/backend/services/desafio1BillingLogic.js
+index 532eb2c..2184c19 100644
+--- a/backend/services/desafio1BillingLogic.js
++++ b/backend/services/desafio1BillingLogic.js
+@@ -11,11 +11,22 @@ function toFiniteNumber(value, fallback = 0) {
+ 
+ function roundMoney(value) {
+   const number = toFiniteNumber(value, 0);
+-
+-  return Math.round(
+-    (number + Number.EPSILON) *
+-    10 ** MONEY_PRECISION
+-  ) / 10 ** MONEY_PRECISION;
++  const factor =
++    10 ** MONEY_PRECISION;
++  const sign =
++    number < 0 ? -1 : 1;
++  const roundedMagnitude =
++    Math.round(
++      (Math.abs(number) +
++        Number.EPSILON) *
++      factor
++    ) / factor;
++  const result =
++    sign * roundedMagnitude;
++
++  return Object.is(result, -0)
++    ? 0
++    : result;
+ }
+ 
+ function sumMoney(values) {
+diff --git a/backend/services/desafio1CustomerPresentation.js b/backend/services/desafio1CustomerPresentation.js
+index 7502360..b8b1750 100644
+--- a/backend/services/desafio1CustomerPresentation.js
++++ b/backend/services/desafio1CustomerPresentation.js
+@@ -5,9 +5,19 @@ function roundMoney(value) {
+     return 0;
+   }
+ 
+-  return Math.round(
+-    (number + Number.EPSILON) * 100
+-  ) / 100;
++  const sign =
++    number < 0 ? -1 : 1;
++  const roundedMagnitude =
++    Math.round(
++      (Math.abs(number) +
++        Number.EPSILON) * 100
++    ) / 100;
++  const result =
++    sign * roundedMagnitude;
++
++  return Object.is(result, -0)
++    ? 0
++    : result;
+ }
+ 
+ function formatMoney(value) {
+diff --git a/backend/services/desafio1FinancialAuditLogic.js b/backend/services/desafio1FinancialAuditLogic.js
+index 130d188..95c1f5c 100644
+--- a/backend/services/desafio1FinancialAuditLogic.js
++++ b/backend/services/desafio1FinancialAuditLogic.js
+@@ -8,7 +8,7 @@ const {
+ );
+ 
+ const PHASE16_AUDIT_VERSION =
+-  'desafio1-phase16-financial-audit-v1';
++  'desafio1-phase16-financial-audit-v2';
+ 
+ const ASSERTION_STATUS = Object.freeze({
+   PASS: 'PASS',
+@@ -288,6 +288,10 @@ function buildRawChargeChanges(
+ 
+     result.set(code, {
+       chargeCode: code,
++      presentInCurrent:
++        current.has(code),
++      presentInPrevious:
++        previous.has(code),
+       currentAmount:
+         roundMoney(currentAmount),
+       previousAmount:
+@@ -649,8 +653,10 @@ function auditComparison({
+     [...rawChanges.values()]
+       .filter(
+         (change) =>
++          change.presentInCurrent !==
++            change.presentInPrevious ||
+           Math.abs(change.delta) >=
+-          MONEY_EPSILON
++            MONEY_EPSILON
+       )
+       .map(
+         (change) => change.chargeCode
+@@ -672,7 +678,7 @@ function auditComparison({
+           category:
+             ASSERTION_CATEGORY.RETRIEVAL,
+           label:
+-            'comparison includes exactly the raw charge codes with monetary changes',
++            'comparison includes exactly the raw charge codes with structural or monetary changes',
+           expected:
+             expectedChangedCodes.join(','),
+           actual:
+@@ -684,7 +690,7 @@ function auditComparison({
+           category:
+             ASSERTION_CATEGORY.RETRIEVAL,
+           label:
+-            'comparison includes exactly the raw charge codes with monetary changes',
++            'comparison includes exactly the raw charge codes with structural or monetary changes',
+           expected:
+             expectedChangedCodes.join(','),
+           actual:
+@@ -2104,6 +2110,10 @@ function mergeAuditCases(
+       llmUsedForScoring: false,
+       benchmarkGroundTruth:
+         'RAW_SQLITE_ROWS_AND_DETERMINISTIC_INVARIANTS',
++      monetaryRounding:
++        'SYMMETRIC_HALF_AWAY_FROM_ZERO_TO_CENTS',
++      structuralZeroAmountChangesIncluded:
++        true,
+       zeroHallucinationClaimScope:
+         'DETECTABLE_STRUCTURED_FINANCIAL_CLAIMS_ONLY'
+     },
+diff --git a/backend/test/desafio1BillingHistoryLogic.test.js b/backend/test/desafio1BillingHistoryLogic.test.js
+index 4ee8eb3..3fa2a94 100644
+--- a/backend/test/desafio1BillingHistoryLogic.test.js
++++ b/backend/test/desafio1BillingHistoryLogic.test.js
+@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
+ 
+ const {
+   MAX_HISTORY_BILLS,
++  roundMoney,
+   buildBillingHistoryView,
+   findHistoryChargeByText,
+   analyzeChargeRecurrence
+@@ -37,6 +38,17 @@ function item(
+   };
+ }
+ 
++
++test(
++  'histórico conserva redondeo monetario simétrico en importes negativos',
++  () => {
++    assert.equal(
++      roundMoney(-5.635),
++      -5.64
++    );
++  }
++);
++
+ test(
+   'Fase 14 limita el histórico al recibo actual y cinco anteriores',
+   () => {
+diff --git a/backend/test/desafio1BillingLogic.test.js b/backend/test/desafio1BillingLogic.test.js
+index 133eb33..5594903 100644
+--- a/backend/test/desafio1BillingLogic.test.js
++++ b/backend/test/desafio1BillingLogic.test.js
+@@ -79,6 +79,25 @@ test(
+   }
+ );
+ 
++
++test(
++  'roundMoney redondea empates monetarios de forma simétrica para créditos y cargos',
++  () => {
++    assert.equal(
++      roundMoney(5.635),
++      5.64
++    );
++    assert.equal(
++      roundMoney(-5.635),
++      -5.64
++    );
++    assert.equal(
++      roundMoney(-0.004),
++      0
++    );
++  }
++);
++
+ test(
+   'reconstruye una factura completa aunque tenga más de un suscriptor',
+   () => {
+diff --git a/backend/test/desafio1CustomerPresentation.test.js b/backend/test/desafio1CustomerPresentation.test.js
+index 1462c45..2d05bf0 100644
+--- a/backend/test/desafio1CustomerPresentation.test.js
++++ b/backend/test/desafio1CustomerPresentation.test.js
+@@ -2,6 +2,7 @@ const test = require('node:test');
+ const assert = require('node:assert/strict');
+ 
+ const {
++  formatMoney,
+   sanitizeInternalTerms,
+   buildCustomerCauseDescription,
+   buildCustomerFindingDescription,
+@@ -12,6 +13,21 @@ const {
+   '../services/desafio1CustomerPresentation'
+ );
+ 
++
++test(
++  'formatea créditos con el mismo redondeo al centavo que los cargos positivos',
++  () => {
++    assert.equal(
++      formatMoney(5.635),
++      'S/ 5.64'
++    );
++    assert.equal(
++      formatMoney(-5.635),
++      '-S/ 5.64'
++    );
++  }
++);
++
+ test(
+   'oculta nombres internos Brainy en texto dirigido al cliente',
+   () => {
+diff --git a/backend/test/desafio1FinancialAuditLogic.test.js b/backend/test/desafio1FinancialAuditLogic.test.js
+index d161588..6d75ae2 100644
+--- a/backend/test/desafio1FinancialAuditLogic.test.js
++++ b/backend/test/desafio1FinancialAuditLogic.test.js
+@@ -306,6 +306,59 @@ test(
+   }
+ );
+ 
++test(
++  'Retrieval Accuracy considera un CHARGE_CODE agregado a S/ 0.00 como cambio estructural válido',
++  () => {
++    const fixture = baseFixture();
++
++    fixture.rawCurrentCharges.push(
++      rawCharge({
++        code: 'ZERO_ADDED',
++        amount: 0,
++        net: 0,
++        sourceRow: 95
++      })
++    );
++    fixture.explanation.currentBill
++      .items.push(
++        item({
++          code: 'ZERO_ADDED',
++          amount: 0,
++          netAmount: 0,
++          sourceRows: [95]
++        })
++      );
++    fixture.explanation.currentBill
++      .rawChargeRows += 1;
++    fixture.explanation.comparison
++      .chargeChanges.push({
++        chargeCode: 'ZERO_ADDED',
++        previousAmount: 0,
++        currentAmount: 0,
++        delta: 0,
++        status: 'ADDED'
++      });
++
++    const audit =
++      auditFinancialExplanation(
++        fixture
++      );
++    const assertion =
++      audit.assertions.find(
++        (candidate) =>
++          candidate.id ===
++            'COMPARISON_CHANGE_CODE_SET_EXACT'
++      );
++
++    assert.equal(
++      assertion.status,
++      ASSERTION_STATUS.PASS
++    );
++    assert.equal(audit.status, 'PASS');
++  }
++);
++
++
+ test(
+   'una explicación completamente grounded logra 100% retrieval y 0 violaciones financieras detectables',
+   () => {
+@@ -582,6 +635,76 @@ test(
+   }
+ );
+ 
++test(
++  'un crédito crudo de -5.635 se audita como S/ 5.64 y no pierde un centavo por el signo',
++  () => {
++    const fixture = baseFixture();
++    fixture.explanation.interpretation
++      .currentBillFindings = [
++        {
++          code:
++            'SUSPENSION_ADJUSTMENT',
++          amount: 5.64,
++          cutDate: '2026-06-30',
++          reconnectionDate:
++            '2026-07-04',
++          sourceRows: {
++            note: [73],
++            reconnection: [74],
++            facturacion: [1]
++          }
++        }
++      ];
++    fixture.rawEvidence.creditNotes = [
++      {
++        sourceRow: 73,
++        amount: -5.635
++      }
++    ];
++    fixture.rawEvidence.reconnections = [
++      {
++        sourceRow: 74,
++        cutDate: '2026-06-30',
++        reconnectionDate:
++          '2026-07-04'
++      }
++    ];
++    fixture.explanation.interpretation
++      .causes[0].evidence
++      .brainyReconnections = [
++        {
++          sourceRows: [74],
++          amount: 10
++        }
++      ];
++
++    const audit =
++      auditFinancialExplanation(
++        fixture
++      );
++    const assertion =
++      audit.assertions.find(
++        (candidate) =>
++          candidate.id ===
++            'FINDING_SUSPENSION_NOTE_AMOUNT'
++      );
++
++    assert.equal(
++      assertion.status,
++      ASSERTION_STATUS.PASS
++    );
++    assert.equal(
++      assertion.expected,
++      5.64
++    );
++    assert.equal(
++      assertion.actual,
++      5.64
++    );
++  }
++);
++
++
+ test(
+   'un hallazgo de nota contextual conserva trazabilidad sin convertirse en causa',
+   () => {
+diff --git a/backend/test/phase16FinancialAuditContract.test.js b/backend/test/phase16FinancialAuditContract.test.js
+index 84113d8..81decc2 100644
+--- a/backend/test/phase16FinancialAuditContract.test.js
++++ b/backend/test/phase16FinancialAuditContract.test.js
+@@ -61,6 +61,14 @@ test(
+       logic,
+       /llmUsedForScoring:\s*false/
+     );
++    assert.match(
++      logic,
++      /SYMMETRIC_HALF_AWAY_FROM_ZERO_TO_CENTS/
++    );
++    assert.match(
++      logic,
++      /structuralZeroAmountChangesIncluded:\s*true/
++    );
+   }
+ );
+ 

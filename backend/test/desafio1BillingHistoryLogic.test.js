@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   MAX_HISTORY_BILLS,
+  roundMoney,
   buildBillingHistoryView,
   findHistoryChargeByText,
   analyzeChargeRecurrence
@@ -36,6 +37,17 @@ function item(
     amount
   };
 }
+
+
+test(
+  'histórico conserva redondeo monetario simétrico en importes negativos',
+  () => {
+    assert.equal(
+      roundMoney(-5.635),
+      -5.64
+    );
+  }
+);
 
 test(
   'Fase 14 limita el histórico al recibo actual y cinco anteriores',

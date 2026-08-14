@@ -5,9 +5,19 @@ function roundMoney(value) {
     return 0;
   }
 
-  return Math.round(
-    (number + Number.EPSILON) * 100
-  ) / 100;
+  const sign =
+    number < 0 ? -1 : 1;
+  const roundedMagnitude =
+    Math.round(
+      (Math.abs(number) +
+        Number.EPSILON) * 100
+    ) / 100;
+  const result =
+    sign * roundedMagnitude;
+
+  return Object.is(result, -0)
+    ? 0
+    : result;
 }
 
 function formatMoney(value) {

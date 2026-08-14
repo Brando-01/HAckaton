@@ -85,6 +85,6 @@ Métricas calculadas durante la ejecución local:
 - contactos repetidos **proxy** por cliente identificado dentro de la misma ejecución;
 - duración, cierre, mensajes y trazabilidad de las interacciones.
 
-El dashboard no inventa valores para `Retrieval Accuracy`, tasa de alucinación financiera ni precisión del handoff. Esos tres indicadores aparecen como pendientes de instrumentación porque requieren ground truth, logs y casos etiquetados para poder calcularse correctamente.
+El dashboard no inventa valores para métricas que todavía no están instrumentadas. Desde Fase 16, `Retrieval Accuracy` y la tasa de alucinación financiera **detectable** se miden mediante `npm run audit:financial:desafio1`, contrastando las afirmaciones estructuradas contra filas SQLite crudas e invariantes deterministas. La precisión del handoff continúa pendiente porque requiere decisiones esperadas/casos etiquetados; el KPI histórico de resolución digital del dashboard sigue identificado como proxy.
 
 Las métricas se mantienen en memoria para el MVP y se reinician al reiniciar el servidor.

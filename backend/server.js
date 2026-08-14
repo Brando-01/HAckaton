@@ -249,6 +249,32 @@ function sanitizeReturnTo(value) {
   return null;
 }
 
+function buildTurnFinancialTrace(
+  baseTrace,
+  {
+    intents = [],
+    resolution = null
+  } = {}
+) {
+  if (!baseTrace) {
+    return null;
+  }
+
+  return {
+    ...baseTrace,
+    turn: {
+      intents:
+        Array.isArray(intents)
+          ? [...intents]
+          : [],
+      resolutionStatus:
+        resolution?.status || null,
+      resolutionReason:
+        resolution?.reasonCode || null
+    }
+  };
+}
+
 function isDemoMappingError(error) {
   return [
     'DEMO_MAPPING_NOT_CONFIGURED',
@@ -1317,6 +1343,19 @@ function createApp(options = {}) {
                   null
               });
 
+            const financialTrace =
+              buildTurnFinancialTrace(
+                personalExperience
+                  .financialTrace,
+                {
+                  intents:
+                    conversationPlan
+                      .billingIntents,
+                  resolution:
+                    turnResolution
+                }
+              );
+
             addMessage(
               activeSessionId,
               'user',
@@ -1376,7 +1415,9 @@ function createApp(options = {}) {
                     ?.reasonCode ||
                   metricsSession.context
                     .lastResolutionReason ||
-                  null
+                  null,
+                lastFinancialTrace:
+                  financialTrace
               }
             );
 
@@ -1422,6 +1463,7 @@ function createApp(options = {}) {
               nextActions:
                 turnResolution
                   ?.nextActions || [],
+              financialTrace,
               conversation: {
                 multiIntent: true,
                 intentCount:
@@ -1918,6 +1960,20 @@ function createApp(options = {}) {
                 }
               );
 
+            const financialTrace =
+              buildTurnFinancialTrace(
+                officialExperience
+                  .financialTrace,
+                {
+                  intents: [
+                    personalReply.intent
+                  ].filter(Boolean),
+                  resolution:
+                    personalReply
+                      .resolution
+                }
+              );
+
             updateContext(
               activeSessionId,
               {
@@ -1942,7 +1998,9 @@ function createApp(options = {}) {
                   personalReply
                     .resolution
                     ?.reasonCode ||
-                  null
+                  null,
+                lastFinancialTrace:
+                  financialTrace
               }
             );
 
@@ -1975,6 +2033,7 @@ function createApp(options = {}) {
 
             return res.json({
               ...personalReply,
+              financialTrace,
               foundData: true,
               sessionId:
                 activeSessionId,

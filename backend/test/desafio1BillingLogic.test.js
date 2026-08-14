@@ -79,6 +79,25 @@ test(
   }
 );
 
+
+test(
+  'roundMoney redondea empates monetarios de forma simétrica para créditos y cargos',
+  () => {
+    assert.equal(
+      roundMoney(5.635),
+      5.64
+    );
+    assert.equal(
+      roundMoney(-5.635),
+      -5.64
+    );
+    assert.equal(
+      roundMoney(-0.004),
+      0
+    );
+  }
+);
+
 test(
   'reconstruye una factura completa aunque tenga más de un suscriptor',
   () => {
