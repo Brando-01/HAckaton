@@ -38,6 +38,13 @@ const { getFichaCliente } = require('./services/dbService');
 const { esConsultaSensible } = require('./services/consultaSensible');
 
 const {
+  registrarTurno,
+  calcularResumen,
+  exportarRegistros,
+  ORIGENES
+} = require('./services/observabilidadService');
+
+const {
   esSolicitudAsesor,
   determinarMotivoDerivacion,
   obtenerConsultaOriginal,
@@ -616,6 +623,18 @@ function createApp() {
             'HANDOFF'
           );
 
+          registrarTurno({
+            sessionId: activeSessionId,
+            intencion: 'SOLICITUD_ASESOR',
+            autenticado: Boolean(session.context.customerIdentifier),
+            origenRespuesta: ORIGENES.MOTOR,
+            derivacion: {
+              accion: 'DERIVAR',
+              motivo: caso && caso.reason ? caso.reason : 'CLIENT_REQUEST',
+              regla: 'PETICION_EXPLICITA'
+            }
+          });
+
 
           return res.json({
             reply,
@@ -652,6 +671,14 @@ function createApp() {
             const hasCustomer = Boolean(session.context && session.context.customerIdentifier);
 
             if (isSensitive && !hasCustomer) {
+              registrarTurno({
+                sessionId: activeSessionId,
+                intencion: 'CONSULTA_SENSIBLE_SIN_SESION',
+                requiereIdentidad: true,
+                autenticado: false,
+                origenRespuesta: ORIGENES.GATE
+              });
+
               return res.json({
                 reply: 'Para ver información personal sobre tu recibo o deuda debes iniciar sesión. Pulsa "Iniciar sesión" y vuelve a intentarlo.',
                 foundData: false,
@@ -980,6 +1007,29 @@ function createApp() {
       );
     }
   );
+
+  // =========================================================
+  // MÉTRICAS DEL DESAFÍO 1
+  //
+  // Las tres cifras que evalúa el jurado ya se calculaban en cada turno y se
+  // perdían en un console.warn. Acá se exponen.
+  // =========================================================
+
+  app.get('/api/metrics/desafio1', (req, res) => {
+    return res.json({ ok: true, ...calcularResumen() });
+  });
+
+  app.get('/api/metrics/desafio1/export', (req, res) => {
+    const limite = Math.min(Number(req.query.limite) || 500, 5000);
+    const registros = exportarRegistros(limite);
+
+    return res.json({
+      ok: true,
+      total: registros.length,
+      registros
+    });
+  });
+
 
   // =========================================================
   // DICCIONARIO DE DATOS (endpoint de ejemplo)

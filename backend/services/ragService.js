@@ -26,13 +26,15 @@ const { obtenerHechosDeCliente } = require('./cargosRepository');
 const {
   narrarBloqueDeHechos,
   construirBloqueParaPrompt,
-  verificarMontos
+  verificarMontos,
+  extraerMontos
 } = require('./narradorRecibos');
 
 const { clasificarIntencion, INTENCIONES } = require('./intencionService');
 const { construirRespuesta } = require('./respuestaProgresiva');
 
 const { pulirRedaccion } = require('./pulidorRespuesta');
+const { registrarTurno, ORIGENES } = require('./observabilidadService');
 
 /**
  * ¿Está el LLM disponible para pulir la redacción?
@@ -1242,6 +1244,7 @@ async function procesarConsultaFactura(
   let customerIdentifier = null;
   let bloqueDeHechos = null;
   let pidioOtroCiclo = false;
+  const inicioTurno = Date.now();
 
   try {
     session =
@@ -1293,6 +1296,14 @@ async function procesarConsultaFactura(
 
           addMessage(activeSessionId, 'user', mensajeTexto);
           addMessage(activeSessionId, 'assistant', aviso);
+
+          registrarTurno({
+            sessionId: activeSessionId,
+            intencion: 'SUPLANTACION_BLOQUEADA',
+            autenticado: true,
+            origenRespuesta: ORIGENES.GATE,
+            latenciaMs: Date.now() - inicioTurno
+          });
 
           return {
             reply: aviso,
@@ -1408,18 +1419,41 @@ async function procesarConsultaFactura(
       const valeLaPenaPulir = Boolean(respuestaPorCapas.tarjeta)
         || respuestaPorCapas.texto.includes('S/');
 
+      let motivoDescartePulido = null;
+
       if (valeLaPenaPulir && hayModeloDisponible()) {
         const pulido = await pulirRedaccion(respuestaPorCapas.texto, {
           redactar: redactarConGroq
         });
         textoFinal = pulido.texto;
+        if (!pulido.pulido) {
+          motivoDescartePulido = pulido.motivo || 'desconocido';
+        }
       }
 
       addMessage(activeSessionId, 'user', mensajeTexto);
       addMessage(activeSessionId, 'assistant', textoFinal);
 
-      console.log('[INTENCION] %s (confianza %s) → respuesta determinista',
-        clasificacion.intencion, clasificacion.confianza);
+      registrarTurno({
+        sessionId: activeSessionId,
+        intencion: clasificacion.intencion,
+        confianza: clasificacion.confianza,
+        requiereIdentidad: clasificacion.requiereIdentidad,
+        autenticado: Boolean(idBuscar),
+        bloqueEncontrado: Boolean(bloqueDeHechos && bloqueDeHechos.encontrado),
+        origenRespuesta: textoFinal === respuestaPorCapas.texto
+          ? ORIGENES.MOTOR
+          : ORIGENES.MOTOR_PULIDO,
+        montosEnRespuesta: extraerMontos(textoFinal),
+        // Este camino no puede alucinar: los montos salen del bloque y el
+        // pulido se descarta si toca uno.
+        montosInventados: [],
+        pulidoDescartado: motivoDescartePulido,
+        derivacion: respuestaPorCapas.sugerirHandoff
+          ? { accion: 'OFRECER', motivo: 'DISPUTA_O_SIN_DATOS', regla: clasificacion.intencion }
+          : null,
+        latenciaMs: Date.now() - inicioTurno
+      });
 
       return {
         reply: textoFinal,
@@ -1816,6 +1850,15 @@ ${construirContextoAuxiliar({
     //    modelo y se usa la narración determinista.
     // -------------------------------------------------------
 
+    // Se verifica ANTES de blindar para poder registrar qué intentó inventar
+    // el modelo, aunque nunca llegue al cliente. Esa distinción entre
+    // "alucinó" e "intentó alucinar y se frenó" es la evidencia de que el
+    // mecanismo actúa, no solo de que el resultado sale limpio.
+    const verificacionModelo = verificarMontos(
+      respuestaModelo,
+      construirFuenteDeMontos(bloqueDeHechos, customerIdentifier)
+    );
+
     const respuesta = blindarConFuentes(
       respuestaModelo,
       bloqueDeHechos,
@@ -1827,6 +1870,20 @@ ${construirContextoAuxiliar({
         esConsultaDeRecibo: CONSULTAS_DE_RECIBO.has(clasificacion.intencion)
       }
     );
+
+    registrarTurno({
+      sessionId: activeSessionId,
+      intencion: clasificacion.intencion,
+      confianza: clasificacion.confianza,
+      requiereIdentidad: clasificacion.requiereIdentidad,
+      autenticado: Boolean(customerIdentifier),
+      bloqueEncontrado: Boolean(bloqueDeHechos && bloqueDeHechos.encontrado),
+      origenRespuesta: ORIGENES.LLM,
+      montosEnRespuesta: extraerMontos(respuesta),
+      montosInventados: verificacionModelo.inventados,
+      respuestaReemplazada: respuesta !== respuestaModelo,
+      latenciaMs: Date.now() - inicioTurno
+    });
 
 
     // -------------------------------------------------------
