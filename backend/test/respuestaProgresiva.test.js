@@ -225,10 +225,41 @@ test('INVARIANTE: todo monto de toda respuesta existe en el bloque', () => {
 
 test('las intenciones que necesitan redacción libre se delegan al LLM', () => {
   // Devolver null es la señal de "esto lo escribe el modelo".
-  for (const mensaje of ['que planes de fibra tienen?', 'mi internet esta lento', 'que es el prorrateo?']) {
+  for (const mensaje of ['que planes de fibra tienen?', 'mi internet esta lento']) {
     const { respuesta } = responder(mensaje);
     assert.equal(respuesta, null, `"${mensaje}" no debería resolverse por capas`);
   }
+});
+
+test('el glosario responde los conceptos sin cifras y sin LLM', () => {
+  // Estos términos son numéricos por naturaleza y el modelo tiende a
+  // explicarlos con cifras de ejemplo ("si pagas S/ 100 y usas 10 días..."),
+  // que el verificador rechaza. Se responden desde el diccionario.
+  const conceptos = [
+    ['que es el prorrateo?', /días|proporcional/i],
+    ['que es una nota de credito?', /devuelve|cobrado de más/i],
+    ['que es un cargo por reconexion?', /suspende|reactivar/i],
+    ['que significa el igv?', /Impuesto General a las Ventas/i],
+    ['que es el ciclo de facturacion?', /fecha de corte|periodo/i]
+  ];
+
+  for (const [pregunta, esperado] of conceptos) {
+    const { respuesta } = responder(pregunta);
+
+    assert.ok(respuesta, `"${pregunta}" debería responderse desde el glosario`);
+    assert.match(respuesta.texto, esperado);
+    assert.deepEqual(
+      extraerMontos(respuesta.texto),
+      [],
+      `"${pregunta}" no debe traer ninguna cifra`
+    );
+  }
+});
+
+test('un concepto que no está en el glosario sí se delega al LLM', () => {
+  const { respuesta } = responder('que significa el codigo RC_PLANRE500?');
+
+  assert.equal(respuesta, null);
 });
 
 test('la tarjeta hereda los montos del bloque', () => {

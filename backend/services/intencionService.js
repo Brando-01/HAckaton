@@ -220,7 +220,10 @@ const REGLAS = [
     intencion: INTENCIONES.CONSULTA_CONCEPTO,
     // Glosario: se responde con información pública, sin tocar datos personales.
     patrones: [
-      /\bque (es|son|significa|significan|quiere decir) (un|una|el|la|los|las)?\s*(prorrateo|igv|reconexion|renta|ciclo|nota de credito|cuota|financiamiento|cargo fijo|cargo recurrente|paquete|roaming|descuento)\b/,
+      // Se admiten hasta tres palabras entre el verbo y el término, porque la
+      // gente pregunta "¿qué es un cargo por reconexión?" o "¿qué significa
+      // eso del prorrateo?". Sin eso caía en DESCONOCIDA.
+      /\bque (es|son|significa|significan|quiere decir) (?:[a-z]+ ){0,3}?(prorrateo|igv|reconexion|renta|ciclo|nota de credito|cuota|financiamiento|cargo fijo|cargo recurrente|paquete|roaming|descuento|larga distancia)\b/,
       /\bque significa\b/, /\bque es eso de\b/, /\bcomo funciona (el|la) (prorrateo|facturacion|ciclo)\b/
     ]
   },

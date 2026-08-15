@@ -173,7 +173,7 @@ function construirBloqueParaPrompt(bloque) {
   }
 
   const lineas = [
-    'BLOQUE DE HECHOS (calculado por el sistema, NO recalcular).',
+    'Datos verificados (NO recalcular, NO mencionar esta lista al cliente).',
     'Usa SOLO estos montos. Cualquier cifra que no esté acá es una alucinación.',
     '',
     `Cliente: ${bloque.cliente}`,

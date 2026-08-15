@@ -32,6 +32,50 @@ const {
 const { clasificarIntencion, INTENCIONES } = require('./intencionService');
 const { construirRespuesta } = require('./respuestaProgresiva');
 
+const { pulirRedaccion } = require('./pulidorRespuesta');
+
+/**
+ * ¿Está el LLM disponible para pulir la redacción?
+ *
+ * En `GROQ_FALLBACK_MODE` o sin API key nos quedamos con el texto
+ * determinista, que ya es correcto: el pulido es una mejora, no un requisito.
+ */
+function hayModeloDisponible() {
+  const forzado = String(process.env.GROQ_FALLBACK_MODE || '').toLowerCase();
+  if (forzado === '1' || forzado === 'true') {
+    return false;
+  }
+  return Boolean(getGroqClient());
+}
+
+/** Pide al modelo una reescritura corta y barata del texto determinista. */
+async function redactarConGroq(sistema, usuario) {
+  const client = getGroqClient();
+
+  const completion = await client.chat.completions.create({
+    messages: [
+      { role: 'system', content: sistema },
+      { role: 'user', content: usuario }
+    ],
+    model: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
+    // Algo de temperatura: con 0 devuelve el mismo texto que entró.
+    temperature: 0.4,
+    max_tokens: 320
+  });
+
+  return completion.choices[0]?.message?.content || '';
+}
+
+/** Intenciones cuya respuesta correcta es hablar del recibo del cliente. */
+const CONSULTAS_DE_RECIBO = new Set([
+  INTENCIONES.CONSULTA_MONTO,
+  INTENCIONES.CONSULTA_VARIACION,
+  INTENCIONES.CONSULTA_DETALLE,
+  INTENCIONES.CONSULTA_VENCIMIENTO,
+  INTENCIONES.CONSULTA_HISTORIAL,
+  INTENCIONES.DISPUTA_COBRO
+]);
+
 const {
   getOrCreateSession,
   addMessage,
@@ -860,6 +904,13 @@ function blindarConFuentes(respuesta, bloqueDeHechos, customerId, contexto = {})
     verificacion.inventados, customerId, contexto.sessionId || 'sin sesión'
   );
 
+  // El reemplazo tiene que encajar con lo que se preguntó. Narrar el recibo
+  // entero ante un "¿qué es el prorrateo?" es tan malo como la alucinación:
+  // el cliente preguntó un concepto y recibe un volcado que no pidió.
+  if (!contexto.esConsultaDeRecibo) {
+    return 'Te lo explico sin números para no darte una cifra equivocada: si necesitas el importe exacto de tu caso, dime y lo revisamos sobre tu recibo.';
+  }
+
   if (bloqueDeHechos && bloqueDeHechos.encontrado) {
     return narrarBloqueDeHechos(bloqueDeHechos);
   }
@@ -1345,14 +1396,26 @@ async function procesarConsultaFactura(
     });
 
     if (respuestaPorCapas) {
+      // Los hechos ya están fijados. El modelo solo reescribe para que no
+      // suene a plantilla, y la reescritura se descarta si toca una cifra o
+      // un mes. Sin modelo disponible, el texto determinista sale tal cual.
+      let textoFinal = respuestaPorCapas.texto;
+
+      if (hayModeloDisponible()) {
+        const pulido = await pulirRedaccion(respuestaPorCapas.texto, {
+          redactar: redactarConGroq
+        });
+        textoFinal = pulido.texto;
+      }
+
       addMessage(activeSessionId, 'user', mensajeTexto);
-      addMessage(activeSessionId, 'assistant', respuestaPorCapas.texto);
+      addMessage(activeSessionId, 'assistant', textoFinal);
 
       console.log('[INTENCION] %s (confianza %s) → respuesta determinista',
         clasificacion.intencion, clasificacion.confianza);
 
       return {
-        reply: respuestaPorCapas.texto,
+        reply: textoFinal,
         foundData: Boolean(bloqueDeHechos && bloqueDeHechos.encontrado),
         sessionId: activeSessionId,
         intencion: clasificacion.intencion,
@@ -1454,22 +1517,72 @@ proporcionados al sistema.
 REGLAS DE RESPUESTA:
 
 
-1. CERO ALUCINACIONES
+1. CERO ALUCINACIONES — PERO SOLO SOBRE LOS DATOS DEL CLIENTE
 
-Responde únicamente utilizando información disponible en el contexto
-proporcionado.
-
-Nunca inventes:
+La regla dura aplica a lo que es PROPIO de esta persona. Nunca inventes:
 - montos;
-- fechas;
-- cargos;
-- promociones;
-- descuentos;
-- planes;
-- periodos;
-- causas;
-- datos personales;
-- resultados de operaciones no respaldadas por el contexto.
+- fechas de su recibo;
+- cargos, promociones o descuentos suyos;
+- su plan, sus periodos o las causas de su variación;
+- sus datos personales.
+
+Si te falta uno de esos datos, dilo y ofrece derivar con un asesor.
+
+SÍ puedes usar tu conocimiento general de telecomunicaciones para explicar
+CONCEPTOS, porque no son datos de nadie: qué es un prorrateo, qué significa
+el IGV, cómo funciona un ciclo de facturación, qué es una nota de crédito,
+qué es un cargo por reconexión. Explicarlos es tu trabajo.
+
+La frontera es simple:
+- "¿Qué es el prorrateo?" → explícalo con tus palabras, SIN cifras.
+- "¿Cuánto me prorratearon?" → solo si el dato está en el contexto.
+
+Responder "no tengo información sobre eso" a una pregunta conceptual es un
+error: deja al cliente peor que si no hubiera preguntado.
+
+AL EXPLICAR UN CONCEPTO NO USES EJEMPLOS CON CIFRAS. Nada de "si tu plan
+cuesta S/ 100 y usas 10 días, pagarías S/ 33.33". En un chat de facturación
+cualquier cifra se lee como el cargo propio, y ese ejemplo se convierte en
+un reclamo. Explica el mecanismo con palabras: qué se cobra, por qué y
+cuándo. Si el cliente quiere el número de su caso, se lo das del recibo.
+
+
+1.b NUNCA HABLES DE TU FUNCIONAMIENTO INTERNO
+
+El cliente no sabe —ni tiene por qué— que existe un "bloque de hechos", un
+"contexto proporcionado" o un "sistema". Jamás menciones esas palabras.
+
+Mal:  "El bloque de hechos solo menciona tu recibo."
+Mal:  "No hay información sobre eso en el contexto proporcionado."
+Bien: "Eso no lo puedo ver desde acá, pero te puedo derivar con un asesor."
+
+Si algo se sale de lo que manejas (soporte técnico, tiendas, cobertura),
+dilo en una línea y ofrece la vía correcta. Sin rodeos ni disculpas largas.
+
+
+1.c NO AFIRMES HECHOS COMERCIALES QUE NO PUEDES VERIFICAR
+
+La regla de los montos tiene un punto ciego: una afirmación SIN números
+también puede ser falsa, y ahí no hay verificación automática que te salve.
+
+Nunca afirmes ni niegues, salvo que esté en el catálogo de este prompt:
+- si hay tienda o cobertura en tal ciudad o distrito;
+- horarios de atención, direcciones, números de teléfono;
+- plazos, promociones vigentes o condiciones de un plan;
+- si un trámite se puede o no hacer por un canal.
+
+Mal:  "Sí, tenemos tiendas en Arequipa."
+Bien: "La ubicación de tiendas no la puedo consultar desde acá. Te derivo
+       con un asesor, que sí la tiene a mano."
+
+Ante la duda: no lo afirmes. Es preferible decir que no lo sabes.
+
+
+1.d NUNCA CALCULES NI OFREZCAS CALCULAR
+
+No sumes, restes, dividas ni estimes, aunque el cliente lo pida y aunque
+parezca trivial. Tampoco ofrezcas hacerlo ("puedo ayudarte a calcularlo").
+Los montos ya vienen resueltos: tú los narras.
 
 
 2. CONSULTAS DE FACTURACIÓN
@@ -1566,11 +1679,12 @@ No agregues información nueva que no esté disponible.
 
 
 =========================================================
-BLOQUE DE HECHOS — FUENTE DE VERDAD DE TODO MONTO
+DATOS VERIFICADOS DE ESTE CLIENTE
 =========================================================
 
-Este bloque lo calculó el sistema de forma determinista a partir de los
-recibos reales del cliente. Tiene prioridad sobre cualquier otra sección.
+Calculados de forma determinista a partir de sus recibos reales. Tienen
+prioridad sobre cualquier otra sección. No menciones esta sección al
+cliente ni la describas: para él, simplemente sabes sus datos.
 
 - NO recalcules, NO sumes, NO restes, NO estimes.
 - Si un monto no aparece acá, no existe: no lo escribas.
@@ -1699,7 +1813,12 @@ ${construirContextoAuxiliar({
       respuestaModelo,
       bloqueDeHechos,
       customerIdentifier,
-      { sessionId: activeSessionId }
+      {
+        sessionId: activeSessionId,
+        // Solo tiene sentido reemplazar por la narración del recibo si lo
+        // que se preguntó era, justamente, sobre el recibo.
+        esConsultaDeRecibo: CONSULTAS_DE_RECIBO.has(clasificacion.intencion)
+      }
     );
 
 

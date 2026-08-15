@@ -88,6 +88,79 @@ const EXPLICACION = {
   }
 };
 
+/**
+ * Glosario de facturación, para responder "¿qué es X?" sin pasar por el LLM.
+ *
+ * Estos términos son intrínsecamente numéricos, y el modelo tiende a
+ * explicarlos con cifras de ejemplo ("si pagas S/ 100 y usas 10 días..."). En
+ * un chat de facturación esa cifra se lee como el cargo propio, así que el
+ * verificador la rechaza y el cliente se queda sin respuesta.
+ *
+ * Los conceptos que coinciden con una causa reutilizan su explicación
+ * `ampliada`: así el bot dice lo mismo cuando explica el término suelto y
+ * cuando explica por qué cambió el recibo.
+ */
+const TERMINO_A_CAUSA = [
+  { patron: /\bprorrate/, causa: CAUSAS.PRORRATEO },
+  { patron: /\breconexi/, causa: CAUSAS.RECONEXION },
+  { patron: /\bnota de credito\b/, causa: CAUSAS.NOTA_CREDITO },
+  { patron: /\b(cuota|financiamiento)\b/, causa: CAUSAS.CUOTA_EQUIPO },
+  { patron: /\bpaquete/, causa: CAUSAS.PAQUETE },
+  { patron: /\b(consumo adicional|roaming|trafico adicional)\b/, causa: CAUSAS.CONSUMO_ADICIONAL },
+  { patron: /\bcambio de plan\b/, causa: CAUSAS.CAMBIO_PLAN },
+  { patron: /\bdescuento\b/, causa: CAUSAS.FIN_DESCUENTO }
+];
+
+/** Conceptos que no corresponden a ninguna causa del motor. */
+const GLOSARIO = [
+  {
+    patron: /\bigv\b/,
+    texto: 'El IGV es el Impuesto General a las Ventas: un impuesto que el Estado aplica a casi todos los bienes y servicios en Perú. En tu recibo ya viene incluido dentro del total, así que el monto que ves es lo que pagas, sin sorpresas encima.'
+  },
+  {
+    patron: /\bciclo( de facturacion)?\b/,
+    texto: 'El ciclo de facturación es el periodo que cubre cada recibo. No va del 1 al 30: tiene su propia fecha de corte, y todo lo que consumas entre un corte y el siguiente entra en ese recibo. Por eso la fecha de cierre no coincide con el fin de mes.'
+  },
+  {
+    patron: /\bcargo (fijo|recurrente)\b/,
+    texto: 'El cargo fijo es la tarifa de tu plan: lo que pagas todos los meses por el servicio contratado, independientemente de cuánto lo uses. Es la parte estable de tu recibo.'
+  },
+  {
+    patron: /\b(larga distancia|oldi|americatel)\b/,
+    texto: 'Son llamadas cursadas por otro operador desde tu línea. Movistar las cobra en tu recibo y luego le transfiere ese dinero al proveedor que dio el servicio, por eso aparecen como un concepto aparte.'
+  },
+  {
+    patron: /\brenta (adelantada|vencida)\b/,
+    texto: 'Indica cuándo se cobra el servicio. En renta adelantada pagas el mes que viene a usar; en renta vencida, el mes que ya usaste. Cambia el momento del cobro, no el precio.'
+  }
+];
+
+/**
+ * Responde "¿qué es X?" desde el glosario.
+ *
+ * @returns {object|null} La explicación, o `null` si el término no está y
+ *   conviene que lo redacte el modelo.
+ */
+function responderConcepto(texto) {
+  const coincidencia = TERMINO_A_CAUSA.find((entrada) => entrada.patron.test(texto));
+  if (coincidencia) {
+    return {
+      texto: explicacionDe(coincidencia.causa).ampliada,
+      sugerencias: [CHIPS.VARIACION, CHIPS.DETALLE]
+    };
+  }
+
+  const delGlosario = GLOSARIO.find((entrada) => entrada.patron.test(texto));
+  if (delGlosario) {
+    return {
+      texto: delGlosario.texto,
+      sugerencias: [CHIPS.VARIACION, CHIPS.DETALLE]
+    };
+  }
+
+  return null;
+}
+
 /** Chips de seguimiento. Cada texto tiene que clasificar donde se espera. */
 const CHIPS = {
   VARIACION: '¿Por qué cambió mi recibo?',
@@ -277,11 +350,16 @@ function responderVariacion(bloque, contexto) {
     };
   }
 
-  const verbo = variacion.direccion === 'AUMENTO' ? 'subió' : 'bajó';
   const pasos = [];
 
-  // 1. QUÉ PASÓ — se nombran los dos meses para que la comparación se entienda.
-  pasos.push(`El de ${mes} ${verbo} ${soles(variacion.montoAbsoluto)}: pasaste de ${soles(reciboAnterior.total)} en ${mesAnterior} a ${soles(reciboActual.total)}.`);
+  // 1. QUÉ PASÓ.
+  //
+  // El recorrido va primero y la diferencia después, en su propia frase. Con
+  // "subió S/ 42.95: pasaste de..." una reescritura puede convertirlo en
+  // "subió A S/ 42.95", que cambia el sentido sin tocar ninguna cifra: dice
+  // que el recibo llegó a ese monto en vez de que aumentó en esa cantidad.
+  const direccion = variacion.direccion === 'AUMENTO' ? 'más' : 'menos';
+  pasos.push(`En ${mesAnterior} pagaste ${soles(reciboAnterior.total)} y en ${mes}, ${soles(reciboActual.total)}. Son ${soles(variacion.montoAbsoluto)} ${direccion}.`);
 
   // 2. POR QUÉ
   if (bloque.causas.length === 1) {
@@ -447,6 +525,11 @@ function construirRespuesta(clasificacion, bloque, contexto = {}) {
 
   if (!intencion) {
     return null;
+  }
+
+  // Glosario: se responde con conocimiento del dominio, sin datos de nadie.
+  if (intencion === INTENCIONES.CONSULTA_CONCEPTO) {
+    return responderConcepto(clasificacion.textoNormalizado || '');
   }
 
   // Conversacionales: no miran datos.
