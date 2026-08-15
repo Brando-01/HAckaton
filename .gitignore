@@ -54,3 +54,5 @@ Planta.mp4
 
 # Parches locales usados para aplicar checkpoints; no forman parte del producto
 /*.patch
+
+/backend/data/phase22-challenge-preflight.local.json

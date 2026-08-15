@@ -151,3 +151,26 @@ npm run audit:performance:desafio1 -- --details --write
 El perfil por defecto ejecuta 8 journeys con concurrencia 4 y los compara con 24 journeys con concurrencia 12. Cada journey recorre autenticación demo, Mi Movistar, Lucía determinista y una continuación por el adaptador WhatsApp. El reporte mide p50/p95, throughput, errores, timeouts y corrección; una corrida no puede aprobar solo por ser rápida si pierde grounding o continuidad.
 
 El Dashboard muestra además p50/p95 y éxito de los endpoints núcleo observados durante los últimos cinco minutos de la ejecución local. Estas métricas son in-memory y no constituyen un SLA. La prueba 3× tampoco se extrapola a tráfico productivo, infraestructura Movistar, Meta/Twilio ni escalamiento horizontal. Los criterios, guardas y limitaciones están documentados en `backend/docs/desafio1-fase21.md`.
+
+## Preflight integral del Desafío 1
+
+Fase 22 cierra el roadmap sin añadir nuevas reglas financieras. El comando final reúne en una sola corrida la suite, lineage 8/8, Release 1, auditoría financiera F16, matriz B2C F17, handoff F19, omnicanalidad F20, guardas de histórico/cross-selling, benchmark 3× F21 y smoke end-to-end:
+
+```bash
+cd backend
+npm run challenge:preflight:desafio1 -- --details --write
+```
+
+Estados finales:
+
+```text
+READY
+READY_WITH_KNOWN_LIMITS
+REVIEW_REQUIRED
+```
+
+`READY_WITH_KNOWN_LIMITS` es válido cuando todos los controles bloqueantes pasan pero permanecen límites explícitos del dataset/prototipo. No se fuerza `PASS` para equipo financiado, combinaciones B2C no verificadas, WhatsApp simulado ni benchmarks locales.
+
+Con `--write`, el snapshot agregado se guarda en `backend/data/phase22-challenge-preflight.local.json` y queda ignorado por Git. El reporte congela los casos demo `CLI000001`/Carlos (`RECONNECTION`) y `CLI000002`/Ana (`PRORATION`), la arquitectura, resultados agregados de benchmarks y limitaciones conocidas sin copiar identificadores oficiales, transcripts o filas fuente.
+
+El diseño y la condición de salida están documentados en `backend/docs/desafio1-fase22.md`.

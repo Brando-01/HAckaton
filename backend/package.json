@@ -24,7 +24,8 @@
     "audit:b2c-matrix:desafio1": "node scripts/auditarMatrizB2CDesafio1.js",
     "audit:handoff:desafio1": "node scripts/auditarHandoffDesafio1.js",
     "audit:omnichannel:desafio1": "node scripts/auditarOmnicanalDesafio1.js",
-    "audit:performance:desafio1": "node scripts/auditarRendimientoDesafio1.js"
+    "audit:performance:desafio1": "node scripts/auditarRendimientoDesafio1.js",
+    "challenge:preflight:desafio1": "node scripts/preflightIntegralDesafio1.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
