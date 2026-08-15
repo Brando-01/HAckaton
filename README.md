@@ -138,3 +138,16 @@ npm run audit:omnichannel:desafio1
 ```
 
 Los detalles, limitaciones y recorrido recomendado están documentados en `backend/docs/desafio1-fase20.md`.
+
+## Escalabilidad y latencia del prototipo
+
+Desde Fase 21 el backend incorpora instrumentación liviana de los endpoints núcleo y un benchmark local reproducible que compara una línea base con un perfil de **3× volumen y 3× concurrencia**. El comando principal es:
+
+```bash
+cd backend
+npm run audit:performance:desafio1 -- --details --write
+```
+
+El perfil por defecto ejecuta 8 journeys con concurrencia 4 y los compara con 24 journeys con concurrencia 12. Cada journey recorre autenticación demo, Mi Movistar, Lucía determinista y una continuación por el adaptador WhatsApp. El reporte mide p50/p95, throughput, errores, timeouts y corrección; una corrida no puede aprobar solo por ser rápida si pierde grounding o continuidad.
+
+El Dashboard muestra además p50/p95 y éxito de los endpoints núcleo observados durante los últimos cinco minutos de la ejecución local. Estas métricas son in-memory y no constituyen un SLA. La prueba 3× tampoco se extrapola a tráfico productivo, infraestructura Movistar, Meta/Twilio ni escalamiento horizontal. Los criterios, guardas y limitaciones están documentados en `backend/docs/desafio1-fase21.md`.

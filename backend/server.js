@@ -134,6 +134,11 @@ const {
   getDashboardSummary
 } = require('./services/metricsService');
 
+const {
+  classifyPerformanceRequest,
+  recordPerformanceSample
+} = require('./services/desafio1PerformanceMetrics');
+
 
 const AUTH_COOKIE_NAME =
   'movistarAuth';
@@ -391,6 +396,9 @@ function isDemoMappingError(error) {
 function createApp(options = {}) {
   const app = express();
 
+  const requestLoggingEnabled =
+    options.requestLogging !== false;
+
   const officialDemoExperienceService =
     options.officialDemoExperienceService ||
     createOfficialDemoExperienceService();
@@ -623,6 +631,41 @@ function createApp(options = {}) {
       next();
     }
   );
+
+  // Fase 21: instrumentación liviana de endpoints núcleo.
+  // Solo registra operación, estado y duración; nunca body, cookie,
+  // sessionId ni identificadores del cliente.
+  app.use((req, res, next) => {
+    const operation =
+      classifyPerformanceRequest(
+        req.method,
+        req.originalUrl
+      );
+
+    if (!operation) {
+      return next();
+    }
+
+    const startedAt =
+      process.hrtime.bigint();
+
+    res.once('finish', () => {
+      const elapsedNs =
+        process.hrtime.bigint() -
+        startedAt;
+
+      recordPerformanceSample({
+        operation,
+        statusCode:
+          res.statusCode,
+        durationMs:
+          Number(elapsedNs) /
+          1e6
+      });
+    });
+
+    return next();
+  });
 
   const frontendPath = path.join(
     __dirname,
@@ -1392,12 +1435,14 @@ function createApp(options = {}) {
       };
 
       try {
-        console.log(
-          '[API] /api/chat message=',
-          message,
-          'sessionId=',
-          activeSessionId
-        );
+        if (requestLoggingEnabled) {
+          console.log(
+            '[API] /api/chat message=',
+            message,
+            'sessionId=',
+            activeSessionId
+          );
+        }
 
         const cleanMessage =
           message.trim();

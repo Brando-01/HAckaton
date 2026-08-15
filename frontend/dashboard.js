@@ -50,6 +50,16 @@
       document.getElementById('totalUserMessages'),
     totalAssistantMessages:
       document.getElementById('totalAssistantMessages'),
+    runtimeP50:
+      document.getElementById('runtimeP50'),
+    runtimeP95:
+      document.getElementById('runtimeP95'),
+    runtimeSuccessRate:
+      document.getElementById('runtimeSuccessRate'),
+    runtimeFailureDetail:
+      document.getElementById('runtimeFailureDetail'),
+    runtimeSampleCount:
+      document.getElementById('runtimeSampleCount'),
     endReasonBreakdown:
       document.getElementById('endReasonBreakdown'),
     handoffReasonBreakdown:
@@ -469,6 +479,28 @@
 
     elements.totalUserMessages.textContent = data.totalUserMessages ?? 0;
     elements.totalAssistantMessages.textContent = data.totalAssistantMessages ?? 0;
+
+    const performance = data.performance || {};
+    const runtimeSampleCount = performance.sampleCount ?? 0;
+    const formatLatency = (value) =>
+      Number.isFinite(Number(value))
+        ? `${Number(value).toFixed(0)} ms`
+        : '—';
+
+    elements.runtimeP50.textContent =
+      formatLatency(performance.p50Ms);
+    elements.runtimeP95.textContent =
+      formatLatency(performance.p95Ms);
+    elements.runtimeSuccessRate.textContent =
+      runtimeSampleCount
+        ? `${performance.successRate ?? 0}%`
+        : '—';
+    elements.runtimeFailureDetail.textContent =
+      runtimeSampleCount
+        ? `${performance.failureCount ?? 0} fallos en ventana local`
+        : 'Sin muestras';
+    elements.runtimeSampleCount.textContent =
+      runtimeSampleCount;
 
     renderBreakdown(
       elements.endReasonBreakdown,

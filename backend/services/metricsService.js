@@ -2,6 +2,11 @@ const {
   runHandoffPolicyBenchmark
 } = require('./desafio1HandoffAuditLogic');
 
+const {
+  getRuntimePerformanceSummary,
+  resetRuntimePerformanceMetrics
+} = require('./desafio1PerformanceMetrics');
+
 const interactions = new Map();
 
 const VALID_END_REASONS = new Set([
@@ -929,6 +934,9 @@ function getDashboardSummary() {
     repairInteractionRate,
     totalRepairTurns,
 
+    performance:
+      getRuntimePerformanceSummary(),
+
     handoffAccuracyBenchmark: {
       status:
         handoffBenchmark.status,
@@ -993,6 +1001,7 @@ function getDashboardSummary() {
 
 function resetMetrics() {
   interactions.clear();
+  resetRuntimePerformanceMetrics();
 }
 
 module.exports = {

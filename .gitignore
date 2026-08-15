@@ -50,6 +50,7 @@ Planta.mp4
 /backend/data/phase16-financial-audit.local.json
 /backend/data/phase17-b2c-matrix.local.json
 /backend/data/phase19-handoff-audit.local.json
+/backend/data/phase21-performance-audit.local.json
 
 # Parches locales usados para aplicar checkpoints; no forman parte del producto
 /*.patch
