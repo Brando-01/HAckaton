@@ -195,26 +195,6 @@ function createFakeExplorer() {
         highConfidence: true
       };
     },
-    async createAuthUserForDemoId(
-      demoId
-    ) {
-      assert.equal(
-        demoId,
-        'DEMO000123'
-      );
-      return {
-        userId:
-          'EXP_DEMO000123',
-        customerId:
-          'EXP_DEMO000123',
-        name:
-          'Cliente DEMO000123',
-        email: null,
-        mode: 'EXPLORER',
-        explorerDemoId:
-          'DEMO000123'
-      };
-    },
     async getExperienceForUser(user) {
       return explorerExperience(user);
     }
@@ -272,7 +252,7 @@ function startServer() {
 }
 
 test(
-  'API del explorador lista aliases seguros y abre una sesión temporal reutilizable por Mi Movistar y Lucía',
+  'API del explorador mantiene metadata segura pero bloquea abrir cualquier alias como cuenta',
   async () => {
     clearAuthSessions();
     const server =
@@ -298,42 +278,7 @@ test(
       );
       assert.doesNotMatch(
         JSON.stringify(listData),
-        /subscriberKey|customerKey/
-      );
-
-      const unauthProfileResponse =
-        await fetch(
-          `http://127.0.0.1:${port}/api/chat`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json'
-            },
-            body: JSON.stringify({
-              message:
-                '¿Qué datos tienes de mí?',
-              sessionId:
-                'phase10-profile-public'
-            })
-          }
-        );
-      const unauthProfileData =
-        await unauthProfileResponse
-          .json();
-
-      assert.equal(
-        unauthProfileResponse.status,
-        200
-      );
-      assert.equal(
-        unauthProfileData.requiresAuth,
-        true
-      );
-      assert.equal(
-        unauthProfileData
-          .requestedCapability,
-        'CUSTOMER_PROFILE'
+        /subscriberKey|customerKey|financialAccount/
       );
 
       const openResponse =
@@ -352,67 +297,38 @@ test(
         );
       const openData =
         await openResponse.json();
-      const cookie =
-        getCookie(openResponse);
 
       assert.equal(
         openResponse.status,
-        200
-      );
-      assert.ok(cookie);
-      assert.equal(
-        openData.user.mode,
-        'EXPLORER'
+        403
       );
       assert.equal(
-        openData.user.explorerDemoId,
-        'DEMO000123'
+        openData.code,
+        'EXPLORER_READ_ONLY'
       );
-      assert.doesNotMatch(
-        JSON.stringify(openData),
-        /subscriberKey|customerKey/
+      assert.equal(
+        openData.requiresAuth,
+        true
+      );
+      assert.equal(
+        openData.redirect,
+        '/login'
+      );
+      assert.equal(
+        openResponse.headers.get(
+          'set-cookie'
+        ),
+        null
       );
 
-      const appResponse =
+      const forgedDemoLogin =
         await fetch(
-          `http://127.0.0.1:${port}/api/app/me`,
-          {
-            headers: {
-              Cookie: cookie
-            }
-          }
-        );
-      const appData =
-        await appResponse.json();
-
-      assert.equal(
-        appResponse.status,
-        200
-      );
-      assert.equal(
-        appData.customer.customerId,
-        'EXP_DEMO000123'
-      );
-      assert.equal(
-        appData.explorer.demoId,
-        'DEMO000123'
-      );
-
-      assert.equal(
-        appData.billingHistory
-          .availableBills,
-        3
-      );
-
-      const bindResponse =
-        await fetch(
-          `http://127.0.0.1:${port}/api/session/phase10-explorer/customer`,
+          `http://127.0.0.1:${port}/api/auth/demo-login`,
           {
             method: 'POST',
             headers: {
               'Content-Type':
-                'application/json',
-              Cookie: cookie
+                'application/json'
             },
             body: JSON.stringify({
               customerId:
@@ -421,21 +337,69 @@ test(
           }
         );
 
-      const bindData =
-        await bindResponse.json();
+      assert.equal(
+        forgedDemoLogin.status,
+        400
+      );
+      assert.equal(
+        forgedDemoLogin.headers.get(
+          'set-cookie'
+        ),
+        null
+      );
+
+      const appResponse =
+        await fetch(
+          `http://127.0.0.1:${port}/api/app/me`
+        );
 
       assert.equal(
-        bindResponse.status,
+        appResponse.status,
+        401
+      );
+    } finally {
+      server.close();
+      clearAuthSessions();
+    }
+  }
+);
+
+test(
+  'una llamada manual al open bloqueado no reemplaza una identidad ya autenticada',
+  async () => {
+    clearAuthSessions();
+    const server =
+      await startServer();
+    const { port } =
+      server.address();
+
+    try {
+      const loginResponse =
+        await fetch(
+          `http://127.0.0.1:${port}/api/auth/demo-login`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':
+                'application/json'
+            },
+            body: JSON.stringify({
+              customerId: 'CLI000001'
+            })
+          }
+        );
+      const cookie =
+        getCookie(loginResponse);
+
+      assert.equal(
+        loginResponse.status,
         200
       );
-      assert.equal(
-        bindData.customerId,
-        'EXP_DEMO000123'
-      );
+      assert.ok(cookie);
 
-      const chatResponse =
+      const blockedResponse =
         await fetch(
-          `http://127.0.0.1:${port}/api/chat`,
+          `http://127.0.0.1:${port}/api/explorer/open`,
           {
             method: 'POST',
             headers: {
@@ -444,317 +408,45 @@ test(
               Cookie: cookie
             },
             body: JSON.stringify({
-              message:
-                '¿Cuál es el total de mi recibo?',
-              sessionId:
-                bindData.sessionId
+              demoId: 'DEMO000123'
             })
           }
         );
-      const chatData =
-        await chatResponse.json();
 
       assert.equal(
-        chatResponse.status,
+        blockedResponse.status,
+        403
+      );
+      assert.equal(
+        blockedResponse.headers.get(
+          'set-cookie'
+        ),
+        null
+      );
+
+      const meResponse =
+        await fetch(
+          `http://127.0.0.1:${port}/api/auth/me`,
+          {
+            headers: {
+              Cookie: cookie
+            }
+          }
+        );
+      const meData =
+        await meResponse.json();
+
+      assert.equal(
+        meResponse.status,
         200
       );
       assert.equal(
-        chatData.foundData,
-        true
+        meData.user.customerId,
+        'CLI000001'
       );
-      assert.equal(
-        chatData.authenticated,
-        true
-      );
-      assert.match(
-        chatData.reply,
-        /S\/ 67\.47/
-      );
-      assert.doesNotMatch(
-        chatData.reply,
-        /mismo total/i
-      );
-
-      const profileResponse =
-        await fetch(
-          `http://127.0.0.1:${port}/api/chat`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json',
-              Cookie: cookie
-            },
-            body: JSON.stringify({
-              message:
-                '¿Qué datos tienes de mí?',
-              sessionId:
-                chatData.sessionId
-            })
-          }
-        );
-      const profileData =
-        await profileResponse.json();
-
-      assert.equal(
-        profileResponse.status,
-        200
-      );
-      assert.equal(
-        profileData.source,
-        'DESAFIO1_PROFILE_DETERMINISTIC'
-      );
-      assert.equal(
-        profileData.intent,
-        'PROFILE_SUMMARY'
-      );
-      assert.match(
-        profileData.reply,
-        /TEST-CUSTOMER-001/
-      );
-      assert.match(
-        profileData.reply,
-        /01\/08\/2020/
-      );
-      assert.match(
-        profileData.reply,
-        /Móvil \(WRLS\)/
-      );
-      assert.doesNotMatch(
-        JSON.stringify(profileData),
-        /subscriberKey|financialAccount|phoneHash/
-      );
-
-      const idResponse =
-        await fetch(
-          `http://127.0.0.1:${port}/api/chat`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json',
-              Cookie: cookie
-            },
-            body: JSON.stringify({
-              message:
-                '¿Cuál es mi ID?',
-              sessionId:
-                profileData.sessionId
-            })
-          }
-        );
-      const idData =
-        await idResponse.json();
-
-      assert.equal(
-        idData.intent,
-        'CUSTOMER_ID'
-      );
-      assert.match(
-        idData.reply,
-        /DEMO000123/
-      );
-      assert.match(
-        idData.reply,
-        /TEST-CUSTOMER-001/
-      );
-      assert.doesNotMatch(
-        idData.reply,
-        /PLANTA CLIENTES\.csv/
-      );
-      assert.equal(
-        idData.dataOrigin
-          .generatedByLlm,
-        false
-      );
-
-
-      const multiResponse =
-        await fetch(
-          `http://127.0.0.1:${port}/api/chat`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json',
-              Cookie: cookie
-            },
-            body: JSON.stringify({
-              message:
-                '¿Desde cuándo tengo el servicio? ¿Cuál es mi ciclo? ¿Qué tipo de servicio tengo? ¿Cuál es mi plan? ¿Tengo deuda?',
-              sessionId:
-                idData.sessionId
-            })
-          }
-        );
-      const multiData =
-        await multiResponse.json();
-
-      assert.equal(
-        multiResponse.status,
-        200
-      );
-      assert.equal(
-        multiData.source,
-        'DESAFIO1_CONTEXT_DETERMINISTIC'
-      );
-      assert.equal(
-        multiData.conversation.multiIntent,
-        true
-      );
-      assert.equal(
-        multiData.conversation.domain,
-        'PROFILE'
-      );
-      assert.match(
-        multiData.reply,
-        /01\/08\/2020/
-      );
-      assert.match(
-        multiData.reply,
-        /día 9/
-      );
-      assert.match(
-        multiData.reply,
-        /Móvil \(WRLS\)/
-      );
-      assert.match(
-        multiData.reply,
-        /Plan explorado/
-      );
-      assert.match(
-        multiData.reply,
-        /sin deuda/i
-      );
-      assert.doesNotMatch(
-        multiData.reply,
-        /Según PLANTA|FACTURACION-CLIENTES/i
-      );
-
-      const repairResponse =
-        await fetch(
-          `http://127.0.0.1:${port}/api/chat`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json',
-              Cookie: cookie
-            },
-            body: JSON.stringify({
-              message:
-                'No entendí, ¿me lo explicas más fácil?',
-              sessionId:
-                multiData.sessionId
-            })
-          }
-        );
-      const repairData =
-        await repairResponse.json();
-
-      assert.equal(
-        repairResponse.status,
-        200
-      );
-      assert.equal(
-        repairData.conversation.repair,
-        true
-      );
-      assert.match(
-        repairData.reply,
-        /En simple/i
-      );
-      assert.match(
-        repairData.reply,
-        /Plan explorado/
-      );
-      assert.doesNotMatch(
-        repairData.reply,
-        /•/
-      );
-      assert.equal(
-        repairData.conversation.domain,
-        'PROFILE'
-      );
-      assert.doesNotMatch(
-        repairData.reply,
-        /recibo aument|reconexi[oó]n|descuento|prorrateo/i
-      );
-
-      const historyResponse =
-        await fetch(
-          `http://127.0.0.1:${port}/api/chat`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json',
-              Cookie: cookie
-            },
-            body: JSON.stringify({
-              message:
-                '¿Cuál fue mi recibo más caro?',
-              sessionId:
-                repairData.sessionId
-            })
-          }
-        );
-      const historyData =
-        await historyResponse.json();
-
-      assert.equal(
-        historyResponse.status,
-        200
-      );
-      assert.equal(
-        historyData.intent,
-        'HIGHEST_BILL'
-      );
-      assert.match(
-        historyData.reply,
-        /S\/ 71\.20/
-      );
-      assert.match(
-        historyData.reply,
-        /15\/05\/2026/
-      );
-      assert.equal(
-        historyData
-          .financialReasoningByLlm,
-        false
-      );
-
-      const handoffResponse =
-        await fetch(
-          `http://127.0.0.1:${port}/api/chat`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json',
-              Cookie: cookie
-            },
-            body: JSON.stringify({
-              message:
-                'Quiero hablar con un asesor sobre mi plan',
-              sessionId:
-                repairData.sessionId
-            })
-          }
-        );
-      const handoffData =
-        await handoffResponse.json();
-
-      assert.equal(
-        handoffResponse.status,
-        200
-      );
-      assert.ok(
-        handoffData.handoff?.caseId
-      );
-      assert.doesNotMatch(
-        handoffData.reply,
-        /plan\/cargo principal/i
+      assert.notEqual(
+        meData.user.mode,
+        'EXPLORER'
       );
     } finally {
       server.close();

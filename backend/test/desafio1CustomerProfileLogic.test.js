@@ -125,6 +125,12 @@ test(
       ),
       'DATA_ORIGIN'
     );
+    assert.equal(
+      classifyCustomerProfileIntent(
+        '¿De dónde sacas esos datos?'
+      ),
+      'DATA_ORIGIN'
+    );
 
     assert.equal(
       classifyCustomerProfileIntent(
@@ -536,6 +542,31 @@ test(
         'CURRENT_PLAN',
         'DEBT_STATUS'
       ]
+    );
+  }
+);
+
+test(
+  'una cuenta validada contra dataset no repite un alias ficticio al responder su ID',
+  () => {
+    const reply =
+      buildCustomerProfileReply({
+        intent: 'CUSTOMER_ID',
+        profile: {
+          ...profile(),
+          visibleId: '115358834',
+          customerCode: '115358834'
+        },
+        experience: experience()
+      });
+
+    assert.match(
+      reply,
+      /código de cliente anonimizado es 115358834/i
+    );
+    assert.doesNotMatch(
+      reply,
+      /CLI000|DEMO000/i
     );
   }
 );

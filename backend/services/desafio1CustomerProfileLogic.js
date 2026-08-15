@@ -143,6 +143,10 @@ const PROFILE_INTENT_RULES = [
       'la ia genera mis datos',
       'de donde sale mi perfil',
       'de donde sale este dato',
+      'de donde sacas esos datos',
+      'de donde sacas estos datos',
+      'de donde obtienes esos datos',
+      'de donde obtienes estos datos',
       'cual es la fuente de mis datos'
     ]
   }
@@ -569,10 +573,27 @@ function buildCustomerProfileReply({
         experience
       });
 
-    case 'CUSTOMER_ID':
+    case 'CUSTOMER_ID': {
+      const visible =
+        profile.visibleId || null;
+      const customerCode =
+        profile.customerCode || null;
+
+      if (
+        visible &&
+        customerCode &&
+        String(visible) ===
+          String(customerCode)
+      ) {
+        return concise
+          ? `Tu código de cliente anonimizado es ${customerCode}.`
+          : `Tu código de cliente anonimizado es ${customerCode}. Ese valor proviene del perfil validado del dataset del desafío.`;
+      }
+
       return concise
-        ? `Tu ID visible es ${profile.visibleId || 'no disponible'} y tu código de cliente anonimizado es ${profile.customerCode || 'no disponible'}.`
-        : `Tu identificador visible aquí es ${profile.visibleId || 'no disponible'}. También tengo asociado el código de cliente anonimizado ${profile.customerCode || 'no disponible'}.`;
+        ? `Tu ID visible es ${visible || 'no disponible'} y tu código de cliente anonimizado es ${customerCode || 'no disponible'}.`
+        : `Tu identificador visible aquí es ${visible || 'no disponible'}. También tengo asociado el código de cliente anonimizado ${customerCode || 'no disponible'}.`;
+    }
 
     case 'ACTIVATION_DATE':
       return `Tu servicio figura activo desde el ${formatDate(profile.activationDate)}.`;

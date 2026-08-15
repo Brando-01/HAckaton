@@ -293,19 +293,22 @@ button, input, select { font: inherit; }
   border-radius: 10px;
 }
 
-.open-profile {
-  width: 100%;
-  min-height: 42px;
+.profile-access-note {
   margin-top: 14px;
-  color: white;
-  font-weight: 800;
-  background: var(--blue);
-  border: 0;
+  padding: 10px 12px;
+  color: #405365;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+  background: #edf8fc;
+  border: 1px solid #cce8f2;
   border-radius: 11px;
-  cursor: pointer;
 }
-.open-profile:hover { background: var(--blue-dark); }
-.open-profile:disabled { opacity: 0.6; cursor: wait; }
+
+.inline-auth-link {
+  color: var(--blue-dark);
+  font-weight: 800;
+}
 
 .pagination {
   display: flex;

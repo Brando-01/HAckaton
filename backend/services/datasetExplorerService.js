@@ -1,6 +1,5 @@
 const {
   normalizeExplorerQuery,
-  buildExplorerAuthUser,
   buildExplorerBinding,
   toSafeExplorerProfile,
   buildExplorerSummary
@@ -216,18 +215,6 @@ class DatasetExplorerService {
     );
   }
 
-  async createAuthUserForDemoId(
-    demoId
-  ) {
-    const profile =
-      await this.getPrivateProfile(
-        demoId
-      );
-
-    return buildExplorerAuthUser(
-      profile
-    );
-  }
 
   async getExperienceForUser(
     user,

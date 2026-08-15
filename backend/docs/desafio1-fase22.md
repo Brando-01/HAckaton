@@ -58,6 +58,9 @@ DATASETS_8_OF_8
 TEST_SUITE
 CRITICAL_DEMO_CAUSES
 PRIVACY
+EXPLORER_AUTH_BOUNDARY
+DATASET_AUTH_BOUNDARY
+CONVERSATIONAL_GROUNDING_BOUNDARY
 RETRIEVAL_ACCURACY
 HALLUCINATION_GUARD
 HANDOFF_POLICY
@@ -68,6 +71,20 @@ OMNICHANNEL_CONTINUITY
 PERFORMANCE_3X
 RELEASE_SMOKE
 ```
+
+### Frontera de autenticación del Explorador
+
+El hardening post-F22 añade `EXPLORER_AUTH_BOUNDARY`: `/explorer` queda como herramienta de cobertura de solo lectura. Un alias `DEMOxxxxxx` no crea ni reemplaza una sesión autenticada y no permite abrir datos personales. Mi Movistar, Lucía y WhatsApp solo reciben contexto personal después de `/login`. Tras el hardening de login contra dataset, la UI cliente valida una pareja `COD_CLIENTE + NUM_ANEXO`; los perfiles demo versionados quedan reservados para automatización y benchmarks.
+
+### Frontera de autenticación contra dataset
+
+`DATASET_AUTH_BOUNDARY` exige que el acceso cliente use dos campos existentes en `PLANTA CLIENTES`, con coincidencia exacta y sin exponer `NUM_ANEXO` completo al navegador. Los identificadores son anonimizados del desafío y no se presentan como secretos productivos de Mi Movistar.
+
+### Grounding conversacional
+
+`CONVERSATIONAL_GROUNDING_BOUNDARY` mantiene al LLM fuera del cálculo financiero, valida referencias explícitas contra la cuenta autenticada y exige fallback determinista.
+
+El endpoint histórico `POST /api/explorer/open` se conserva como barrera explícita y responde `403 EXPLORER_READ_ONLY` sin emitir cookie.
 
 ### Datasets 8/8
 

@@ -32,6 +32,12 @@ const {
   '../services/desafio1PerformanceMetrics'
 );
 
+const {
+  createDesafio1ConversationalAiService
+} = require(
+  '../services/desafio1ConversationalAiService'
+);
+
 function getArgValue(flag) {
   const index =
     process.argv.indexOf(flag);
@@ -238,7 +244,11 @@ async function main() {
   const profile = parseArgs();
   const app =
     createApp({
-      requestLogging: false
+      requestLogging: false,
+      conversationalAiService:
+        createDesafio1ConversationalAiService({
+          enabled: false
+        })
     });
 
   let server = null;

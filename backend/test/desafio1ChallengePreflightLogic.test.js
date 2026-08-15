@@ -13,6 +13,7 @@ const {
   buildDatasetAudit,
   runHistoryGuardAudit,
   runCommercialGuardAudit,
+  runExplorerAuthBoundaryAudit,
   expectedDemoCasesPass,
   dynamicB2CLimits,
   safeBenchmarkSnapshot,
@@ -381,6 +382,51 @@ test(
       report.checks
         .benefitHasPriority,
       true
+    );
+  }
+);
+
+test(
+  'frontera F22 exige Explorer solo lectura sin creación de sesión',
+  () => {
+    const report =
+      runExplorerAuthBoundaryAudit();
+
+    assert.equal(
+      report.status,
+      'PASS'
+    );
+    assert.equal(
+      report.checks.noImpersonation,
+      true
+    );
+    assert.equal(
+      report.checks.noAuthSessionFromExplorer,
+      true
+    );
+    assert.equal(
+      report.checks.personalDataNeedsAuth,
+      true
+    );
+  }
+);
+
+test(
+  'frontera F22 falla si el Explorador vuelve a permitir suplantación',
+  () => {
+    const report =
+      runExplorerAuthBoundaryAudit({
+        mode: 'READ_ONLY_COVERAGE',
+        publicMetadataOnly: true,
+        accountImpersonationAllowed: true,
+        explorerCreatesAuthSession: true,
+        financialDetailsRequireAuthenticatedDemoProfile: false,
+        authenticatedEntryPoint: '/login'
+      });
+
+    assert.equal(
+      report.status,
+      'FAIL'
     );
   }
 );

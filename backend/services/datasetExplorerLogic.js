@@ -1,6 +1,27 @@
 const EXPLORER_SCHEMA_VERSION =
   'desafio1-dataset-explorer-v1';
 
+const EXPLORER_ACCESS_POLICY =
+  Object.freeze({
+    mode:
+      'READ_ONLY_COVERAGE',
+    publicMetadataOnly: true,
+    accountImpersonationAllowed:
+      false,
+    explorerCreatesAuthSession:
+      false,
+    financialDetailsRequireAuthenticatedDemoProfile:
+      true,
+    authenticatedEntryPoint:
+      '/login'
+  });
+
+function getExplorerAccessPolicy() {
+  return {
+    ...EXPLORER_ACCESS_POLICY
+  };
+}
+
 const SCENARIO_LABELS =
   Object.freeze({
     RECONNECTION:
@@ -179,34 +200,6 @@ function getScenarioLabel(
   );
 }
 
-function buildExplorerAuthUser(
-  profile
-) {
-  const demoId =
-    String(
-      profile?.demoId || ''
-    ).trim().toUpperCase();
-
-  if (!/^DEMO\d{6}$/.test(demoId)) {
-    throw new Error(
-      'El perfil del explorador no tiene un alias DEMO válido.'
-    );
-  }
-
-  return {
-    userId:
-      `EXP_${demoId}`,
-    customerId:
-      `EXP_${demoId}`,
-    name:
-      `Cliente ${demoId}`,
-    email: null,
-    mode: 'EXPLORER',
-    explorerDemoId:
-      demoId
-  };
-}
-
 function buildExplorerBinding(
   profile
 ) {
@@ -380,20 +373,18 @@ function buildExplorerSummary(
         true,
       officialIdentifiersExposed:
         false,
-      explorerCreatesPermanentAccounts:
-        false,
-      financialDetailsRequireTemporarySession:
-        true
+      ...getExplorerAccessPolicy()
     }
   };
 }
 
 module.exports = {
   EXPLORER_SCHEMA_VERSION,
+  EXPLORER_ACCESS_POLICY,
+  getExplorerAccessPolicy,
   SCENARIO_LABELS,
   normalizeExplorerQuery,
   getScenarioLabel,
-  buildExplorerAuthUser,
   buildExplorerBinding,
   toSafeExplorerProfile,
   buildExplorerSummary

@@ -26,6 +26,24 @@ const {
   './desafio1CommercialPolicyLogic'
 );
 
+const {
+  getExplorerAccessPolicy
+} = require(
+  './datasetExplorerLogic'
+);
+
+const {
+  getConversationalGroundingPolicy
+} = require(
+  './desafio1ConversationalAiLogic'
+);
+
+const {
+  getDatasetAccountAuthPolicy
+} = require(
+  './desafio1DatasetAccountAuthService'
+);
+
 const CHECK_STATUS = Object.freeze({
   PASS: 'PASS',
   KNOWN_LIMITS: 'KNOWN_LIMITS',
@@ -413,6 +431,164 @@ function runCommercialGuardAudit() {
   };
 }
 
+function runExplorerAuthBoundaryAudit(
+  policy = getExplorerAccessPolicy()
+) {
+  const checks = {
+    readOnlyCoverage:
+      policy?.mode ===
+        'READ_ONLY_COVERAGE',
+    metadataOnly:
+      policy?.publicMetadataOnly ===
+        true,
+    noImpersonation:
+      policy?.accountImpersonationAllowed ===
+        false,
+    noAuthSessionFromExplorer:
+      policy?.explorerCreatesAuthSession ===
+        false,
+    personalDataNeedsAuth:
+      policy?.financialDetailsRequireAuthenticatedDemoProfile ===
+        true,
+    loginIsEntryPoint:
+      policy?.authenticatedEntryPoint ===
+        '/login'
+  };
+
+  return {
+    status:
+      Object.values(checks)
+        .every(Boolean)
+        ? 'PASS'
+        : 'FAIL',
+    checks,
+    policy: {
+      mode:
+        policy?.mode || null,
+      authenticatedEntryPoint:
+        policy?.authenticatedEntryPoint || null
+    }
+  };
+}
+
+function runDatasetAccountAuthAudit(
+  policy = getDatasetAccountAuthPolicy()
+) {
+  const checks = {
+    usesRealDatasetFields:
+      policy?.source ===
+        'PLANTA_CLIENTES' &&
+      policy?.customerCodeField ===
+        'COD_CLIENTE' &&
+      policy?.serviceNumberField ===
+        'NUM_ANEXO',
+    exactPairRequired:
+      policy?.exactPairRequired ===
+        true,
+    billableSubscriberRequired:
+      policy?.billableSubscriberRequired ===
+        true,
+    invalidPairCannotCreateSession:
+      policy?.invalidPairCreatesSession ===
+        false,
+    subscriberNotExposed:
+      policy?.subscriberKeyExposedToBrowser ===
+        false,
+    productionClaimIsExplicitlyFalse:
+      policy?.identifiersAreProductionSecrets ===
+        false
+  };
+
+  return {
+    status:
+      Object.values(checks)
+        .every(Boolean)
+        ? 'PASS'
+        : 'FAIL',
+    checks,
+    policy: {
+      mode:
+        policy?.mode || null,
+      source:
+        policy?.source || null,
+      fields: [
+        policy?.customerCodeField || null,
+        policy?.serviceNumberField || null
+      ].filter(Boolean),
+      exactPairRequired:
+        policy?.exactPairRequired === true
+    }
+  };
+}
+
+function runConversationalGroundingAudit(
+  policy = getConversationalGroundingPolicy()
+) {
+  const checks = {
+    deterministicFinancialAuthority:
+      policy?.financialReasoningAuthority ===
+        'STRUCTURED_DATA_AND_DETERMINISTIC_RULES',
+    llmIntentOnly:
+      policy?.llmMayClassifyIntent ===
+        true,
+    llmLanguageOnly:
+      policy?.llmMayNaturalizeLanguage ===
+        true,
+    llmCannotCreateFinancialFacts:
+      policy?.llmMayCreateFinancialFacts ===
+        false,
+    invoiceReferenceScopedToAuthenticatedHistory:
+      policy?.explicitInvoiceReferencesValidatedAgainstAuthenticatedHistory ===
+        true,
+    billingPeriodScopedToAuthenticatedHistory:
+      policy?.explicitBillingPeriodsValidatedAgainstAuthenticatedHistory ===
+        true,
+    groundedDetailFollowUpsReuseSubject:
+      policy?.groundedDetailFollowUpsReuseLastFinancialSubject ===
+        true,
+    customerReferenceCannotSwitchIdentity:
+      policy?.customerReferenceCannotSwitchAuthenticatedIdentity ===
+        true,
+    deterministicFallback:
+      policy?.deterministicFallbackRequired ===
+        true
+  };
+
+  return {
+    status:
+      Object.values(checks)
+        .every(Boolean)
+        ? 'PASS'
+        : 'FAIL',
+    checks,
+    policy: {
+      financialReasoningAuthority:
+        policy?.financialReasoningAuthority ||
+        null,
+      explicitInvoiceReferencesValidatedAgainstAuthenticatedHistory:
+        Boolean(
+          policy?.explicitInvoiceReferencesValidatedAgainstAuthenticatedHistory
+        ),
+      explicitBillingPeriodsValidatedAgainstAuthenticatedHistory:
+        Boolean(
+          policy?.explicitBillingPeriodsValidatedAgainstAuthenticatedHistory
+        ),
+      groundedDetailFollowUpsReuseLastFinancialSubject:
+        Boolean(
+          policy?.groundedDetailFollowUpsReuseLastFinancialSubject
+        ),
+      customerReferenceCannotSwitchAuthenticatedIdentity:
+        Boolean(
+          policy?.customerReferenceCannotSwitchAuthenticatedIdentity
+        ),
+      deterministicFallbackRequired:
+        Boolean(
+          policy?.deterministicFallbackRequired
+        )
+    }
+  };
+}
+
 function expectedDemoCasesPass(
   releaseReport
 ) {
@@ -795,6 +971,15 @@ function buildChallengePreflightReport({
       releaseReport
     );
 
+  const explorerAuthAudit =
+    runExplorerAuthBoundaryAudit();
+
+  const datasetAccountAuthAudit =
+    runDatasetAccountAuthAudit();
+
+  const conversationalGroundingAudit =
+    runConversationalGroundingAudit();
+
   const releaseChecks =
     new Map(
       (releaseReport?.checks || [])
@@ -905,6 +1090,64 @@ function buildChallengePreflightReport({
         privacyPass
           ? 'Payload demo y benchmarks mantienen fuera identificadores oficiales/financieros privados.'
           : 'Alguna salvaguarda de privacidad dejó de cumplirse.'
+    })
+  );
+
+  checks.push(
+    buildCheck({
+      id: 'EXPLORER_AUTH_BOUNDARY',
+      label: 'Frontera de autenticación del Explorador',
+      status:
+        explorerAuthAudit.status ===
+          'PASS'
+          ? CHECK_STATUS.PASS
+          : CHECK_STATUS.FAIL,
+      detail:
+        explorerAuthAudit.status ===
+          'PASS'
+          ? 'El Explorador es solo lectura: no crea sesiones ni adopta identidades; los datos personales requieren /login.'
+          : 'El Explorador volvió a permitir adoptar identidades o acceder a datos personales sin la frontera explícita de autenticación.',
+      evidence:
+        explorerAuthAudit.policy
+    })
+  );
+
+  checks.push(
+    buildCheck({
+      id: 'DATASET_AUTH_BOUNDARY',
+      label: 'Autenticación demo contra dataset',
+      status:
+        datasetAccountAuthAudit.status ===
+          'PASS'
+          ? CHECK_STATUS.PASS
+          : CHECK_STATUS.FAIL,
+      detail:
+        datasetAccountAuthAudit.status ===
+          'PASS'
+          ? 'El acceso cliente valida la pareja COD_CLIENTE + NUM_ANEXO contra PLANTA CLIENTES; no publica NUM_ANEXO ni lo trata como credencial productiva.'
+          : 'La autenticación demo dejó de exigir la pareja exacta del dataset o expone identificadores privados.',
+      evidence:
+        datasetAccountAuthAudit.policy
+    })
+  );
+
+  checks.push(
+    buildCheck({
+      id: 'CONVERSATIONAL_GROUNDING_BOUNDARY',
+      label: 'Grounding conversacional',
+      status:
+        conversationalGroundingAudit
+          .status === 'PASS'
+          ? CHECK_STATUS.PASS
+          : CHECK_STATUS.FAIL,
+      detail:
+        conversationalGroundingAudit
+          .status === 'PASS'
+          ? 'Groq puede interpretar intención y naturalizar lenguaje, pero montos/causas siguen bajo autoridad determinista; códigos, periodos y seguimientos de mayor detalle se resuelven contra el contexto grounded de la cuenta autenticada.'
+          : 'La capa conversacional perdió alguna guarda de grounding, identidad o fallback determinista.',
+      evidence:
+        conversationalGroundingAudit
+          .policy
     })
   );
 
@@ -1320,6 +1563,9 @@ module.exports = {
   buildDatasetAudit,
   runHistoryGuardAudit,
   runCommercialGuardAudit,
+  runExplorerAuthBoundaryAudit,
+  runDatasetAccountAuthAudit,
+  runConversationalGroundingAudit,
   expectedDemoCasesPass,
   dynamicB2CLimits,
   safeBenchmarkSnapshot,

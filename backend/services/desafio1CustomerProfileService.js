@@ -18,11 +18,15 @@ function toSafeDatasetProfile({
     schemaVersion:
       'desafio1-customer-profile-v1',
     visibleId:
-      user?.mode === 'EXPLORER'
-        ? user?.explorerDemoId ||
-          user?.customerId ||
+      user?.mode === 'DATASET'
+        ? user?.customerCode ||
+          subscriber.customerKey ||
           null
-        : user?.customerId || null,
+        : user?.mode === 'EXPLORER'
+          ? user?.explorerDemoId ||
+            user?.customerId ||
+            null
+          : user?.customerId || null,
     customerCode:
       subscriber.customerKey || null,
     activationDate:

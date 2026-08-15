@@ -5,7 +5,8 @@ const {
   DEMO_PASSWORD,
   authenticateUser,
   authenticateDemoCustomer,
-  getDemoProfiles
+  getDemoProfiles,
+  toPublicAuthUser
 } = require(
   '../services/authService'
 );
@@ -102,6 +103,57 @@ test(
           false
         );
       }
+    );
+  }
+);
+
+test(
+  'un alias del Explorador no es una cuenta autenticable de cliente',
+  () => {
+    assert.equal(
+      authenticateDemoCustomer(
+        'EXP_DEMO000123'
+      ),
+      null
+    );
+  }
+);
+
+
+test(
+  'la proyección pública de una cuenta dataset elimina NUM_ANEXO interno',
+  () => {
+    const projected =
+      toPublicAuthUser({
+        userId: 'D1U-X',
+        customerId: 'D1A-X',
+        customerCode: '100000001',
+        name: 'Cliente 100000001',
+        email: null,
+        mode: 'DATASET',
+        serviceNumberMasked: '•••••0002',
+        datasetSubscriberKey: '200000002',
+        financialAccount: 'PRIVATE'
+      });
+
+    assert.deepEqual(
+      projected,
+      {
+        userId: 'D1U-X',
+        customerId: 'D1A-X',
+        name: 'Cliente 100000001',
+        email: null,
+        mode: 'DATASET',
+        customerCode: '100000001',
+        serviceNumberMasked: '•••••0002'
+      }
+    );
+    assert.equal(
+      Object.hasOwn(
+        projected,
+        'datasetSubscriberKey'
+      ),
+      false
     );
   }
 );

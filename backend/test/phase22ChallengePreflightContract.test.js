@@ -182,6 +182,41 @@ test(
 );
 
 test(
+  'preflight F22 congela explícitamente la frontera de autenticación del Explorador',
+  () => {
+    const manifest =
+      read(
+        'backend/config/desafio1ChallengeManifest.js'
+      );
+    const logic =
+      read(
+        'backend/services/desafio1ChallengePreflightLogic.js'
+      );
+    const hardening =
+      read(
+        'backend/docs/desafio1-postfase22-hardening-explorer-auth.md'
+      );
+
+    assert.match(
+      manifest,
+      /EXPLORER_AUTH_BOUNDARY/
+    );
+    assert.match(
+      logic,
+      /runExplorerAuthBoundaryAudit/
+    );
+    assert.match(
+      hardening,
+      /EXPLORER_READ_ONLY/
+    );
+    assert.match(
+      hardening,
+      /no crea.*Set-Cookie|no crea `Set-Cookie`/i
+    );
+  }
+);
+
+test(
   'README publica el comando final y explica known limits',
   () => {
     const readme =

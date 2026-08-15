@@ -69,6 +69,17 @@
       'Sin causa reconocida';
   }
 
+  function caseLabel(demoId) {
+    const match =
+      /^DEMO(\d{6})$/i.exec(
+        String(demoId || '')
+      );
+
+    return match
+      ? `Caso #${match[1]}`
+      : 'Caso de cobertura';
+  }
+
   function tierLabel(tier) {
     const labels = {
       CONSULTABLE: 'Consultable',
@@ -153,7 +164,7 @@
       createElement(
         'div',
         'demo-id',
-        profile.demoId
+        caseLabel(profile.demoId)
       )
     );
     title.appendChild(
@@ -263,21 +274,13 @@
       )
     );
 
-    const openButton =
+    const accessNote =
       createElement(
-        'button',
-        'open-profile',
-        'Abrir caso en Mi Movistar'
+        'div',
+        'profile-access-note',
+        'Cobertura segura · no abre una cuenta. Para consultar datos personales usa un perfil autorizado desde Iniciar sesión.'
       );
-    openButton.type = 'button';
-    openButton.addEventListener(
-      'click',
-      () => openProfile(
-        profile.demoId,
-        openButton
-      )
-    );
-    card.appendChild(openButton);
+    card.appendChild(accessNote);
 
     return card;
   }
@@ -432,59 +435,6 @@
     }
   }
 
-  async function openProfile(
-    demoId,
-    button
-  ) {
-    const original =
-      button.textContent;
-    button.disabled = true;
-    button.textContent =
-      'Abriendo caso…';
-
-    try {
-      const response =
-        await fetch(
-          '/api/explorer/open',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json'
-            },
-            body:
-              JSON.stringify({
-                demoId
-              })
-          }
-        );
-
-      const data =
-        await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error ||
-          'No se pudo abrir el caso.'
-        );
-      }
-
-      sessionStorage.removeItem(
-        'chatSessionId'
-      );
-      sessionStorage.removeItem(
-        'pendingAuthBillingPrompt'
-      );
-
-      window.location.href =
-        data.redirect ||
-        '/app?source=explorer';
-    } catch (error) {
-      button.disabled = false;
-      button.textContent = original;
-      window.alert(error.message);
-    }
-  }
 
   function scheduleReload() {
     clearTimeout(state.timer);

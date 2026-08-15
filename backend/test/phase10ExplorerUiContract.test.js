@@ -31,7 +31,7 @@ test(
     );
     assert.match(
       html,
-      /Explora los clientes utilizables/
+      /Explora los casos utilizables/
     );
     assert.match(
       demo,
@@ -45,68 +45,59 @@ test(
 );
 
 test(
-  'el frontend consume solo endpoints explorer y nunca solicita subscriberKey o customerKey',
+  'el frontend del explorador es solo lectura y nunca intenta adoptar una identidad',
   () => {
     const source =
       read('frontend/explorer.js');
+    const html =
+      read('frontend/explorer.html');
 
     assert.match(
       source,
       /\/api\/explorer\/profiles/
     );
-    assert.match(
+    assert.doesNotMatch(
       source,
       /\/api\/explorer\/open/
     );
     assert.doesNotMatch(
       source,
-      /subscriberKey/
+      /subscriberKey|customerKey/
     );
+    assert.match(
+      html,
+      /solo lectura/i
+    );
+    assert.match(
+      html,
+      /href="\/login"/
+    );
+  }
+);
+
+test(
+  'contrato web no presenta el Explorador como acceso a cuentas personales',
+  () => {
+    const html =
+      read('frontend/explorer.html');
+    const demo =
+      read('frontend/demo.html');
+
     assert.doesNotMatch(
-      source,
-      /customerKey/
-    );
-  }
-);
-
-test(
-  'Mi Movistar distingue la sesión temporal del explorador y permite regresar al índice',
-  () => {
-    const appJs =
-      read('frontend/app.js');
-    const appHtml =
-      read('frontend/app.html');
-
-    assert.match(
-      appJs,
-      /EXPLORER/
+      html,
+      /Abrir caso en Mi Movistar/i
     );
     assert.match(
-      appJs,
-      /Explorador dataset/
+      html,
+      /no permite adoptar la identidad/i
     );
     assert.match(
-      appHtml,
-      /returnExplorerLink/
-    );
-  }
-);
-
-test(
-  'Lucía identifica visualmente sesiones del explorador',
-  () => {
-    const chatJs =
-      read('frontend/chat.js');
-    const chatHtml =
-      read('frontend/index.html');
-
-    assert.match(
-      chatJs,
-      /'explorador'/
+      demo,
+      /modo lectura/i
     );
     assert.match(
-      chatHtml,
-      /href="\/explorer"/
+      demo,
+      /no permiten adoptar identidades/i
     );
   }
 );

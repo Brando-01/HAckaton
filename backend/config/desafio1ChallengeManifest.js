@@ -59,6 +59,12 @@ const ARCHITECTURE_SNAPSHOT = Object.freeze({
 
 const STATIC_KNOWN_LIMITS = Object.freeze([
   Object.freeze({
+    code: 'DATASET_IDENTIFIER_AUTH_DEMO_ONLY',
+    area: 'AUTHENTICATION',
+    detail:
+      'COD_CLIENTE + NUM_ANEXO se usan únicamente para validar el prototipo contra PLANTA CLIENTES; son identificadores anonimizados del desafío, no secretos ni credenciales productivas de Mi Movistar.'
+  }),
+  Object.freeze({
     code: 'FINANCED_EQUIPMENT_MAPPING_PENDING',
     area: 'DATASET_COVERAGE',
     detail:
@@ -113,6 +119,9 @@ const FINAL_REQUIRED_CHECK_IDS = Object.freeze([
   'TEST_SUITE',
   'CRITICAL_DEMO_CAUSES',
   'PRIVACY',
+  'EXPLORER_AUTH_BOUNDARY',
+  'DATASET_AUTH_BOUNDARY',
+  'CONVERSATIONAL_GROUNDING_BOUNDARY',
   'RETRIEVAL_ACCURACY',
   'HALLUCINATION_GUARD',
   'HANDOFF_POLICY',

@@ -145,6 +145,57 @@ const PERSONAL_FOLLOWUPS = [
   'es recurrente'
 ];
 
+const BILLING_DETAIL_MARKERS = [
+  'mas detalle',
+  'mas detalles',
+  'mas a detalle',
+  'a mas detalle',
+  'con mas detalle',
+  'con mas detalles',
+  'dame mas detalle',
+  'dame mas detalles',
+  'quiero mas detalle',
+  'quiero mas detalles',
+  'quiero saber mas detalle',
+  'quiero saber mas detalles',
+  'explicamelo con mas detalle',
+  'explicamelo con mas detalles',
+  'explicamelo a mas detalle',
+  'explicamelo a mayor detalle',
+  'explicalo con mas detalle',
+  'amplia la informacion',
+  'amplia eso',
+  'amplialo',
+  'profundiza',
+  'profundiza mas',
+  'desglosalo',
+  'desglosame eso',
+  'que mas puedes decirme'
+];
+
+function isBillingDetailRequest(
+  message
+) {
+  const text =
+    normalizeText(message);
+
+  if (!text) {
+    return false;
+  }
+
+  return BILLING_DETAIL_MARKERS
+    .some(
+      (marker) =>
+        text === marker ||
+        text.startsWith(
+          `${marker} `
+        ) ||
+        text.includes(
+          ` ${marker}`
+        )
+    );
+}
+
 function isGeneralBillingEducationQuery(
   message
 ) {
@@ -247,6 +298,9 @@ function requiresPersonalBillingAccess(
       isPersonalBillingFollowup(
         text
       ) ||
+      isBillingDetailRequest(
+        text
+      ) ||
       isBillingRepairRequest(
         text
       )
@@ -309,6 +363,13 @@ function isBillingRepairRequest(
 ) {
   const text = normalizeText(message);
 
+  // Pedir profundidad no equivale a decir que la explicación
+  // anterior fue incomprensible. Así evitamos consumir el umbral
+  // de handoff por frases como "explícamelo a más detalle".
+  if (isBillingDetailRequest(text)) {
+    return false;
+  }
+
   return [
     'no entendi',
     'no lo entendi',
@@ -351,6 +412,54 @@ function classifyPersonalBillingIntents(
       intents.push(intent);
     }
   };
+
+  const detailRequest =
+    isBillingDetailRequest(text);
+
+  if (
+    detailRequest &&
+    hasAny(
+      text,
+      [
+        'recibo actual',
+        'factura actual',
+        'recibo de este mes',
+        'factura de este mes'
+      ]
+    )
+  ) {
+    add('CURRENT_TOTAL');
+  }
+
+  if (
+    detailRequest &&
+    hasAny(
+      text,
+      [
+        'recibo anterior',
+        'factura anterior',
+        'mes pasado'
+      ]
+    )
+  ) {
+    add('PREVIOUS_BILL');
+  }
+
+  if (
+    detailRequest &&
+    hasAny(
+      text,
+      [
+        'variacion',
+        'diferencia',
+        'por que subio',
+        'por que cambio',
+        'por que aumento'
+      ]
+    )
+  ) {
+    add('EXPLANATION');
+  }
 
   const historyTrendQuestion =
     hasAny(
@@ -585,12 +694,21 @@ function classifyPersonalBillingIntents(
         'cuanto tengo que pagar',
         'cuanto pago',
         'cuanto pago ahora',
+        'cuanto estoy pagando',
+        'cuanto estoy pagando actualmente',
+        'cuanto me estan cobrando',
+        'cuanto me cobran actualmente',
+        'que monto estoy pagando',
         'monto actual',
         'total actual',
         'total de mi recibo',
         'total de mi factura',
         'cuanto es mi recibo',
-        'cuanto cuesta mi recibo'
+        'cuanto cuesta mi recibo',
+        'cual es mi recibo actual',
+        'cual es mi factura actual',
+        'cuanto vino mi recibo',
+        'cuanto me vino el recibo'
       ]
     ) ||
     (
@@ -646,6 +764,15 @@ function classifyPersonalBillingIntents(
     )
   ) {
     add('EXPLANATION');
+  }
+
+  if (
+    !intents.length &&
+    detailRequest &&
+    hasPersonalBillingContext &&
+    lastBillingIntent
+  ) {
+    add(lastBillingIntent);
   }
 
   if (
@@ -747,10 +874,30 @@ function isOutstandingDebtQuestion(
   );
 }
 
+function isAmbiguousCurrentPaymentQuestion(
+  message
+) {
+  const text =
+    normalizeText(message);
+
+  return hasAny(
+    text,
+    [
+      'cuanto estoy pagando',
+      'cuanto estoy pagando actualmente',
+      'cuanto pago actualmente',
+      'cuanto me estan cobrando',
+      'cuanto me cobran actualmente',
+      'que monto estoy pagando'
+    ]
+  );
+}
+
 function buildCurrentTotalReply(
   experience,
   {
-    debtQuestion = false
+    debtQuestion = false,
+    paymentQuestion = false
   } = {}
 ) {
   const bill =
@@ -769,6 +916,13 @@ function buildCurrentTotalReply(
     );
   }
 
+  if (paymentQuestion) {
+    return (
+      `El total de tu recibo actual es ${formatMoney(bill.total)} y corresponde a ${bill.period}. ` +
+      'Si con “cuánto estoy pagando” te refieres al saldo pendiente exacto por pagar hoy, ese dato no está disponible de forma verificable en la fuente actual; por eso no lo voy a inferir.'
+    );
+  }
+
   const status =
     bill.status &&
     bill.status !==
@@ -780,6 +934,176 @@ function buildCurrentTotalReply(
     `Tu recibo actual es de ${formatMoney(bill.total)}. ` +
     `Corresponde a ${bill.period}.${status}`
   );
+}
+
+function buildVisibleBillConceptsDetail(
+  bill,
+  {
+    maxItems = 5
+  } = {}
+) {
+  const items =
+    (bill?.items || [])
+      .filter(
+        (item) =>
+          Number.isFinite(
+            Number(item?.amount)
+          )
+      );
+
+  if (!items.length) {
+    return null;
+  }
+
+  const visible = items
+    .slice(0, maxItems)
+    .map(
+      (item) =>
+        `${sanitizeInternalTerms(item.label || 'Concepto')}: ${formatMoney(item.amount)}`
+    );
+
+  const suffix =
+    items.length > visible.length
+      ? ` Hay ${items.length - visible.length} concepto(s) visible(s) adicional(es) en el detalle del recibo.`
+      : '';
+
+  return (
+    `Entre los conceptos visibles del recibo: ${visible.join('; ')}.${suffix}`
+  );
+}
+
+function buildCurrentBillDetailReply(
+  experience
+) {
+  const current =
+    experience?.currentBill;
+
+  if (!current) {
+    return (
+      'No tengo un recibo actual disponible para ampliar el detalle.'
+    );
+  }
+
+  const blocks = [
+    `Tu recibo actual es de ${formatMoney(current.total)} y corresponde a ${current.period}.`
+  ];
+
+  const previous =
+    experience?.previousBill;
+  const difference =
+    Number(
+      experience?.comparison
+        ?.difference
+    );
+
+  if (
+    previous &&
+    Number.isFinite(difference)
+  ) {
+    if (Math.abs(difference) < 0.005) {
+      blocks.push(
+        `El recibo anterior fue de ${formatMoney(previous.total)} (${previous.period}) y el total no cambió de forma material frente a ese ciclo.`
+      );
+    } else {
+      const verb =
+        difference > 0
+          ? 'aumentó'
+          : 'disminuyó';
+
+      blocks.push(
+        `El recibo anterior fue de ${formatMoney(previous.total)} (${previous.period}), así que el actual ${verb} ${formatMoney(Math.abs(difference))}.`
+      );
+    }
+  } else if (!previous) {
+    blocks.push(
+      'No hay un recibo anterior comparable disponible, así que no voy a inventar una variación mensual.'
+    );
+  }
+
+  const summary =
+    sanitizeInternalTerms(
+      experience
+        ?.financialExplanation
+        ?.customerFacing
+        ?.summary || ''
+    );
+
+  if (summary) {
+    blocks.push(
+      `Explicación verificada: ${summary}`
+    );
+  }
+
+  const concepts =
+    buildVisibleBillConceptsDetail(
+      current
+    );
+
+  if (concepts) {
+    blocks.push(concepts);
+  }
+
+  return blocks
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+function buildPreviousBillDetailReply(
+  experience
+) {
+  const previous =
+    experience?.previousBill;
+
+  if (!previous) {
+    return buildPreviousBillReply(
+      experience
+    );
+  }
+
+  const blocks = [
+    `Tu recibo anterior fue de ${formatMoney(previous.total)} y corresponde a ${previous.period}.`
+  ];
+
+  const current =
+    experience?.currentBill;
+  const difference =
+    Number(
+      experience?.comparison
+        ?.difference
+    );
+
+  if (
+    current &&
+    Number.isFinite(difference)
+  ) {
+    if (Math.abs(difference) < 0.005) {
+      blocks.push(
+        `El recibo actual es de ${formatMoney(current.total)} (${current.period}) y no presenta una variación material frente al anterior.`
+      );
+    } else {
+      const direction =
+        difference > 0
+          ? 'subió'
+          : 'bajó';
+
+      blocks.push(
+        `Desde ese recibo hasta el actual (${formatMoney(current.total)}, ${current.period}), el total ${direction} ${formatMoney(Math.abs(difference))}.`
+      );
+    }
+  }
+
+  const concepts =
+    buildVisibleBillConceptsDetail(
+      previous
+    );
+
+  if (concepts) {
+    blocks.push(concepts);
+  }
+
+  return blocks
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 function buildPreviousBillReply(
@@ -1254,18 +1578,29 @@ function buildPersonalBillingReplyForIntent(
   intent,
   {
     concise = false,
+    detail = false,
     message = '',
     lastBillingIntent = null
   } = {}
 ) {
   switch (intent) {
     case 'CURRENT_TOTAL': {
+      if (detail) {
+        return buildCurrentBillDetailReply(
+          experience
+        );
+      }
+
       if (!concise) {
         return buildCurrentTotalReply(
           experience,
           {
             debtQuestion:
               isOutstandingDebtQuestion(
+                message
+              ),
+            paymentQuestion:
+              isAmbiguousCurrentPaymentQuestion(
                 message
               )
           }
@@ -1282,15 +1617,24 @@ function buildPersonalBillingReplyForIntent(
       if (
         isOutstandingDebtQuestion(
           message
+        ) ||
+        isAmbiguousCurrentPaymentQuestion(
+          message
         )
       ) {
-        return `Recibo actual: ${formatMoney(bill.total)}. No tengo un saldo pendiente verificable separado del total.`;
+        return `Recibo actual: ${formatMoney(bill.total)}. El saldo pendiente exacto por pagar no está disponible de forma verificable en la fuente actual.`;
       }
 
       return `Recibo actual: ${formatMoney(bill.total)}${bill.status && bill.status !== 'Estado no disponible' ? ` · ${bill.status}` : ''}.`;
     }
 
     case 'PREVIOUS_BILL': {
+      if (detail) {
+        return buildPreviousBillDetailReply(
+          experience
+        );
+      }
+
       if (!concise) {
         return buildPreviousBillReply(
           experience
@@ -1370,6 +1714,12 @@ function buildPersonalBillingReplyForIntent(
     }
 
     case 'EXPLANATION': {
+      if (detail) {
+        return buildCurrentBillDetailReply(
+          experience
+        );
+      }
+
       if (concise) {
         const summary =
           experience
@@ -1443,6 +1793,7 @@ function buildPersonalBillingMultiReply(
   intents,
   {
     repair = false,
+    detail = false,
     includeIntro = true,
     message = '',
     lastBillingIntent = null
@@ -1464,6 +1815,7 @@ function buildPersonalBillingMultiReply(
       uniqueIntents[0],
       {
         concise: repair,
+        detail,
         message,
         lastBillingIntent
       }
@@ -1490,6 +1842,7 @@ function buildPersonalBillingMultiReply(
           intent,
           {
             concise: true,
+            detail,
             message,
             lastBillingIntent
           }
@@ -1519,6 +1872,7 @@ function buildPersonalBillingReply(
   options = {}
 ) {
   const intent =
+    options.forcedIntent ||
     classifyPersonalBillingIntent(
       message,
       options
@@ -1531,6 +1885,10 @@ function buildPersonalBillingReply(
       {
         concise:
           isBillingRepairRequest(
+            message
+          ),
+        detail:
+          isBillingDetailRequest(
             message
           ),
         message,
@@ -1577,7 +1935,10 @@ module.exports = {
   normalizeText,
   isGeneralBillingEducationQuery,
   isPersonalBillingFollowup,
+  isBillingDetailRequest,
   isBillingRepairRequest,
+  isOutstandingDebtQuestion,
+  isAmbiguousCurrentPaymentQuestion,
   requiresPersonalBillingAccess,
   classifyPersonalBillingIntent,
   classifyPersonalBillingIntents,
@@ -1589,6 +1950,8 @@ module.exports = {
   buildChargeRecurrenceReply,
   buildPackageReply,
   buildSuspensionAdjustmentReply,
+  buildCurrentBillDetailReply,
+  buildPreviousBillDetailReply,
   buildPersonalBillingReply,
   buildPersonalBillingReplyForIntent,
   buildPersonalBillingMultiReply,

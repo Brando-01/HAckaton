@@ -18,7 +18,8 @@ const {
   createAuthSession,
   getAuthSession,
   destroyAuthSession,
-  getDemoProfiles
+  getDemoProfiles,
+  toPublicAuthUser
 } = require('./services/authService');
 
 const {
@@ -62,8 +63,16 @@ const {
 } = require('./services/datasetExplorerService');
 
 const {
+  getExplorerAccessPolicy
+} = require('./services/datasetExplorerLogic');
+
+const {
   createDatasetCustomerProfileService
 } = require('./services/desafio1CustomerProfileService');
+
+const {
+  createDatasetAccountAuthService
+} = require('./services/desafio1DatasetAccountAuthService');
 
 const {
   buildCustomerProfileMultiReply
@@ -80,6 +89,27 @@ const {
   planCustomerConversationTurn,
   buildCompositeCustomerReply
 } = require('./services/desafio1ConversationalOrchestrator');
+
+const {
+  createDesafio1ConversationalAiService
+} = require('./services/desafio1ConversationalAiService');
+
+const {
+  mergeConversationPlanWithAi
+} = require('./services/desafio1ConversationalAiLogic');
+
+const {
+  extractExplicitInvoiceReference,
+  extractExplicitBillingPeriodReference,
+  extractExplicitCustomerReference,
+  evaluateCustomerReference,
+  buildCustomerReferenceReply,
+  buildInvoiceReferenceReply,
+  resolveBillingPeriodReference,
+  buildBillingPeriodReferenceReply,
+  buildSafeInvoiceReferenceMetadata,
+  buildSafeBillingPeriodReferenceMetadata
+} = require('./services/desafio1ConversationReferenceLogic');
 
 const {
   aggregateCustomerResolutions
@@ -425,6 +455,14 @@ function createApp(options = {}) {
     options.whatsappAdapterService ||
     createDesafio1WhatsAppAdapterService();
 
+  const conversationalAiService =
+    options.conversationalAiService ||
+    createDesafio1ConversationalAiService();
+
+  const datasetAccountAuthService =
+    options.datasetAccountAuthService ||
+    createDatasetAccountAuthService();
+
   const datasetExplorerService =
     options.datasetExplorerService ||
     createDatasetExplorerService();
@@ -435,20 +473,10 @@ function createApp(options = {}) {
       resolveSubscriberKey:
         async (user) => {
           if (
-            user?.mode === 'EXPLORER' &&
-            user?.explorerDemoId
+            user?.mode === 'DATASET' &&
+            user?.datasetSubscriberKey
           ) {
-            const explorerProfile =
-              await datasetExplorerService
-                .getPrivateProfile(
-                  user.explorerDemoId
-                );
-
-            return (
-              explorerProfile
-                ?.subscriberKey ||
-              null
-            );
+            return user.datasetSubscriberKey;
           }
 
           const binding =
@@ -468,14 +496,6 @@ function createApp(options = {}) {
     user,
     options = {}
   ) {
-    if (user?.mode === 'EXPLORER') {
-      return datasetExplorerService
-        .getExperienceForUser(
-          user,
-          options
-        );
-    }
-
     return officialDemoExperienceService
       .getExperienceForUser(
         user,
@@ -484,13 +504,6 @@ function createApp(options = {}) {
   }
 
   async function getAppExperience(user) {
-    if (user?.mode === 'EXPLORER') {
-      return getPersonalExperience(
-        user,
-        { includeHistory: true }
-      );
-    }
-
     try {
       return await getPersonalExperience(
         user,
@@ -857,7 +870,9 @@ function createApp(options = {}) {
       return res.json({
         ok: true,
         user:
-          authSession.user
+          toPublicAuthUser(
+            authSession.user
+          )
       });
     }
   );
@@ -894,7 +909,88 @@ function createApp(options = {}) {
       return res.json({
         ok: true,
         user:
-          authSession.user
+          toPublicAuthUser(
+            authSession.user
+          )
+      });
+    }
+  );
+
+  app.post(
+    '/api/auth/dataset-login',
+    async (req, res) => {
+      const {
+        customerCode,
+        serviceNumber
+      } = req.body || {};
+
+      let result;
+
+      try {
+        result =
+          await datasetAccountAuthService
+            .authenticate({
+              customerCode,
+              serviceNumber
+            });
+      } catch (error) {
+        return res
+          .status(503)
+          .json({
+            error:
+              'No se pudo validar la cuenta contra el dataset en este momento',
+            code:
+              'DATASET_ACCOUNT_AUTH_UNAVAILABLE'
+          });
+      }
+
+      if (!result?.ok) {
+        const missingFields =
+          result?.code ===
+          'DATASET_ACCOUNT_FIELDS_REQUIRED';
+
+        return res
+          .status(
+            missingFields ? 400 : 401
+          )
+          .json({
+            error:
+              missingFields
+                ? 'Completa el código de cliente y el número de servicio.'
+                : 'Los datos no coinciden con una cuenta facturable disponible en el dataset.',
+            code:
+              missingFields
+                ? 'DATASET_ACCOUNT_FIELDS_REQUIRED'
+                : 'DATASET_ACCOUNT_INVALID'
+          });
+      }
+
+      const authSession =
+        createAuthSession(
+          result.user
+        );
+
+      setAuthCookie(
+        res,
+        authSession.token
+      );
+
+      return res.json({
+        ok: true,
+        user:
+          toPublicAuthUser(
+            authSession.user
+          ),
+        authSource: {
+          dataset:
+            'PLANTA CLIENTES',
+          fields: [
+            'COD_CLIENTE',
+            'NUM_ANEXO'
+          ],
+          simulatedAuthentication:
+            true
+        }
       });
     }
   );
@@ -906,7 +1002,9 @@ function createApp(options = {}) {
       return res.json({
         authenticated: true,
         user:
-          req.auth.session.user
+          toPublicAuthUser(
+            req.auth.session.user
+          )
       });
     }
   );
@@ -1139,44 +1237,31 @@ function createApp(options = {}) {
     }
   );
 
+  // Hardening post-F22: el explorador es una herramienta de
+  // cobertura de solo lectura. Nunca puede crear/reemplazar una
+  // sesión autenticada ni adoptar la identidad de un alias DEMO.
+  // Los datos personales de Mi Movistar/Lucía requieren pasar por
+  // la autenticación demo explícita de /login.
   app.post(
     '/api/explorer/open',
-    async (req, res) => {
-      try {
-        const user =
-          await datasetExplorerService
-            .createAuthUserForDemoId(
-              req.body?.demoId
-            );
+    (req, res) => {
+      const policy =
+        getExplorerAccessPolicy();
 
-        // El explorador crea una sesión temporal, no una cuenta.
-        // Reemplazamos cualquier cookie demo anterior para que el
-        // chat rote su contexto al nuevo alias DEMO seleccionado.
-        destroyAuthSession(
-          getAuthToken(req)
-        );
-
-        const authSession =
-          createAuthSession(user);
-
-        setAuthCookie(
-          res,
-          authSession.token
-        );
-
-        return res.json({
-          ok: true,
-          user:
-            authSession.user,
+      return res
+        .status(403)
+        .json({
+          ok: false,
+          code:
+            'EXPLORER_READ_ONLY',
+          error:
+            'El Explorador es de solo lectura y no puede abrir cuentas de clientes.',
+          requiresAuth: true,
+          accessPolicy:
+            policy.mode,
           redirect:
-            '/app?source=explorer'
+            policy.authenticatedEntryPoint
         });
-      } catch (error) {
-        return sendExplorerError(
-          res,
-          error
-        );
-      }
     }
   );
 
@@ -1673,7 +1758,7 @@ function createApp(options = {}) {
         // Multi-intent, reparación y cambios de tema.
         // =====================================================
 
-        const conversationPlan =
+        let conversationPlan =
           planCustomerConversationTurn(
             cleanMessage,
             {
@@ -1695,6 +1780,52 @@ function createApp(options = {}) {
                     .hasOfficialBillingContext
                 )
             }
+          );
+
+        const semanticInterpretation =
+          await conversationalAiService
+            .interpretTurn({
+              message:
+                cleanMessage,
+              deterministicPlan:
+                conversationPlan,
+              authenticated:
+                Boolean(requestAuth)
+            });
+
+        if (
+          semanticInterpretation.used &&
+          semanticInterpretation
+            .interpretation
+        ) {
+          const merged =
+            mergeConversationPlanWithAi(
+              conversationPlan,
+              semanticInterpretation
+                .interpretation
+            );
+
+          if (merged.applied) {
+            conversationPlan =
+              merged.plan;
+          }
+        }
+
+        const explicitInvoiceReference =
+          extractExplicitInvoiceReference(
+            cleanMessage
+          );
+
+        const explicitBillingPeriodReference =
+          explicitInvoiceReference
+            ? null
+            : extractExplicitBillingPeriodReference(
+                cleanMessage
+              );
+
+        const explicitCustomerReference =
+          extractExplicitCustomerReference(
+            cleanMessage
           );
 
         const repairState =
@@ -1759,6 +1890,104 @@ function createApp(options = {}) {
           preHandoffPolicy.decision ===
           HANDOFF_DECISIONS.TRANSFER_NOW;
 
+        const customerReferenceDecision =
+          evaluateCustomerReference({
+            reference:
+              explicitCustomerReference,
+            authenticatedCustomerId:
+              requestAuth?.session?.user
+                ?.customerId || null,
+            authenticatedCustomerReferences:
+              [
+                requestAuth?.session?.user
+                  ?.customerCode
+              ].filter(Boolean)
+          });
+
+        if (
+          !wantsHandoff &&
+          customerReferenceDecision.present &&
+          !customerReferenceDecision.allowed
+        ) {
+          const reply =
+            buildCustomerReferenceReply(
+              customerReferenceDecision
+            );
+
+          addMessage(
+            activeSessionId,
+            'user',
+            cleanMessage,
+            { channel: activeChannel }
+          );
+          addMessage(
+            activeSessionId,
+            'assistant',
+            reply,
+            { channel: activeChannel }
+          );
+          registerMessage(
+            activeSessionId,
+            'assistant'
+          );
+
+          registerTurnOutcome(
+            activeSessionId,
+            {
+              resolutionStatus:
+                'RESOLVED',
+              resolutionReason:
+                customerReferenceDecision
+                  .reasonCode,
+              domain: 'SECURITY'
+            }
+          );
+
+          updateContext(
+            activeSessionId,
+            {
+              lastConversationDomain:
+                'SECURITY',
+              lastResolutionStatus:
+                'RESOLVED',
+              lastResolutionReason:
+                customerReferenceDecision
+                  .reasonCode
+            }
+          );
+
+          return res.json({
+            reply,
+            foundData: false,
+            authenticated:
+              Boolean(requestAuth),
+            sessionId:
+              activeSessionId,
+            requiresAuth:
+              !requestAuth,
+            ...(!requestAuth
+              ? {
+                  authUrl:
+                    '/login?returnTo=' +
+                    encodeURIComponent(
+                      '/chat?resume=1'
+                    )
+                }
+              : {}),
+            source:
+              'DESAFIO1_IDENTITY_BOUNDARY',
+            financialReasoningByLlm:
+              false,
+            securityBoundary: {
+              customerReferenceAccepted:
+                false,
+              reasonCode:
+                customerReferenceDecision
+                  .reasonCode
+            }
+          });
+        }
+
         // Si el usuario mezcla varias preguntas en un solo
         // turno, resolvemos todas con una sola carga del perfil
         // y de la facturación. No hacemos varias llamadas al LLM.
@@ -1821,6 +2050,9 @@ function createApp(options = {}) {
                 requestAuth.session.user,
                 {
                   includeHistory:
+                    Boolean(
+                      explicitBillingPeriodReference
+                    ) ||
                     needsBillingHistoryForIntents(
                       conversationPlan
                         .billingIntents
@@ -1836,7 +2068,7 @@ function createApp(options = {}) {
               experiencePromise
             ]);
 
-            const reply =
+            const baseReply =
               buildCompositeCustomerReply({
                 plan: conversationPlan,
                 profile:
@@ -1844,6 +2076,23 @@ function createApp(options = {}) {
                 experience:
                   personalExperience
               });
+
+            const languageResult =
+              await conversationalAiService
+                .naturalizeReply({
+                  message:
+                    cleanMessage,
+                  baseReply,
+                  intent:
+                    conversationPlan.domain,
+                  repair:
+                    Boolean(
+                      conversationPlan.repair
+                    )
+                });
+
+            const reply =
+              languageResult.reply;
 
             const turnResolution =
               aggregateCustomerResolutions({
@@ -1997,9 +2246,24 @@ function createApp(options = {}) {
                   .billingIntents
               ],
               source:
-                'DESAFIO1_CONTEXT_DETERMINISTIC',
+                languageResult.used
+                  ? 'DESAFIO1_CONTEXT_DETERMINISTIC_GROQ_LANGUAGE'
+                  : 'DESAFIO1_CONTEXT_DETERMINISTIC',
               financialReasoningByLlm:
                 false,
+              languageGenerationByLlm:
+                languageResult.used,
+              conversationalAi: {
+                semanticInterpretationByLlm:
+                  Boolean(
+                    conversationPlan
+                      .semanticInterpretation
+                  ),
+                languageNaturalizationByLlm:
+                  languageResult.used,
+                deterministicFallback:
+                  languageResult.fallback
+              },
               foundData: true,
               authenticated: true,
               sessionId:
@@ -2113,7 +2377,7 @@ function createApp(options = {}) {
               )
             ]);
 
-            const reply =
+            const baseReply =
               buildCustomerProfileMultiReply({
                 intents:
                   customerProfileIntents,
@@ -2124,6 +2388,24 @@ function createApp(options = {}) {
                 repair:
                   conversationPlan.repair
               });
+
+            const languageResult =
+              await conversationalAiService
+                .naturalizeReply({
+                  message:
+                    cleanMessage,
+                  baseReply,
+                  intent:
+                    customerProfileIntents
+                      .join(','),
+                  repair:
+                    Boolean(
+                      conversationPlan.repair
+                    )
+                });
+
+            const reply =
+              languageResult.reply;
 
             const profileResolution =
               aggregateCustomerResolutions({
@@ -2204,7 +2486,22 @@ function createApp(options = {}) {
               intents:
                 customerProfileIntents,
               source:
-                'DESAFIO1_PROFILE_DETERMINISTIC',
+                languageResult.used
+                  ? 'DESAFIO1_PROFILE_DETERMINISTIC_GROQ_LANGUAGE'
+                  : 'DESAFIO1_PROFILE_DETERMINISTIC',
+              languageGenerationByLlm:
+                languageResult.used,
+              conversationalAi: {
+                semanticInterpretationByLlm:
+                  Boolean(
+                    conversationPlan
+                      .semanticInterpretation
+                  ),
+                languageNaturalizationByLlm:
+                  languageResult.used,
+                deterministicFallback:
+                  languageResult.fallback
+              },
               foundData: true,
               authenticated: true,
               sessionId:
@@ -2477,6 +2774,16 @@ function createApp(options = {}) {
           );
 
         const needsPersonalBilling =
+          Boolean(explicitInvoiceReference) ||
+          Boolean(explicitBillingPeriodReference) ||
+          (
+            Boolean(
+              conversationPlan
+                .semanticInterpretation
+            ) &&
+            conversationPlan
+              .billingIntents.length > 0
+          ) ||
           requiresPersonalBillingAccess(
             cleanMessage,
             {
@@ -2525,19 +2832,317 @@ function createApp(options = {}) {
           }
 
           try {
-            const officialExperience =
-              await getPersonalExperience(
+            const [
+              officialExperience,
+              invoiceReferenceValidation
+            ] = await Promise.all([
+              getPersonalExperience(
                 requestAuth.session.user,
                 {
                   includeHistory:
+                    Boolean(
+                      explicitBillingPeriodReference
+                    ) ||
                     needsBillingHistoryForIntents(
                       conversationPlan
                         .billingIntents
                     )
                 }
+              ),
+              explicitInvoiceReference
+                ? officialDemoExperienceService
+                    .getInvoiceReferenceForUser(
+                      requestAuth.session.user,
+                      explicitInvoiceReference
+                    )
+                : Promise.resolve(null)
+            ]);
+
+            const billingPeriodValidation =
+              explicitBillingPeriodReference
+                ? resolveBillingPeriodReference({
+                    experience:
+                      officialExperience,
+                    reference:
+                      explicitBillingPeriodReference
+                  })
+                : null;
+
+            const referenceReply =
+              buildInvoiceReferenceReply({
+                validation:
+                  invoiceReferenceValidation,
+                message:
+                  cleanMessage
+              });
+
+            const billingPeriodReply =
+              buildBillingPeriodReferenceReply({
+                validation:
+                  billingPeriodValidation,
+                message:
+                  cleanMessage
+              });
+
+            if (referenceReply?.handled) {
+              const languageResult =
+                await conversationalAiService
+                  .naturalizeReply({
+                    message:
+                      cleanMessage,
+                    baseReply:
+                      referenceReply.reply,
+                    intent:
+                      'INVOICE_REFERENCE',
+                    repair:
+                      false
+                  });
+
+              const referenceResolution = {
+                status:
+                  referenceReply
+                    .resolutionStatus,
+                reasonCode:
+                  referenceReply.reasonCode,
+                nextActions: [
+                  {
+                    id: 'REVIEW_BILL_DETAIL',
+                    label:
+                      'Revisar recibo actual',
+                    type: 'NAVIGATE',
+                    href: '/app'
+                  },
+                  {
+                    id: 'REVIEW_BILL_HISTORY',
+                    label:
+                      'Revisar últimos recibos',
+                    type: 'CHAT',
+                    prompt:
+                      '¿Cómo han cambiado mis últimos recibos?'
+                  }
+                ]
+              };
+
+              const postHandoffPolicy =
+                trackResolutionOutcome(
+                  activeSessionId,
+                  referenceResolution,
+                  'BILLING'
+                );
+
+              addMessage(
+                activeSessionId,
+                'user',
+                cleanMessage,
+                { channel: activeChannel }
+              );
+              addMessage(
+                activeSessionId,
+                'assistant',
+                languageResult.reply,
+                { channel: activeChannel }
+              );
+              registerMessage(
+                activeSessionId,
+                'assistant'
               );
 
-            const personalReply =
+              updateContext(
+                activeSessionId,
+                {
+                  customerIdentifier:
+                    requestAuth.session.user
+                      .customerId,
+                  identityLocked: true,
+                  hasOfficialBillingContext:
+                    true,
+                  lastConversationDomain:
+                    'BILLING',
+                  lastResolutionStatus:
+                    referenceResolution.status,
+                  lastResolutionReason:
+                    referenceResolution
+                      .reasonCode,
+                  lastHandoffPolicyDecision:
+                    postHandoffPolicy.decision,
+                  lastHandoffPolicyReason:
+                    postHandoffPolicy.reasonCode,
+                  lastHandoffPolicyRuleId:
+                    postHandoffPolicy.ruleId
+                }
+              );
+
+              return res.json({
+                reply:
+                  languageResult.reply,
+                source:
+                  'DESAFIO1_INVOICE_REFERENCE_GROUNDED',
+                foundData:
+                  invoiceReferenceValidation
+                    ?.status === 'MATCHED',
+                authenticated: true,
+                sessionId:
+                  activeSessionId,
+                financialReasoningByLlm:
+                  false,
+                languageGenerationByLlm:
+                  languageResult.used,
+                conversationalAi: {
+                  semanticInterpretationByLlm:
+                    Boolean(
+                      conversationPlan
+                        .semanticInterpretation
+                    ),
+                  languageNaturalizationByLlm:
+                    languageResult.used,
+                  deterministicFallback:
+                    languageResult.fallback
+                },
+                invoiceReference:
+                  buildSafeInvoiceReferenceMetadata(
+                    invoiceReferenceValidation
+                  ),
+                resolution:
+                  referenceResolution,
+                resolutionStatus:
+                  referenceResolution.status,
+                nextActions:
+                  referenceResolution
+                    .nextActions
+              });
+            }
+
+            if (
+              !referenceReply?.handled &&
+              billingPeriodReply?.handled
+            ) {
+              const languageResult =
+                await conversationalAiService
+                  .naturalizeReply({
+                    message:
+                      cleanMessage,
+                    baseReply:
+                      billingPeriodReply.reply,
+                    intent:
+                      'BILLING_PERIOD_REFERENCE',
+                    repair:
+                      false
+                  });
+
+              const periodResolution = {
+                status:
+                  billingPeriodReply
+                    .resolutionStatus,
+                reasonCode:
+                  billingPeriodReply.reasonCode,
+                nextActions: [
+                  {
+                    id: 'REVIEW_BILL_HISTORY',
+                    label:
+                      'Revisar últimos recibos',
+                    type: 'CHAT',
+                    prompt:
+                      '¿Cómo han cambiado mis últimos recibos?'
+                  },
+                  {
+                    id: 'REVIEW_CURRENT_BILL',
+                    label:
+                      'Ver recibo actual',
+                    type: 'NAVIGATE',
+                    href: '/app'
+                  }
+                ]
+              };
+
+              const postHandoffPolicy =
+                trackResolutionOutcome(
+                  activeSessionId,
+                  periodResolution,
+                  'BILLING'
+                );
+
+              addMessage(
+                activeSessionId,
+                'user',
+                cleanMessage,
+                { channel: activeChannel }
+              );
+              addMessage(
+                activeSessionId,
+                'assistant',
+                languageResult.reply,
+                { channel: activeChannel }
+              );
+              registerMessage(
+                activeSessionId,
+                'assistant'
+              );
+
+              updateContext(
+                activeSessionId,
+                {
+                  customerIdentifier:
+                    requestAuth.session.user
+                      .customerId,
+                  identityLocked: true,
+                  hasOfficialBillingContext:
+                    true,
+                  lastConversationDomain:
+                    'BILLING',
+                  lastResolutionStatus:
+                    periodResolution.status,
+                  lastResolutionReason:
+                    periodResolution
+                      .reasonCode,
+                  lastHandoffPolicyDecision:
+                    postHandoffPolicy.decision,
+                  lastHandoffPolicyReason:
+                    postHandoffPolicy.reasonCode,
+                  lastHandoffPolicyRuleId:
+                    postHandoffPolicy.ruleId
+                }
+              );
+
+              return res.json({
+                reply:
+                  languageResult.reply,
+                source:
+                  'DESAFIO1_BILLING_PERIOD_REFERENCE_GROUNDED',
+                foundData:
+                  billingPeriodValidation
+                    ?.status === 'MATCHED',
+                authenticated: true,
+                sessionId:
+                  activeSessionId,
+                financialReasoningByLlm:
+                  false,
+                languageGenerationByLlm:
+                  languageResult.used,
+                conversationalAi: {
+                  semanticInterpretationByLlm:
+                    Boolean(
+                      conversationPlan
+                        .semanticInterpretation
+                    ),
+                  languageNaturalizationByLlm:
+                    languageResult.used,
+                  deterministicFallback:
+                    languageResult.fallback
+                },
+                billingPeriodReference:
+                  buildSafeBillingPeriodReferenceMetadata(
+                    billingPeriodValidation
+                  ),
+                resolution:
+                  periodResolution,
+                resolutionStatus:
+                  periodResolution.status,
+                nextActions:
+                  periodResolution.nextActions
+              });
+            }
+
+            let personalReply =
               buildPersonalBillingReply(
                 officialExperience,
                 cleanMessage,
@@ -2550,9 +3155,87 @@ function createApp(options = {}) {
                   lastBillingIntent:
                     billingSession.context
                       .lastBillingIntent ||
+                    null,
+                  forcedIntent:
+                    conversationPlan
+                      .billingIntents[0] ||
                     null
                 }
               );
+
+            if (
+              referenceReply?.prefix &&
+              invoiceReferenceValidation
+                ?.status === 'MATCHED' &&
+              invoiceReferenceValidation
+                ?.position === 'CURRENT'
+            ) {
+              personalReply = {
+                ...personalReply,
+                reply:
+                  `${referenceReply.prefix}\n\n${personalReply.reply}`
+              };
+            }
+
+            if (
+              billingPeriodReply?.prefix &&
+              billingPeriodValidation
+                ?.status === 'MATCHED' &&
+              billingPeriodValidation
+                ?.position === 'CURRENT'
+            ) {
+              personalReply = {
+                ...personalReply,
+                reply:
+                  `${billingPeriodReply.prefix}\n\n${personalReply.reply}`
+              };
+            }
+
+            const languageResult =
+              await conversationalAiService
+                .naturalizeReply({
+                  message:
+                    cleanMessage,
+                  baseReply:
+                    personalReply.reply,
+                  intent:
+                    personalReply.intent,
+                  repair:
+                    Boolean(
+                      conversationPlan.repair
+                    )
+                });
+
+            personalReply = {
+              ...personalReply,
+              reply:
+                languageResult.reply,
+              source:
+                languageResult.used
+                  ? 'DESAFIO1_DETERMINISTIC_GROQ_LANGUAGE'
+                  : personalReply.source,
+              languageGenerationByLlm:
+                languageResult.used,
+              conversationalAi: {
+                semanticInterpretationByLlm:
+                  Boolean(
+                    conversationPlan
+                      .semanticInterpretation
+                  ),
+                languageNaturalizationByLlm:
+                  languageResult.used,
+                deterministicFallback:
+                  languageResult.fallback
+              },
+              invoiceReference:
+                buildSafeInvoiceReferenceMetadata(
+                  invoiceReferenceValidation
+                ),
+              billingPeriodReference:
+                buildSafeBillingPeriodReferenceMetadata(
+                  billingPeriodValidation
+                )
+            };
 
             const postHandoffPolicy =
               trackResolutionOutcome(
@@ -3219,19 +3902,19 @@ function createApp(options = {}) {
               customerId
           );
 
-      const knownExplorerProfile =
+      const datasetAccount =
         auth.session.user.mode ===
-          'EXPLORER' &&
+          'DATASET' &&
         Boolean(
           auth.session.user
-            .explorerDemoId
+            .datasetSubscriberKey
         );
 
       if (
         !customerId ||
         (
           !knownDemoProfile &&
-          !knownExplorerProfile
+          !datasetAccount
         )
       ) {
         return res

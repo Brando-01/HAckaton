@@ -225,6 +225,77 @@ class Desafio1Repository {
     );
   }
 
+  async getSubscriberByCustomerAndService(
+    customerKey,
+    subscriberKey
+  ) {
+    const customer =
+      normalizeKey(
+        customerKey
+      );
+
+    const subscriber =
+      normalizeKey(
+        subscriberKey
+      );
+
+    if (
+      !customer ||
+      !subscriber
+    ) {
+      return null;
+    }
+
+    return this.get(
+      `
+        SELECT
+          customer_key AS customerKey,
+          financial_account AS financialAccount,
+          subscriber_key AS subscriberKey,
+          activation_date AS activationDate,
+          billing_cycle_day AS billingCycleDay,
+          lob_type AS lobType,
+          business_type AS businessType,
+          source_row AS sourceRow
+        FROM d1_clientes
+        WHERE customer_key = ?
+          AND subscriber_key = ?
+        LIMIT 1
+      `,
+      [
+        customer,
+        subscriber
+      ]
+    );
+  }
+
+  async subscriberHasBilling(
+    subscriberKey
+  ) {
+    const key =
+      normalizeKey(
+        subscriberKey
+      );
+
+    if (!key) {
+      return false;
+    }
+
+    const row = await this.get(
+      `
+        SELECT 1 AS hasBilling
+        FROM d1_facturacion
+        WHERE subscriber_key = ?
+        LIMIT 1
+      `,
+      [key]
+    );
+
+    return Boolean(
+      row?.hasBilling
+    );
+  }
+
   async getSubscriber(
     subscriberKey
   ) {

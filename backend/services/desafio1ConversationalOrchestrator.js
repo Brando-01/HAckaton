@@ -8,6 +8,7 @@ const {
 
 const {
   classifyPersonalBillingIntents,
+  isBillingDetailRequest,
   isBillingRepairRequest,
   buildPersonalBillingMultiReply
 } = require(
@@ -47,12 +48,20 @@ function planCustomerConversationTurn(
     hasPersonalBillingContext = false
   } = {}
 ) {
+  const detailRequest =
+    isBillingDetailRequest(
+      message
+    );
+
   const repair =
-    isConversationRepairRequest(
-      message
-    ) ||
-    isBillingRepairRequest(
-      message
+    !detailRequest &&
+    (
+      isConversationRepairRequest(
+        message
+      ) ||
+      isBillingRepairRequest(
+        message
+      )
     );
 
   const repairProfileContext =
@@ -73,6 +82,16 @@ function planCustomerConversationTurn(
       lastConversationDomain
     );
 
+  const detailBillingContext =
+    detailRequest &&
+    [
+      'BILLING',
+      'COMPOSITE'
+    ].includes(
+      lastConversationDomain
+    ) &&
+    Boolean(lastBillingIntent);
+
   const profileIntents =
     resolveCustomerProfileIntents(
       message,
@@ -91,9 +110,17 @@ function planCustomerConversationTurn(
         hasPersonalBillingContext:
           repair
             ? repairBillingContext
-            : hasPersonalBillingContext,
+            : (
+                detailRequest
+                  ? (
+                      detailBillingContext ||
+                      hasPersonalBillingContext
+                    )
+                  : hasPersonalBillingContext
+              ),
         lastBillingIntent:
-          repairBillingContext
+          repairBillingContext ||
+          detailBillingContext
             ? lastBillingIntent
             : null
       }
@@ -117,6 +144,7 @@ function planCustomerConversationTurn(
     profileIntents,
     billingIntents,
     repair,
+    detailRequest,
     domain,
     intentCount,
     isComposite:
@@ -165,6 +193,8 @@ function buildCompositeCustomerReply({
         {
           repair:
             Boolean(plan.repair),
+          detail:
+            Boolean(plan.detailRequest),
           includeIntro: false,
           message:
             plan.message || '',

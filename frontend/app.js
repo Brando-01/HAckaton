@@ -802,18 +802,31 @@
 
     const isExplorer =
       user.mode === 'EXPLORER';
+    const isDataset =
+      user.mode === 'DATASET';
 
     authenticatedUserEmail.textContent =
-      isExplorer
-        ? user.explorerDemoId || ''
-        : user.email || '';
+      isDataset
+        ? [
+            user.customerCode
+              ? `Código ${user.customerCode}`
+              : null,
+            user.serviceNumberMasked
+              ? `Servicio ${user.serviceNumberMasked}`
+              : null
+          ].filter(Boolean).join(' · ')
+        : isExplorer
+          ? user.explorerDemoId || ''
+          : user.email || '';
 
     authModeBadge.textContent =
-      isExplorer
-        ? 'Explorador dataset'
-        : user.mode === 'DEMO'
-          ? 'Perfil demo'
-          : 'Sesión autenticada';
+      isDataset
+        ? 'Dataset validado'
+        : isExplorer
+          ? 'Explorador dataset'
+          : user.mode === 'DEMO'
+            ? 'Perfil demo'
+            : 'Sesión autenticada';
 
     if (returnExplorerLink) {
       returnExplorerLink.hidden =

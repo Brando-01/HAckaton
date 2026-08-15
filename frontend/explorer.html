@@ -27,10 +27,9 @@
     <section class="hero">
       <div>
         <span class="eyebrow">Fase 10 · exploración masiva</span>
-        <h1>Explora los clientes utilizables sin exponer identificadores oficiales</h1>
+        <h1>Explora los casos utilizables sin exponer identificadores oficiales</h1>
         <p>
-          El índice local de Fase 9 resume la cobertura de los 20 000 registros. Aquí solo se muestran alias sintéticos
-          <strong>DEMO</strong>, capacidades y escenarios; los identificadores oficiales permanecen en SQLite local.
+          El índice local de Fase 9 resume la cobertura de los 20 000 registros. Aquí se muestran números de caso, capacidades y escenarios; los identificadores oficiales y el mapping técnico permanecen en SQLite local.
         </p>
       </div>
       <div class="hero-badge" id="coverageBadge">Cargando índice…</div>
@@ -68,7 +67,7 @@
       <div class="filters-heading">
         <div>
           <span class="eyebrow">Índice consultable</span>
-          <h2>Buscar y filtrar perfiles DEMO</h2>
+          <h2>Buscar y filtrar casos de cobertura</h2>
         </div>
         <button class="ghost-button" id="resetFilters" type="button">Limpiar filtros</button>
       </div>
@@ -76,7 +75,7 @@
       <form class="filters-grid" id="filtersForm">
         <label class="field search-field">
           <span>Buscar</span>
-          <input id="searchInput" name="search" placeholder="DEMO000123, MOVIL, WRLS…" autocomplete="off">
+          <input id="searchInput" name="search" placeholder="000074, MOVIL, WRLS…" autocomplete="off">
         </label>
 
         <label class="field">
@@ -118,7 +117,7 @@
         <label class="field">
           <span>Ordenar</span>
           <select id="sortSelect" name="sort">
-            <option value="DEMO_ASC">Alias DEMO</option>
+            <option value="DEMO_ASC">Número de caso</option>
             <option value="PREMIUM_FIRST">Premium primero</option>
             <option value="COVERAGE_DESC">Mayor conciliación</option>
             <option value="INVOICES_DESC">Más recibos</option>
@@ -130,7 +129,7 @@
     <section class="results-section">
       <div class="results-toolbar">
         <div>
-          <h2>Perfiles encontrados</h2>
+          <h2>Casos encontrados</h2>
           <p id="resultsSummary">Cargando…</p>
         </div>
         <div class="privacy-note">
@@ -151,12 +150,11 @@
 
     <section class="explorer-note">
       <div>
-        <span class="eyebrow">Sesión temporal</span>
-        <h2>“Abrir caso” no crea una cuenta de cliente</h2>
+        <span class="eyebrow">Frontera de autenticación</span>
+        <h2>El Explorador no permite adoptar la identidad de un cliente</h2>
       </div>
       <p>
-        Al seleccionar un alias DEMO, el backend resuelve su vínculo local y crea una sesión temporal de exploración.
-        Mi Movistar y Lucía reciben el mismo motor financiero de Fases 2–3, sin convertir los 18 450 perfiles consultables en credenciales permanentes.
+        Esta vista es de solo lectura y muestra únicamente metadata de cobertura con números de caso. Para consultar un recibo o continuar en Lucía debes pasar por <a class="inline-auth-link" href="/login">Iniciar sesión</a> y validar una pareja COD_CLIENTE + NUM_ANEXO del dataset. El número de caso nunca crea una sesión autenticada ni reemplaza la identidad activa.
       </p>
     </section>
   </main>

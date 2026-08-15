@@ -759,3 +759,47 @@ test(
     );
   }
 );
+
+test(
+  'una cuenta autenticada desde PLANTA usa su NUM_ANEXO interno sin depender del catálogo demo',
+  async () => {
+    const requested = [];
+
+    const service =
+      createOfficialDemoExperienceService({
+        explainSubscriber:
+          async (subscriberKey) => {
+            requested.push(
+              subscriberKey
+            );
+            return reconnectionExplanation();
+          },
+        loadHistory:
+          async () => []
+      });
+
+    const experience =
+      await service.getExperienceForUser({
+        userId: 'D1U-TEST',
+        customerId: 'D1A-TEST',
+        customerCode: '100000001',
+        name: 'Cliente 100000001',
+        mode: 'DATASET',
+        datasetSubscriberKey:
+          'SECRET_SUBSCRIBER_A'
+      });
+
+    assert.deepEqual(
+      requested,
+      ['SECRET_SUBSCRIBER_A']
+    );
+    assert.equal(
+      experience.customer.name,
+      'Cliente 100000001'
+    );
+    assert.equal(
+      experience.customer.demoScenario,
+      'DATASET_ACCOUNT'
+    );
+  }
+);

@@ -681,7 +681,8 @@
     agregarDato(
       grid,
       'ID de cliente',
-      customer.customerId ||
+      customer.customerCode ||
+        customer.customerId ||
         caso.customerIdentifier ||
         'No disponible'
     );

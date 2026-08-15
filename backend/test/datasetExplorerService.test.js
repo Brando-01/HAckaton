@@ -139,35 +139,14 @@ test(
 );
 
 test(
-  'crea sesión temporal para un alias consultable sin revelar el vínculo privado',
-  async () => {
+  'service del explorador ya no fabrica identidades autenticables desde un alias',
+  () => {
     const service =
-      new DatasetExplorerService({
-        async readPrivateProfile() {
-          return privateProfile();
-        }
-      });
-
-    const user =
-      await service
-        .createAuthUserForDemoId(
-          'DEMO000777'
-        );
+      new DatasetExplorerService();
 
     assert.equal(
-      user.mode,
-      'EXPLORER'
-    );
-    assert.equal(
-      user.explorerDemoId,
-      'DEMO000777'
-    );
-    assert.equal(
-      Object.hasOwn(
-        user,
-        'subscriberKey'
-      ),
-      false
+      typeof service.createAuthUserForDemoId,
+      'undefined'
     );
   }
 );

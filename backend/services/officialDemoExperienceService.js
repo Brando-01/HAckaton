@@ -405,6 +405,8 @@ function buildOfficialDemoExperience({
     customer: {
       customerId:
         user.customerId,
+      customerCode:
+        user.customerCode || null,
       name:
         user.name,
       plan:
@@ -515,6 +517,115 @@ class OfficialDemoExperienceService {
     );
   }
 
+  getBindingForUser(user) {
+    if (
+      user?.mode === 'DATASET' &&
+      user?.datasetSubscriberKey
+    ) {
+      return {
+        customerId:
+          user.customerId,
+        subscriberKey:
+          user.datasetSubscriberKey,
+        scenario:
+          'DATASET_ACCOUNT',
+        scenarioLabel:
+          'Cuenta validada del dataset',
+        score: null,
+        evidenceLevel: null,
+        rentType: null,
+        source:
+          'PLANTA_CLIENTES_LOGIN'
+      };
+    }
+
+    return this.getBinding(
+      user?.customerId
+    );
+  }
+
+  async getInvoiceReferenceForUser(
+    user,
+    reference
+  ) {
+    const binding =
+      this.getBindingForUser(
+        user
+      );
+
+    if (!binding) {
+      throw new DemoProfileBindingError(
+        'DEMO_PROFILE_NOT_BOUND',
+        `El perfil ${user?.customerId || 'desconocido'} no tiene un caso oficial asociado.`
+      );
+    }
+
+    const normalizedReference =
+      String(reference ?? '')
+        .trim()
+        .toUpperCase();
+
+    if (!normalizedReference) {
+      return {
+        status: 'NOT_PROVIDED',
+        reference: null
+      };
+    }
+
+    const invoices =
+      await this.loadHistory(
+        binding.subscriberKey
+      );
+
+    const matchIndex =
+      (invoices || []).findIndex(
+        (invoice) =>
+          String(
+            invoice?.invoiceNumber ?? ''
+          )
+            .trim()
+            .toUpperCase() ===
+          normalizedReference
+      );
+
+    if (matchIndex < 0) {
+      return {
+        status: 'NOT_FOUND',
+        reference:
+          normalizedReference,
+        availableBillCount:
+          (invoices || []).length
+      };
+    }
+
+    const invoice =
+      invoices[matchIndex];
+
+    return {
+      status: 'MATCHED',
+      reference:
+        normalizedReference,
+      position:
+        matchIndex === 0
+          ? 'CURRENT'
+          : matchIndex === 1
+            ? 'PREVIOUS'
+            : 'HISTORY',
+      period:
+        formatCycleLabel(
+          invoice?.cycleDate
+        ),
+      total:
+        Number.isFinite(
+          Number(invoice?.total)
+        )
+          ? Number(invoice.total)
+          : null,
+      availableBillCount:
+        (invoices || []).length
+    };
+  }
+
   async getExperienceForUser(
     user,
     {
@@ -522,8 +633,8 @@ class OfficialDemoExperienceService {
     } = {}
   ) {
     const binding =
-      this.getBinding(
-        user?.customerId
+      this.getBindingForUser(
+        user
       );
 
     if (!binding) {

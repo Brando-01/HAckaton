@@ -86,18 +86,41 @@ function verifyPassword(
   );
 }
 
+function toPublicAuthUser(user) {
+  if (!user) {
+    return null;
+  }
+
+  return {
+    userId:
+      user.userId || null,
+    customerId:
+      user.customerId || null,
+    name:
+      user.name || null,
+    email:
+      user.email || null,
+    mode:
+      user.mode || 'ACCOUNT',
+    ...(user.mode === 'DATASET'
+      ? {
+          customerCode:
+            user.customerCode || null,
+          serviceNumberMasked:
+            user.serviceNumberMasked || null
+        }
+      : {})
+  };
+}
+
 function sanitizeUser(
   user,
   mode = 'ACCOUNT'
 ) {
-  return {
-    userId: user.userId,
-    customerId:
-      user.customerId,
-    name: user.name,
-    email: user.email,
+  return toPublicAuthUser({
+    ...user,
     mode
-  };
+  });
 }
 
 function authenticateUser(
@@ -254,5 +277,6 @@ module.exports = {
   getAuthSession,
   destroyAuthSession,
   getDemoProfiles,
+  toPublicAuthUser,
   clearAuthSessions
 };

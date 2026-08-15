@@ -14,6 +14,7 @@
     "demo:rank:desafio1": "node scripts/seleccionarCasosDemoDesafio1.js",
     "demo:configure:desafio1": "node scripts/configurarDemoDesafio1.js",
     "demo:profiles:desafio1": "node scripts/listarPerfilesDemoDesafio1.js",
+    "demo:login-case:desafio1": "node scripts/resolverCasoLoginDesafio1.js",
     "demo:preflight:desafio1": "node scripts/verificarRelease1Desafio1.js",
     "demo:smoke:desafio1": "node scripts/smokeRelease1Desafio1.js",
     "demo:coverage:desafio1": "node scripts/generarCoberturaDesafio1.js",

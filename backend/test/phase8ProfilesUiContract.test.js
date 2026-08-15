@@ -16,53 +16,51 @@ function read(relativePath) {
 }
 
 test(
-  'login obtiene los perfiles desde la API y no construye una lista fija de botones demo',
+  'login público post-F22 valida la pareja real del dataset y no expone perfiles demo',
   () => {
     const js =
       read('frontend/login.js');
+    const html =
+      read('frontend/login.html');
 
     assert.match(
       js,
-      /\/api\/auth\/demo-profiles/
+      /\/api\/auth\/dataset-login/
     );
     assert.match(
-      js,
-      /data\.profiles/
+      html,
+      /COD_CLIENTE/
     );
     assert.match(
-      js,
-      /release1Pitch/
+      html,
+      /NUM_ANEXO/
     );
-    assert.match(
+    assert.doesNotMatch(
       js,
-      /officialDataReady/
+      /demoProfiles|demoLogin\(/
     );
   }
 );
 
 test(
-  'la interfaz distingue perfiles del pitch y perfiles de cobertura',
+  'los perfiles de Fase 8 permanecen como catálogo interno para pruebas y benchmarks',
   () => {
-    const html =
-      read('frontend/login.html');
-    const css =
-      read('frontend/login.css');
+    const catalog =
+      read(
+        'backend/config/demoProfiles.js'
+      );
 
     assert.match(
-      html,
-      /Pitch R1/
+      catalog,
+      /CLI000001/
     );
     assert.match(
-      html,
-      /Cobertura/
+      catalog,
+      /CLI000006/
     );
     assert.match(
-      css,
-      /demo-profile-badge\.pitch/
-    );
-    assert.match(
-      css,
-      /demo-profile-badge\.extended/
+      catalog,
+      /release1Pitch/
     );
   }
 );

@@ -43,6 +43,12 @@ const {
   './desafio1ChallengePreflightLogic'
 );
 
+const {
+  createDesafio1ConversationalAiService
+} = require(
+  './desafio1ConversationalAiService'
+);
+
 const BACKEND_ROOT = path.resolve(
   __dirname,
   '..'
@@ -224,7 +230,11 @@ async function runLocalPerformanceAudit() {
     normalizePerformanceProfile({});
   const app =
     createApp({
-      requestLogging: false
+      requestLogging: false,
+      conversationalAiService:
+        createDesafio1ConversationalAiService({
+          enabled: false
+        })
     });
 
   let server = null;

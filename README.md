@@ -50,27 +50,17 @@ npm run dev
 
 ## Autenticación local de la demo
 
-El prototipo incluye una autenticación local para proteger la vista de Mi Movistar y conservar la identidad del cliente al pasar a Lucía.
+El acceso cliente del prototipo se valida contra dos campos **reales del dataset anonimizado** de `PLANTA CLIENTES`: `COD_CLIENTE` + `NUM_ANEXO`. La pareja debe pertenecer a la misma fila y el servicio debe tener facturación importada para abrir Mi Movistar.
 
-- `http://localhost:3000/login` muestra el inicio de sesión.
+- `http://localhost:3000/login` solicita `COD_CLIENTE` y `NUM_ANEXO`.
 - `http://localhost:3000/app` requiere una sesión autenticada.
-- El modo demo permite entrar como Carlos o Ana sin escribir credenciales.
-- La sesión se guarda en una cookie `HttpOnly` y se reutiliza al abrir Lucía.
-- Al cerrar sesión se invalida el acceso a Mi Movistar.
+- una pareja incorrecta no crea cookie ni sesión;
+- un `COD_CLIENTE` correcto combinado con el `NUM_ANEXO` de otra cuenta también se rechaza;
+- `NUM_ANEXO` se conserva únicamente dentro de la sesión del backend y el navegador recibe una versión enmascarada;
+- `/explorer` sigue siendo de solo lectura y no permite adoptar identidades;
+- los perfiles `CLI000001`–`CLI000006` se conservan internamente para regresiones, benchmarks y los casos congelados de Release 1, pero ya no son el login cliente mostrado en la UI.
 
-Cuentas ficticias disponibles:
-
-```text
-Carlos Mendoza
-Correo: carlos.demo@movistar.pe
-Contraseña: Demo1234!
-
-Ana Torres
-Correo: ana.demo@movistar.pe
-Contraseña: Demo1234!
-```
-
-Estas cuentas son exclusivamente para el prototipo. El sistema de autenticación se mantiene en memoria y no sustituye la autenticación real de Mi Movistar.
+Esto **no representa la autenticación productiva de Mi Movistar**: `COD_CLIENTE` y `NUM_ANEXO` son identificadores anonimizados del desafío, no contraseñas ni secretos. La demo valida que la identidad seleccionada exista realmente en el dataset antes de habilitar datos personales.
 
 ## Dashboard de métricas del Desafío 1
 
@@ -174,3 +164,30 @@ REVIEW_REQUIRED
 Con `--write`, el snapshot agregado se guarda en `backend/data/phase22-challenge-preflight.local.json` y queda ignorado por Git. El reporte congela los casos demo `CLI000001`/Carlos (`RECONNECTION`) y `CLI000002`/Ana (`PRORATION`), la arquitectura, resultados agregados de benchmarks y limitaciones conocidas sin copiar identificadores oficiales, transcripts o filas fuente.
 
 El diseño y la condición de salida están documentados en `backend/docs/desafio1-fase22.md`.
+
+> Hardening post-F22: `/explorer` es de solo lectura. Los aliases DEMO no crean sesiones ni permiten adoptar identidades; los datos personales requieren `/login`. Ver `backend/docs/desafio1-postfase22-hardening-explorer-auth.md`.
+
+> Hardening conversacional post-F22: Lucía valida referencias explícitas de factura **y de periodo (mes/año)** contra el historial de la cuenta autenticada; si el periodo solicitado no existe, no lo sustituye por el recibo anterior. Tampoco permite cambiar de cliente mediante IDs escritos en el chat. Con una clave Groq real, el LLM puede ayudar a interpretar formulaciones no reconocidas y naturalizar una respuesta ya grounded; los montos/causas siguen siendo deterministas y cualquier naturalización que altere claims protegidos cae al fallback. Ver `backend/docs/desafio1-postfase22-hardening-conversacional.md`.
+
+
+> Hardening de autenticación con dataset: el login público valida `COD_CLIENTE + NUM_ANEXO` directamente contra `PLANTA CLIENTES`, mantiene `NUM_ANEXO` fuera de los payloads y conserva los perfiles ficticios solo para automatización interna. Ver `backend/docs/desafio1-postfase22-login-dataset.md`.
+
+
+### Elegir un caso Premium/HIGH para la demo
+
+El Explorador muestra `Caso #000074` en vez del alias técnico `DEMO000074`. Si el presentador necesita abrir exactamente ese caso mediante el login del dataset, puede resolver la pareja **solo desde la terminal local**:
+
+```bash
+cd backend
+npm run demo:login-case:desafio1 -- --case 74
+```
+
+También puede pedir el mejor caso disponible por escenario:
+
+```bash
+npm run demo:login-case:desafio1 -- --scenario RECONNECTION --quality PREMIUM
+```
+
+El comando revalida `COD_CLIENTE + NUM_ANEXO` contra PLANTA y confirma facturación antes de imprimirlos. No existe un endpoint web equivalente, no crea sesión y no guarda las credenciales en un artefacto. Consulta `backend/docs/desafio1-postfase22-presenter-case-login.md`.
+
+> Seguimientos grounded post-F22: pedir `más detalle`, `profundiza` o `desglósalo` reutiliza el último sujeto financiero autenticado y amplía la respuesta con hechos estructurados del recibo. Estas frases no consumen el umbral de incomprensión de Fase 19. Ver `backend/docs/desafio1-postfase22-followup-detalle-grounded.md`.

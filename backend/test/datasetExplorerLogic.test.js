@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const {
   normalizeExplorerQuery,
   getScenarioLabel,
-  buildExplorerAuthUser,
+  getExplorerAccessPolicy,
   toSafeExplorerProfile,
   buildExplorerSummary
 } = require('../services/datasetExplorerLogic');
@@ -44,31 +44,23 @@ test(
 );
 
 test(
-  'construye una identidad temporal sintética sin copiar identificadores oficiales',
+  'política del explorador es solo lectura y no permite suplantar cuentas',
   () => {
-    const user =
-      buildExplorerAuthUser({
-        demoId: 'DEMO000123',
-        subscriberKey: 'SECRET_SUB',
-        customerKey: 'SECRET_CUST'
-      });
-
     assert.deepEqual(
-      user,
+      getExplorerAccessPolicy(),
       {
-        userId: 'EXP_DEMO000123',
-        customerId: 'EXP_DEMO000123',
-        name: 'Cliente DEMO000123',
-        email: null,
-        mode: 'EXPLORER',
-        explorerDemoId: 'DEMO000123'
+        mode:
+          'READ_ONLY_COVERAGE',
+        publicMetadataOnly: true,
+        accountImpersonationAllowed:
+          false,
+        explorerCreatesAuthSession:
+          false,
+        financialDetailsRequireAuthenticatedDemoProfile:
+          true,
+        authenticatedEntryPoint:
+          '/login'
       }
-    );
-    assert.equal(
-      JSON.stringify(user).includes(
-        'SECRET_SUB'
-      ),
-      false
     );
   }
 );
