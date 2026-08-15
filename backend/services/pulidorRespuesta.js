@@ -40,6 +40,18 @@ function mesesDe(texto) {
 }
 
 /**
+ * Fechas concretas del texto (D/M/AAAA).
+ *
+ * Se comprueban aparte de los montos y los meses porque el modelo las
+ * eliminaba: ante "¿cuándo vence?" devolvía "ya está pagado" sin ninguna
+ * fecha, que es justo lo que el cliente preguntó.
+ */
+function fechasDe(texto) {
+  const encontradas = String(texto || '').match(/\b\d{1,2}\/\d{1,2}\/\d{4}\b/g) || [];
+  return [...encontradas].sort().join('|');
+}
+
+/**
  * Comprueba que la reescritura conserve los hechos.
  *
  * @returns {{valido: boolean, motivo?: string}}
@@ -57,13 +69,45 @@ function conservaLosHechos(original, reescrito) {
     return { valido: false, motivo: 'cambiaron los meses' };
   }
 
+  if (fechasDe(original) !== fechasDe(reescrito)) {
+    return { valido: false, motivo: 'cambiaron o se perdieron las fechas' };
+  }
+
   // Una reescritura que triplica el largo dejó de ser una reescritura: el
   // modelo se puso a agregar cosas.
   if (reescrito.length > original.length * 2.2 + 120) {
     return { valido: false, motivo: 'se alargó demasiado' };
   }
 
+  // El gancho final es lo que invita al cliente a seguir preguntando. Si el
+  // original cerraba con una pregunta y la reescritura la perdió, la
+  // conversación se corta ahí: se descarta.
+  if (original.trim().endsWith('?') && !reescrito.trim().endsWith('?')) {
+    return { valido: false, motivo: 'perdió la pregunta final' };
+  }
+
   return { valido: true };
+}
+
+/**
+ * Recorta la coletilla con la que el modelo abre casi todas sus respuestas.
+ *
+ * Se le pidió variar y no lo hace: arranca con "Mira, te cuento que..." una y
+ * otra vez, que cansa igual que la plantilla que veníamos a arreglar. Se
+ * quita acá, que es determinista, en vez de seguir insistiendo en el prompt.
+ */
+function quitarMuletillaInicial(texto) {
+  const sinMuletilla = texto
+    .replace(/^(mira|oye|ya|bueno)[,:]?\s*(te cuento|te explico|te comento)?\s*(que)?\s*/i, '')
+    // "Mira, te cuento que, cuando..." deja una coma huérfana al inicio.
+    .replace(/^[,;:.\s]+/, '');
+
+  if (!sinMuletilla || sinMuletilla === texto) {
+    return texto;
+  }
+
+  // Al cortar el arranque la frase queda en minúscula: se recupera.
+  return sinMuletilla.charAt(0).toUpperCase() + sinMuletilla.slice(1);
 }
 
 const INSTRUCCIONES = `Eres el asistente de Movistar Perú. Vas a REESCRIBIR un mensaje ya redactado
@@ -86,11 +130,23 @@ CUIDADO CON EL SENTIDO, no solo con los números:
 - Si el texto dice que algo está pagado o pendiente, tu versión dice lo
   mismo. Nunca lo inviertas.
 
-ESTILO:
-- Tutea, cercano pero profesional. Nada de "estimado cliente".
-- Frases cortas. Como se habla, no como se redacta un oficio.
-- Sin emojis, sin exclamaciones de más, sin "¡Claro que sí!".
-- Mismo largo o más corto que el original.
+ESTILO — habla como un amigo peruano que trabaja en Movistar y te está
+explicando tu recibo en la mesa de un café:
+- Tutea siempre. Nada de "estimado cliente" ni "le informamos que".
+- Frases cortas, español peruano natural: "mira", "te cuento", "nada que
+  ver", "tranquilo", "ojo que", "nomás". Con moderación: UNO por mensaje
+  como mucho, y no siempre el mismo. Abrir cada respuesta con "Mira, te
+  cuento" cansa igual que una plantilla; muchas veces lo mejor es entrar
+  directo al dato.
+- NUNCA quites una fecha, una hora ni un plazo. Si el cliente pregunta
+  "¿cuándo vence?", la respuesta sin la fecha no sirve de nada.
+- Nada de tecnicismos. Si el texto ya tradujo la jerga, no la devuelvas.
+- Sin emojis. Sin "¡Claro que sí!". Sin disculpas largas.
+- MÁS CORTO que el original, nunca más largo. Si puedes decirlo en dos
+  frases en vez de tres, hazlo.
+- Si el original termina con una pregunta al cliente, la tuya TAMBIÉN
+  termina con una pregunta. Ese cierre es lo que lo invita a seguir
+  preguntando: no lo conviertas en una despedida ni lo elimines.
 
 Devuelve SOLO el mensaje reescrito, sin comillas ni comentarios.`;
 
@@ -120,7 +176,9 @@ async function pulirRedaccion(textoBase, opciones = {}) {
     return { texto: textoBase, pulido: false, motivo: 'error del modelo' };
   }
 
-  const limpio = String(reescrito || '').trim().replace(/^["'`]|["'`]$/g, '');
+  const limpio = quitarMuletillaInicial(
+    String(reescrito || '').trim().replace(/^["'`]|["'`]$/g, '')
+  );
   const verificacion = conservaLosHechos(textoBase, limpio);
 
   if (!verificacion.valido) {

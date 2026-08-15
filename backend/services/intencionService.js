@@ -66,6 +66,22 @@ const RESUELVE_MOTOR = new Set([
   INTENCIONES.SOLICITUD_ASESOR
 ]);
 
+/**
+ * Intenciones que ya preguntan por datos de un recibo.
+ *
+ * Un seguimiento que nombra otro periodo solo puede heredar una de estas: las
+ * demás (NO_ENTIENDE, SOLICITUD_ASESOR, SALUDO) hablan de la conversación, no
+ * del recibo, y heredarlas hace que el bot conteste otra cosa.
+ */
+const PREGUNTA_POR_DATOS = new Set([
+  'CONSULTA_MONTO',
+  'CONSULTA_VARIACION',
+  'CONSULTA_DETALLE',
+  'CONSULTA_VENCIMIENTO',
+  'CONSULTA_HISTORIAL',
+  'DISPUTA_COBRO'
+]);
+
 const MESES = {
   enero: '01', febrero: '02', marzo: '03', abril: '04',
   mayo: '05', junio: '06', julio: '07', agosto: '08',
@@ -382,8 +398,16 @@ function clasificarIntencion(mensaje, opciones = {}) {
   }
 
   if (intencionAnterior && esSeguimientoEliptico(texto, slots)) {
+    // Nombrar otro periodo abre un tema nuevo, no continúa el anterior. Si se
+    // hereda tal cual, un "¿y el mes pasado?" después de un "no entendí"
+    // vuelve a responder "déjame intentarlo de otra forma", cuando lo que
+    // se está preguntando es cuánto salió ese recibo.
+    const heredable = (slots.mes || slots.mesesAtras) && !PREGUNTA_POR_DATOS.has(intencionAnterior)
+      ? INTENCIONES.CONSULTA_MONTO
+      : intencionAnterior;
+
     return decorar(
-      { ...base, intencion: intencionAnterior, confianza: 0.6, esSeguimiento: true },
+      { ...base, intencion: heredable, confianza: 0.6, esSeguimiento: true },
       intencionAnterior
     );
   }

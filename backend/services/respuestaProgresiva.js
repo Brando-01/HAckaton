@@ -32,59 +32,59 @@ const { INTENCIONES } = require('./intencionService');
  */
 const EXPLICACION = {
   [CAUSAS.FIN_DESCUENTO]: {
-    corta: 'se terminó un descuento que tenías y volviste a la tarifa normal',
-    ampliada: 'Tenías una promoción con fecha de fin. Mientras estuvo activa pagabas menos que la tarifa de tu plan; al vencer, el plan se cobra completo. No es un cargo nuevo: es el mismo plan sin el descuento encima.',
-    accion: 'Puedo revisar si hay alguna promoción vigente para tu línea.'
+    corta: 'se te acabó un descuento que tenías, nada más',
+    ampliada: 'Tenías una promo con fecha de fin. Mientras corría pagabas menos que tu tarifa; al vencerse, el plan se cobra completo. No te agregaron nada: es el mismo plan, sin el descuento encima.',
+    accion: '¿Te reviso si hay alguna promo vigente para tu línea?'
   },
   [CAUSAS.NUEVO_DESCUENTO]: {
-    corta: 'se aplicó un descuento a tu recibo',
-    ampliada: 'Se activó una promoción sobre tu plan, así que este ciclo pagas menos que la tarifa normal. Suele tener una duración definida.',
-    accion: 'Si quieres, te confirmo hasta cuándo aplica.'
+    corta: 'te entró un descuento',
+    ampliada: 'Se activó una promo sobre tu plan, así que este mes pagas menos que la tarifa normal. Estas promos suelen tener una duración definida.',
+    accion: '¿Quieres que te diga hasta cuándo te dura?'
   },
   [CAUSAS.PRORRATEO]: {
-    corta: 'se cobraron solo los días que usaste el servicio, no el mes completo',
-    ampliada: 'Cuando un servicio se activa o cambia a mitad de ciclo, no se cobra el mes entero: se calcula la parte proporcional a los días que estuvo activo. Por eso el monto no coincide con la tarifa redonda de tu plan.',
-    accion: 'El próximo ciclo ya se cobra completo y vuelve a ser parejo.'
+    corta: 'te cobraron solo los días que usaste, no el mes completo',
+    ampliada: 'Cuando un servicio se activa o cambia a mitad de mes, no te cobran el mes entero: calculan la parte de los días que estuvo activo. Por eso el monto te sale "raro" y no cuadra con la tarifa redonda.',
+    accion: 'El próximo mes ya se cobra completo y vuelve a ser parejo. ¿Te muestro el detalle?'
   },
   [CAUSAS.RECONEXION]: {
-    corta: 'se cobró la reconexión del servicio tras una suspensión',
-    ampliada: 'Cuando un recibo queda impago el servicio se suspende, y al regularizar el pago se cobra un cargo único por reactivarlo. Es un cargo de una sola vez, no se repite el próximo mes.',
-    accion: 'Para que no vuelva a pasar, puedo ayudarte a revisar tu fecha de vencimiento.'
+    corta: 'te cobraron la reconexión del servicio',
+    ampliada: 'Cuando un recibo queda impago cortan el servicio, y al ponerte al día cobran un cargo único por reactivarlo. Es de una sola vez: el próximo mes ya no aparece.',
+    accion: '¿Quieres que revisemos tu fecha de pago para que no se repita?'
   },
   [CAUSAS.CAMBIO_PLAN]: {
     corta: 'cambiaste de plan y la tarifa se ajustó',
-    ampliada: 'Al migrar de plan se deja de cobrar el anterior y empieza a cobrarse el nuevo. Si el cambio ocurrió a mitad de ciclo, puedes ver ambos en el mismo recibo, cada uno por los días que estuvo activo.',
-    accion: 'Puedo mostrarte el detalle de los dos planes en este recibo.'
+    ampliada: 'Al migrar de plan dejan de cobrarte el anterior y empiezan con el nuevo. Si el cambio cayó a mitad de mes, puedes ver los dos en el mismo recibo, cada uno por los días que estuvo activo.',
+    accion: '¿Te muestro cómo quedaron los dos planes en este recibo?'
   },
   [CAUSAS.CONSUMO_ADICIONAL]: {
-    corta: 'hubo consumo por encima de lo que incluye tu plan',
-    ampliada: 'Tu plan incluye una bolsa de datos, minutos o mensajes. Lo que se usa por encima de esa bolsa se factura aparte, según la tarifa de consumo adicional. Por eso este cargo varía cada mes.',
-    accion: 'Si se repite, quizá te convenga un plan con más incluido.'
+    corta: 'usaste más de lo que incluye tu plan',
+    ampliada: 'Tu plan trae una bolsa de datos, minutos o mensajes. Lo que pasa de ahí se cobra aparte, con su propia tarifa. Por eso este cargo te varía de un mes a otro.',
+    accion: '¿Te muestro qué fue lo que más consumiste?'
   },
   [CAUSAS.CARGO_TERCEROS]: {
-    corta: 'se facturaron servicios de terceros usados desde tu línea',
-    ampliada: 'Hay servicios que no son de Movistar pero se cobran en tu recibo: llamadas de larga distancia por otro operador, suscripciones o contenidos. Movistar los factura y luego los transfiere a ese proveedor.',
-    accion: 'Si no reconoces el cargo, te derivo con un asesor para revisarlo.'
+    corta: 'te facturaron servicios de terceros usados desde tu línea',
+    ampliada: 'Hay servicios que no son de Movistar pero se cobran en tu recibo: llamadas de larga distancia por otro operador, suscripciones o contenidos. Movistar los cobra y después le pasa esa plata al proveedor.',
+    accion: '¿No reconoces el cargo? Te paso con un asesor para revisarlo.'
   },
   [CAUSAS.PAQUETE]: {
     corta: 'se cobraron paquetes que contrataste',
-    ampliada: 'Son bolsas adicionales que se compran aparte del plan: gigas extra, minutos o contenidos. Se cobran en el recibo del ciclo en que se contrataron.',
-    accion: 'Puedo mostrarte qué paquetes se cobraron este mes.'
+    ampliada: 'Son bolsas que se compran aparte del plan: gigas extra, minutos o contenidos. Se cobran en el recibo del mes en que los contrataste.',
+    accion: '¿Te muestro qué paquetes entraron este mes?'
   },
   [CAUSAS.NOTA_CREDITO]: {
-    corta: 'se aplicó una nota de crédito a tu favor',
-    ampliada: 'Una nota de crédito devuelve un monto que se había cobrado de más o que correspondía anular. Se descuenta directamente del recibo, por eso el total baja.',
-    accion: 'No tienes que hacer nada: ya está aplicada.'
+    corta: 'te aplicaron una nota de crédito a favor',
+    ampliada: 'Una nota de crédito te devuelve un monto que te habían cobrado de más. Se descuenta directo del recibo, por eso el total te baja.',
+    accion: 'No tienes que hacer nada, ya está aplicada. ¿Te muestro el detalle?'
   },
   [CAUSAS.CUOTA_EQUIPO]: {
     corta: 'se facturó la cuota de tu equipo',
-    ampliada: 'Cuando el equipo se compra financiado, su precio se reparte en cuotas mensuales que se cobran junto al plan. Al terminar las cuotas, el recibo baja.',
-    accion: 'Puedo decirte cuántas cuotas te quedan.'
+    ampliada: 'Cuando el equipo se compra financiado, su precio se reparte en cuotas mensuales que van junto al plan. Cuando terminan las cuotas, el recibo te baja solo.',
+    accion: '¿Quieres que veamos el detalle de la cuota?'
   },
   [CAUSAS.AJUSTE_TARIFA]: {
-    corta: 'cambió la tarifa de un concepto que ya venías pagando',
-    ampliada: 'El mismo concepto se sigue cobrando, pero con un importe distinto al del mes pasado. Suele deberse a un ajuste de tarifa o a un cambio en las condiciones del servicio.',
-    accion: 'Puedo mostrarte el detalle línea por línea.'
+    corta: 'cambió la tarifa de algo que ya venías pagando',
+    ampliada: 'El mismo concepto se sigue cobrando, pero con otro importe que el mes pasado. Suele ser un ajuste de tarifa o un cambio en las condiciones del servicio.',
+    accion: '¿Te muestro el detalle línea por línea?'
   }
 };
 
@@ -266,8 +266,8 @@ function responderSaludo(contexto) {
   const nombre = contexto.nombreCliente ? ` ${contexto.nombreCliente}` : '';
 
   const texto = contexto.tieneCliente
-    ? `¡Hola${nombre}! Soy tu asistente de Movistar. Puedo explicarte tu recibo, decirte cuánto debes o por qué cambió el monto. ¿Qué necesitas?`
-    : '¡Hola! Soy tu asistente de Movistar. Puedo resolver dudas sobre tu recibo, tus cargos y los planes disponibles. Para ver información de tu cuenta necesito que inicies sesión.';
+    ? `¡Hola${nombre}! Te explico tu recibo en simple, sin vueltas. ¿Qué quieres saber?`
+    : '¡Hola! Te puedo explicar tu recibo y resolverte dudas de facturación. Para ver tu cuenta necesito que inicies sesión primero.';
 
   return {
     texto,
@@ -279,14 +279,14 @@ function responderSaludo(contexto) {
 
 function responderAgradecimiento() {
   return {
-    texto: '¡Con gusto! Si te queda alguna duda sobre tu recibo, acá estoy.',
+    texto: '¡Un gusto! Cualquier otra duda de tu recibo, me escribes nomás.',
     sugerencias: []
   };
 }
 
 function responderDespedida() {
   return {
-    texto: 'Gracias a ti. Que tengas un buen día.',
+    texto: 'Gracias a ti. ¡Que estés bien!',
     sugerencias: [],
     cerrarInteraccion: true
   };
@@ -294,7 +294,7 @@ function responderDespedida() {
 
 function responderFueraDeAlcance() {
   return {
-    texto: 'Sobre eso no te puedo ayudar; me dedico a tu servicio Movistar. Si quieres, revisamos tu recibo, tus cargos o los planes disponibles.',
+    texto: 'Uy, de eso no manejo. Yo veo tu recibo y tus cargos. ¿Te ayudo con algo de tu cuenta?',
     sugerencias: [CHIPS.MONTO, CHIPS.VARIACION]
   };
 }
@@ -321,8 +321,13 @@ function responderMonto(bloque, contexto) {
     sugerencias.unshift(CHIPS.VARIACION);
   }
 
+  // Gancho: se ofrece el siguiente paso en vez de esperar a que lo adivine.
+  const gancho = bloque.causas.length > 0
+    ? ' ¿Te cuento por qué cambió?'
+    : ' ¿Quieres ver el detalle?';
+
   return {
-    texto: `${encabezado}${fraseEstado(bloque, contexto)}`,
+    texto: `${encabezado}${fraseEstado(bloque, contexto)}${gancho}`,
     sugerencias,
     tarjeta: construirTarjeta(bloque)
   };
@@ -344,7 +349,7 @@ function responderVariacion(bloque, contexto) {
 
   if (variacion.direccion === 'SIN_CAMBIO') {
     return {
-      texto: `En realidad no cambió: el de ${mes} salió ${soles(reciboActual.total)}, igual que el de ${mesAnterior}.`,
+      texto: `Nada que ver, no cambió: el de ${mes} salió ${soles(reciboActual.total)}, igualito que el de ${mesAnterior}. ¿Te muestro el detalle?`,
       sugerencias: [CHIPS.DETALLE, CHIPS.HISTORIAL],
       tarjeta: construirTarjeta(bloque)
     };
@@ -361,7 +366,7 @@ function responderVariacion(bloque, contexto) {
   const direccion = variacion.direccion === 'AUMENTO' ? 'más' : 'menos';
   pasos.push(`En ${mesAnterior} pagaste ${soles(reciboAnterior.total)} y en ${mes}, ${soles(reciboActual.total)}. Son ${soles(variacion.montoAbsoluto)} ${direccion}.`);
 
-  // 2. POR QUÉ
+  // 2. POR QUÉ — una línea. Lo largo va detrás de "no entendí".
   if (bloque.causas.length === 1) {
     pasos.push(`Fue porque ${explicacionDe(bloque.causas[0].codigo).corta}.`);
   } else if (bloque.causas.length > 1) {
@@ -371,7 +376,7 @@ function responderVariacion(bloque, contexto) {
     pasos.push(`Fueron ${bloque.causas.length} cosas a la vez:\n${lista}`);
   }
 
-  // 3. QUÉ HACER
+  // 3. EL GANCHO — se ofrece el siguiente paso, no se cierra la conversación.
   if (bloque.causas.length > 0) {
     pasos.push(explicacionDe(bloque.causas[0].codigo).accion);
   }
@@ -401,7 +406,7 @@ function responderDetalle(bloque) {
   const cierre = omitidas > 0 ? `\n\nY ${omitidas} concepto(s) más de menor monto.` : '';
 
   return {
-    texto: `Los ${soles(bloque.reciboActual.total)} de ${mesDelPeriodo(bloque.reciboActual.periodo)} se reparten así:\n\n${detalle}${cierre}`,
+    texto: `Los ${soles(bloque.reciboActual.total)} de ${mesDelPeriodo(bloque.reciboActual.periodo)} se reparten así:\n\n${detalle}${cierre}\n\n¿Hay alguno que no reconozcas?`,
     sugerencias: [CHIPS.VARIACION, CHIPS.HISTORIAL],
     tarjeta: construirTarjeta(bloque)
   };
@@ -418,11 +423,11 @@ function responderVencimiento(bloque) {
   }
 
   const estado = actual.deuda === 'CON DEUDA'
-    ? 'y todavía está pendiente'
-    : 'aunque ya lo tienes pagado';
+    ? `Vence el ${formatearVencimiento(actual.vencimiento)} y son ${soles(actual.total)}. Todavía está pendiente.`
+    : `Venció el ${formatearVencimiento(actual.vencimiento)}, pero tranquilo: esos ${soles(actual.total)} ya los pagaste.`;
 
   return {
-    texto: `Vence el ${formatearVencimiento(actual.vencimiento)}, ${estado}. Son ${soles(actual.total)}.`,
+    texto: `${estado} ¿Te cuento algo más de este recibo?`,
     sugerencias: [CHIPS.DETALLE, CHIPS.VARIACION],
     tarjeta: construirTarjeta(bloque)
   };
@@ -434,7 +439,7 @@ function responderHistorial(bloque) {
     .join('\n');
 
   return {
-    texto: `Mira cómo vienes pagando:\n\n${serie}\n\nEn promedio te sale ${soles(bloque.promedioHistorico)} al mes.`,
+    texto: `Mira cómo vienes pagando:\n\n${serie}\n\nEn promedio te sale ${soles(bloque.promedioHistorico)} al mes. ¿Quieres que veamos algún mes en particular?`,
     sugerencias: [CHIPS.VARIACION, CHIPS.DETALLE],
     tarjeta: construirTarjeta(bloque)
   };
@@ -453,7 +458,7 @@ function responderNoEntiende(bloque) {
   const explicacion = explicacionDe(causa.codigo);
 
   return {
-    texto: `Te lo cuento de otra manera.\n\n${explicacion.ampliada}\n\nEn tu caso eso significó ${soles(causa.impacto)} de diferencia.`,
+    texto: `Va de nuevo, más simple.\n\n${explicacion.ampliada}\n\nEn tu caso fueron ${soles(causa.impacto)} de diferencia. ¿Se entiende mejor así?`,
     sugerencias: [CHIPS.DETALLE, CHIPS.ASESOR],
     tarjeta: construirTarjeta(bloque)
   };
@@ -475,16 +480,16 @@ function responderDisputa(bloque) {
     };
   }
 
-  const partes = [`Vamos a revisarlo. Tu recibo del ${bloque.reciboActual.periodo} es de ${soles(bloque.reciboActual.total)}.`];
+  const partes = [`Ya, vamos a revisarlo. El de ${mesDelPeriodo(bloque.reciboActual.periodo)} salió ${soles(bloque.reciboActual.total)}.`];
 
   if (bloque.causas.length > 0) {
     const causa = bloque.causas[0];
-    partes.push(`La diferencia frente al mes anterior viene de que ${explicacionDe(causa.codigo).corta}, por ${soles(causa.impacto)}.`);
+    partes.push(`La diferencia con el mes pasado es que ${explicacionDe(causa.codigo).corta}, por ${soles(causa.impacto)}.`);
   } else if (bloque.reciboAnterior) {
-    partes.push(`Es el mismo monto que el mes anterior (${soles(bloque.reciboAnterior.total)}), así que no hubo ningún cargo nuevo.`);
+    partes.push(`Es el mismo monto que el mes pasado (${soles(bloque.reciboAnterior.total)}), así que no te agregaron ningún cargo nuevo.`);
   }
 
-  partes.push('Si aun así no te cuadra, te derivo con un asesor que puede revisarlo a fondo con tu cuenta a la vista.');
+  partes.push('Si aun así no te cuadra, te paso con un asesor que lo revisa a fondo. ¿Te lo derivo?');
 
   return {
     texto: partes.join('\n\n'),

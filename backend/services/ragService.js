@@ -1401,7 +1401,14 @@ async function procesarConsultaFactura(
       // un mes. Sin modelo disponible, el texto determinista sale tal cual.
       let textoFinal = respuestaPorCapas.texto;
 
-      if (hayModeloDisponible()) {
+      // Solo se pule lo que lleva datos. En un "gracias" o un saludo el
+      // modelo no tiene nada que mejorar y sí puede empeorar: a un "¡Un
+      // gusto!" le agregó "todo está en orden con tu recibo", una afirmación
+      // que nadie verificó y que ninguna comprobación de cifras detecta.
+      const valeLaPenaPulir = Boolean(respuestaPorCapas.tarjeta)
+        || respuestaPorCapas.texto.includes('S/');
+
+      if (valeLaPenaPulir && hayModeloDisponible()) {
         const pulido = await pulirRedaccion(respuestaPorCapas.texto, {
           redactar: redactarConGroq
         });

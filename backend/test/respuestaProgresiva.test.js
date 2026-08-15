@@ -115,7 +115,7 @@ test('preguntar el monto responde el monto, no el historial completo', () => {
   assert.ok(respuesta.texto.length < 300, 'la respuesta debe ser breve');
 });
 
-test('la variación sigue los tres pasos: qué pasó, por qué, qué hacer', () => {
+test('la variación sigue los tres pasos: qué pasó, por qué, y el gancho', () => {
   const { respuesta } = responder('por que subio mi recibo?');
   const parrafos = respuesta.texto.split('\n\n');
 
@@ -129,7 +129,9 @@ test('la variación sigue los tres pasos: qué pasó, por qué, qué hacer', () 
   assert.match(parrafos[0], /julio.*junio|junio.*julio/s, 'debe nombrar los dos meses');
 
   assert.match(parrafos[1], /reconexión/i, 'la causa en lenguaje de cliente');
-  assert.match(parrafos[2], /vencimiento|puedo/i, 'la acción siguiente');
+
+  // 3. El gancho: una pregunta que invita a seguir, no un cierre.
+  assert.match(parrafos[2].trim(), /\?$/, 'debe terminar preguntando');
 });
 
 test('"no entendí" cambia de registro, no repite lo mismo', () => {
@@ -260,6 +262,77 @@ test('un concepto que no está en el glosario sí se delega al LLM', () => {
   const { respuesta } = responder('que significa el codigo RC_PLANRE500?');
 
   assert.equal(respuesta, null);
+});
+
+test('toda respuesta con datos termina invitando a seguir', () => {
+  // El gancho es lo que hace que el cliente pregunte lo siguiente en vez de
+  // irse. Sin él, cada respuesta es un callejón sin salida.
+  const conGancho = [
+    'cuanto debo pagar?',
+    'por que subio mi recibo?',
+    'cuando vence?',
+    'ver el detalle de cargos',
+    'mis ultimos recibos',
+    'no entendi',
+    'no me cuadra el cobro'
+  ];
+
+  for (const mensaje of conGancho) {
+    const { respuesta } = responder(mensaje);
+
+    assert.match(
+      respuesta.texto.trim(),
+      /\?$/,
+      `"${mensaje}" debería cerrar con una pregunta que invite a seguir`
+    );
+  }
+});
+
+test('las respuestas son breves: nada de muros de texto', () => {
+  // Explicar bien no es explicar mucho. El detalle profundo vive detrás de
+  // "no entendí" y de los chips, no en la primera respuesta.
+  const limites = [
+    ['hola', 160],
+    ['cuanto debo pagar?', 220],
+    ['cuando vence?', 220],
+    ['por que subio mi recibo?', 400],
+    ['gracias', 120]
+  ];
+
+  for (const [mensaje, maximo] of limites) {
+    const { respuesta } = responder(mensaje);
+
+    assert.ok(
+      respuesta.texto.length <= maximo,
+      `"${mensaje}" devolvió ${respuesta.texto.length} caracteres (máx ${maximo}): ${respuesta.texto}`
+    );
+  }
+});
+
+test('preguntar por otro mes tras "no entendí" no repite la explicación', () => {
+  // "¿y el mes pasado?" heredaba NO_ENTIENDE y respondía "déjame intentarlo
+  // de otra forma", cuando lo que se pregunta es cuánto salió ese recibo.
+  const { clasificacion } = responder(
+    'y el mes pasado?', BLOQUE, CON_CLIENTE, INTENCIONES.NO_ENTIENDE
+  );
+
+  assert.equal(clasificacion.intencion, INTENCIONES.CONSULTA_MONTO);
+  assert.equal(clasificacion.esSeguimiento, true);
+});
+
+test('un seguimiento sobre datos sí conserva su intención', () => {
+  const { clasificacion } = responder(
+    'y el mes pasado?', BLOQUE, CON_CLIENTE, INTENCIONES.CONSULTA_VARIACION
+  );
+
+  assert.equal(clasificacion.intencion, INTENCIONES.CONSULTA_VARIACION);
+});
+
+test('el saludo no arranca explicando nada: pregunta qué necesitas', () => {
+  const { respuesta } = responder('hola');
+
+  assert.match(respuesta.texto, /\?$/);
+  assert.ok(respuesta.texto.length < 160, 'un saludo no puede ser un párrafo');
 });
 
 test('la tarjeta hereda los montos del bloque', () => {
