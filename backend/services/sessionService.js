@@ -1,5 +1,12 @@
 const { randomUUID } = require('crypto');
 
+const {
+  buildEmptyContinuityState,
+  recordChannelTouch,
+  buildSafeContinuitySnapshot,
+  normalizeChannel
+} = require('./desafio1OmnichannelLogic');
+
 const sessions = new Map();
 
 const MAX_HISTORY_MESSAGES = 12;
@@ -35,7 +42,9 @@ function crearSesion(sessionId) {
       customerIdentifier: null,
       currentPeriod: null,
       currentCause: null,
-      detailMode: 'simple'
+      detailMode: 'simple',
+      omnichannel:
+        buildEmptyContinuityState()
     },
 
     history: []
@@ -57,17 +66,38 @@ function getOrCreateSession(sessionId) {
   return session;
 }
 
-function addMessage(sessionId, role, content) {
+function addMessage(
+  sessionId,
+  role,
+  content,
+  metadata = {}
+) {
   const session = getOrCreateSession(sessionId);
 
   if (!['user', 'assistant'].includes(role)) {
     throw new Error(`Rol de mensaje inválido: ${role}`);
   }
 
+  const explicitChannel =
+    normalizeChannel(
+      metadata.channel
+    );
+
+  const inferredChannel =
+    normalizeChannel(
+      session.context
+        ?.omnichannel
+        ?.currentChannel
+    );
+
   session.history.push({
     role,
     content,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    channel:
+      explicitChannel ||
+      inferredChannel ||
+      null
   });
 
   if (session.history.length > MAX_HISTORY_MESSAGES) {
@@ -101,6 +131,47 @@ function updateContext(sessionId, partialContext) {
   return session;
 }
 
+
+function touchChannel(
+  sessionId,
+  channel,
+  options = {}
+) {
+  const session =
+    getOrCreateSession(sessionId);
+
+  session.context.omnichannel =
+    recordChannelTouch(
+      session.context.omnichannel,
+      {
+        channel,
+        event:
+          options.event ||
+          'TOUCH',
+        at:
+          options.at ||
+          new Date().toISOString()
+      }
+    );
+
+  session.updatedAt = Date.now();
+
+  return buildSafeContinuitySnapshot(
+    session.context.omnichannel
+  );
+}
+
+function getContinuitySnapshot(
+  sessionId
+) {
+  const session =
+    getOrCreateSession(sessionId);
+
+  return buildSafeContinuitySnapshot(
+    session.context.omnichannel
+  );
+}
+
 function getSessionSnapshot(sessionId) {
   const session = getOrCreateSession(sessionId);
 
@@ -123,5 +194,7 @@ module.exports = {
   getHistory,
   updateContext,
   getSessionSnapshot,
+  touchChannel,
+  getContinuitySnapshot,
   resetSession
 };

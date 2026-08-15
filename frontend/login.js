@@ -61,7 +61,9 @@
       returnTo === '/app' ||
       returnTo.startsWith('/app?') ||
       returnTo === '/chat' ||
-      returnTo.startsWith('/chat?')
+      returnTo.startsWith('/chat?') ||
+      returnTo === '/whatsapp' ||
+      returnTo.startsWith('/whatsapp?')
     ) {
       return returnTo;
     }

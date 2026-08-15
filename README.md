@@ -123,3 +123,18 @@ npm run audit:handoff:desafio1 -- --details
 ```
 
 mide la exactitud lógica contra casos etiquetados y reporta precisión, recall y falsos positivos/negativos. El dashboard registra además el estado de resolución por turno, reformulaciones y una señal específica de silencio post-explicación, separada de la respuesta a la encuesta. Los detalles y limitaciones están documentados en `backend/docs/desafio1-fase19.md`.
+
+## Continuidad omnicanal y adaptador WhatsApp
+
+Desde Fase 20, Mi Movistar, Lucía web, el simulador de WhatsApp y el Portal del asesor comparten una ruta de continuidad sobre la misma sesión autenticada. El backend registra los canales canónicos `MI_MOVISTAR`, `LUCIA_WEB`, `WHATSAPP` y `ADVISOR`, conserva el canal de cada mensaje y transfiere al asesor un journey seguro junto con el transcript.
+
+La vista `http://localhost:3000/whatsapp` y `POST /api/channels/whatsapp/inbound` representan un **contrato/adaptador simulado**, no una conexión live con Meta, Twilio o un BSP. La identidad sigue viniendo de la cookie autenticada de la demo; un teléfono o `customerId` enviado por el payload no reemplaza esa autoridad. `providerMessageId` permite deduplicar retries locales dentro de la misma conversación.
+
+El contrato puede comprobarse con:
+
+```bash
+cd backend
+npm run audit:omnichannel:desafio1
+```
+
+Los detalles, limitaciones y recorrido recomendado están documentados en `backend/docs/desafio1-fase20.md`.

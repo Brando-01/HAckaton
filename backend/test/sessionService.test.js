@@ -209,3 +209,58 @@ test('solo conserva los últimos 12 mensajes', () => {
     'Mensaje 15'
   );
 });
+test('Fase 20 registra canal actual e infiere canal en el transcript sin alterar getHistory', () => {
+  const {
+    touchChannel,
+    getContinuitySnapshot
+  } = require('../services/sessionService');
+
+  resetSession('phase20-channel-history');
+
+  touchChannel(
+    'phase20-channel-history',
+    'MI_MOVISTAR',
+    { at: '2026-08-14T18:00:00.000Z' }
+  );
+  touchChannel(
+    'phase20-channel-history',
+    'LUCIA_WEB',
+    { at: '2026-08-14T18:00:01.000Z' }
+  );
+
+  addMessage(
+    'phase20-channel-history',
+    'user',
+    '¿Por qué subió?'
+  );
+
+  const snapshot =
+    getSessionSnapshot(
+      'phase20-channel-history'
+    );
+
+  assert.equal(
+    snapshot.history[0].channel,
+    'LUCIA_WEB'
+  );
+
+  assert.deepEqual(
+    getHistory('phase20-channel-history'),
+    [
+      {
+        role: 'user',
+        content: '¿Por qué subió?'
+      }
+    ]
+  );
+
+  const continuity =
+    getContinuitySnapshot(
+      'phase20-channel-history'
+    );
+
+  assert.deepEqual(
+    continuity.visitedChannels,
+    ['MI_MOVISTAR', 'LUCIA_WEB']
+  );
+});

@@ -592,3 +592,49 @@ a {
   color: var(--muted);
   font-size: 11px;
 }
+
+/* Fase 20 · continuidad omnicanal */
+.omnichannel-section {
+  background: #f8fdff;
+  border-color: #cce8f2;
+}
+
+.omnichannel-copy {
+  margin: 0 0 12px;
+  color: #5b6875;
+}
+
+.omnichannel-journey {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.omnichannel-chip,
+.conversation-channel {
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #006b8f;
+  background: #e7f7fc;
+}
+
+.omnichannel-chip {
+  padding: 6px 9px;
+}
+
+.omnichannel-arrow {
+  color: #94a3b8;
+}
+
+.conversation-role-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.conversation-channel {
+  padding: 3px 7px;
+}

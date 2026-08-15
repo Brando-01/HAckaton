@@ -1,3 +1,8 @@
+const {
+  normalizeChannel,
+  buildSafeContinuitySnapshot
+} = require('./desafio1OmnichannelLogic');
+
 const { randomUUID } = require('crypto');
 
 const casos = new Map();
@@ -538,6 +543,19 @@ function normalizarPoliticaHandoff(
   };
 }
 
+
+function normalizarContextoOmnicanal(
+  omnichannelContext
+) {
+  if (!omnichannelContext) {
+    return null;
+  }
+
+  return buildSafeContinuitySnapshot(
+    omnichannelContext
+  );
+}
+
 function crearCaso({
   sessionId,
   customerIdentifier = null,
@@ -547,7 +565,8 @@ function crearCaso({
   reason = 'CLIENT_REQUEST',
   customerContext = null,
   billingContext = null,
-  policyContext = null
+  policyContext = null,
+  omnichannelContext = null
 }) {
   const ahora =
     new Date().toISOString();
@@ -573,11 +592,19 @@ function crearCaso({
       policyContext
     );
 
+  const omnichannel =
+    normalizarContextoOmnicanal(
+      omnichannelContext
+    );
+
   const safeConversation =
     conversation.map(
-      ({ role, content }) => ({
+      ({ role, content, channel }) => ({
         role,
-        content
+        content,
+        channel:
+          normalizeChannel(channel) ||
+          null
       })
     );
 
@@ -593,6 +620,7 @@ function crearCaso({
       handoffMessage || null,
     reason,
     handoffPolicy,
+    omnichannel,
     status: 'PENDING',
 
     advisorSummary:
@@ -671,6 +699,7 @@ function resetHandoffCases() {
 module.exports = {
   adaptarDescripcionParaAsesor,
   normalizarPoliticaHandoff,
+  normalizarContextoOmnicanal,
   esSolicitudAsesor,
   determinarMotivoDerivacion,
   obtenerConsultaOriginal,

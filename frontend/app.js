@@ -677,6 +677,99 @@
     return response.json();
   }
 
+
+  function createContinuitySessionId() {
+    if (
+      window.crypto &&
+      typeof window.crypto.randomUUID ===
+        'function'
+    ) {
+      return `s_${window.crypto.randomUUID()}`;
+    }
+
+    return (
+      `s_${Date.now()}_` +
+      Math.random()
+        .toString(36)
+        .slice(2)
+    );
+  }
+
+  async function registerMiMovistarContinuity(
+    customerId
+  ) {
+    let sessionId =
+      sessionStorage.getItem(
+        'chatSessionId'
+      );
+
+    if (!sessionId) {
+      sessionId =
+        createContinuitySessionId();
+
+      sessionStorage.setItem(
+        'chatSessionId',
+        sessionId
+      );
+    }
+
+    const associationResponse =
+      await fetch(
+        `/api/session/${encodeURIComponent(sessionId)}/customer`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json'
+          },
+          body: JSON.stringify({
+            customerId
+          })
+        }
+      );
+
+    if (!associationResponse.ok) {
+      throw new Error(
+        'No se pudo vincular Mi Movistar con la continuidad conversacional'
+      );
+    }
+
+    const association =
+      await associationResponse.json();
+
+    if (association.sessionId) {
+      sessionId =
+        association.sessionId;
+      sessionStorage.setItem(
+        'chatSessionId',
+        sessionId
+      );
+    }
+
+    const channelResponse =
+      await fetch(
+        `/api/session/${encodeURIComponent(sessionId)}/channel`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json'
+          },
+          body: JSON.stringify({
+            channel: 'MI_MOVISTAR'
+          })
+        }
+      );
+
+    if (!channelResponse.ok) {
+      throw new Error(
+        'No se pudo registrar el canal Mi Movistar'
+      );
+    }
+
+    return channelResponse.json();
+  }
+
   async function loadExperience() {
     const response =
       await fetch(
@@ -787,6 +880,10 @@
 
       renderAuthenticatedUser(
         auth.user
+      );
+
+      await registerMiMovistarContinuity(
+        auth.user.customerId
       );
 
       const experience =

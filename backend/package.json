@@ -22,7 +22,8 @@
     "data:scenario-mapping:desafio1": "node scripts/auditarMapeoEscenariosDesafio1.js",
     "audit:financial:desafio1": "node scripts/auditarPrecisionFinancieraDesafio1.js",
     "audit:b2c-matrix:desafio1": "node scripts/auditarMatrizB2CDesafio1.js",
-    "audit:handoff:desafio1": "node scripts/auditarHandoffDesafio1.js"
+    "audit:handoff:desafio1": "node scripts/auditarHandoffDesafio1.js",
+    "audit:omnichannel:desafio1": "node scripts/auditarOmnicanalDesafio1.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

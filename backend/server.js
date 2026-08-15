@@ -24,8 +24,11 @@ const {
 const {
   resetSession,
   getOrCreateSession,
+  getSessionSnapshot,
   addMessage,
-  updateContext
+  updateContext,
+  touchChannel,
+  getContinuitySnapshot
 } = require('./services/sessionService');
 
 const {
@@ -99,6 +102,15 @@ const {
   obtenerCaso,
   actualizarEstadoCaso
 } = require('./services/handoffService');
+
+const {
+  CHANNELS,
+  normalizeChannel
+} = require('./services/desafio1OmnichannelLogic');
+
+const {
+  createDesafio1WhatsAppAdapterService
+} = require('./services/desafio1WhatsAppAdapterService');
 
 const {
   HANDOFF_DECISIONS,
@@ -260,7 +272,9 @@ function sanitizeReturnTo(value) {
     candidate === '/app' ||
     candidate.startsWith('/app?') ||
     candidate === '/chat' ||
-    candidate.startsWith('/chat?')
+    candidate.startsWith('/chat?') ||
+    candidate === '/whatsapp' ||
+    candidate.startsWith('/whatsapp?')
   ) {
     return candidate;
   }
@@ -398,6 +412,10 @@ function createApp(options = {}) {
   const commercialPolicyService =
     options.commercialPolicyService ||
     createDesafio1CommercialPolicyService();
+
+  const whatsappAdapterService =
+    options.whatsappAdapterService ||
+    createDesafio1WhatsAppAdapterService();
 
   const datasetExplorerService =
     options.datasetExplorerService ||
@@ -657,6 +675,19 @@ function createApp(options = {}) {
       )
     );
   });
+
+  app.get(
+    '/whatsapp',
+    requirePageAuth,
+    (req, res) => {
+      res.sendFile(
+        path.join(
+          frontendPath,
+          'whatsapp.html'
+        )
+      );
+    }
+  );
 
 
   app.get('/advisor', (req, res) => {
@@ -1155,12 +1186,151 @@ function createApp(options = {}) {
 
 
   // =========================================================
-  // CHAT
+  // CONTINUIDAD OMNICANAL · FASE 20
   // =========================================================
 
   app.post(
-    '/api/chat',
-    async (req, res) => {
+    '/api/session/:sessionId/channel',
+    requireApiAuth,
+    (req, res) => {
+      const sessionId =
+        req.params.sessionId;
+
+      const session =
+        getOrCreateSession(sessionId);
+
+      const authenticatedCustomerId =
+        req.auth.session.user.customerId;
+
+      const sessionCustomerId =
+        session.context
+          .customerIdentifier ||
+        null;
+
+      if (
+        sessionCustomerId &&
+        sessionCustomerId !==
+          authenticatedCustomerId
+      ) {
+        return res
+          .status(403)
+          .json({
+            error:
+              'La continuidad no coincide con el cliente autenticado'
+          });
+      }
+
+      const requestedChannel =
+        normalizeChannel(
+          req.body?.channel
+        );
+
+      // Este endpoint representa una vista de Mi Movistar.
+      // Lucía y WhatsApp registran su canal desde sus propios
+      // endpoints; el cliente no puede fingir ADVISOR.
+      if (
+        requestedChannel !==
+        CHANNELS.MI_MOVISTAR
+      ) {
+        return res
+          .status(400)
+          .json({
+            error:
+              'Canal no permitido para este endpoint'
+          });
+      }
+
+      if (!sessionCustomerId) {
+        updateContext(
+          sessionId,
+          {
+            customerIdentifier:
+              authenticatedCustomerId,
+            identityLocked: true
+          }
+        );
+      }
+
+      const continuity =
+        touchChannel(
+          sessionId,
+          requestedChannel,
+          { event: 'VIEW' }
+        );
+
+      return res.json({
+        ok: true,
+        sessionId,
+        continuity
+      });
+    }
+  );
+
+  app.get(
+    '/api/session/:sessionId/continuity',
+    requireApiAuth,
+    (req, res) => {
+      const session =
+        getOrCreateSession(
+          req.params.sessionId
+        );
+
+      const authenticatedCustomerId =
+        req.auth.session.user.customerId;
+
+      if (
+        session.context
+          .customerIdentifier !==
+        authenticatedCustomerId
+      ) {
+        return res
+          .status(403)
+          .json({
+            error:
+              'No puedes consultar la continuidad de otra identidad'
+          });
+      }
+
+      const snapshot =
+        getSessionSnapshot(
+          req.params.sessionId
+        );
+
+      return res.json({
+        sessionId:
+          req.params.sessionId,
+        continuity:
+          getContinuitySnapshot(
+            req.params.sessionId
+          ),
+        recentMessages:
+          snapshot.history
+            .slice(-12)
+            .map(
+              ({
+                role,
+                content,
+                channel
+              }) => ({
+                role,
+                content,
+                channel:
+                  normalizeChannel(
+                    channel
+                  ) ||
+                  null
+              })
+            )
+      });
+    }
+  );
+
+
+  // =========================================================
+  // CHAT
+  // =========================================================
+
+  async function handleChatRequest(req, res) {
       const {
         message,
         sessionId
@@ -1180,6 +1350,46 @@ function createApp(options = {}) {
       let activeSessionId =
         sessionId ||
         `s_${randomUUID()}`;
+
+      const activeChannel =
+        req.omnichannelChannel ||
+        CHANNELS.LUCIA_WEB;
+
+      const originalJson =
+        res.json.bind(res);
+
+      res.json = (payload) => {
+        if (
+          !payload ||
+          typeof payload !== 'object' ||
+          Array.isArray(payload)
+        ) {
+          return originalJson(payload);
+        }
+
+        let continuity = null;
+
+        try {
+          continuity =
+            getContinuitySnapshot(
+              activeSessionId
+            );
+        } catch (error) {
+          continuity = null;
+        }
+
+        return originalJson({
+          ...payload,
+          channel: activeChannel,
+          continuity,
+          ...(req.omnichannelAdapter
+            ? {
+                adapter:
+                  req.omnichannelAdapter
+              }
+            : {})
+        });
+      };
 
       try {
         console.log(
@@ -1237,6 +1447,18 @@ function createApp(options = {}) {
             }
           );
         }
+
+        touchChannel(
+          activeSessionId,
+          activeChannel,
+          {
+            event:
+              activeChannel ===
+                CHANNELS.WHATSAPP
+                ? 'WHATSAPP_MESSAGE'
+                : 'CHAT_MESSAGE'
+          }
+        );
 
         const existingInteraction =
             getInteraction(
@@ -2010,10 +2232,16 @@ function createApp(options = {}) {
             session.history.map(
               ({
                 role,
-                content
+                content,
+                channel
               }) => ({
                 role,
-                content
+                content,
+                channel:
+                  normalizeChannel(
+                    channel
+                  ) ||
+                  activeChannel
               })
             );
 
@@ -2021,7 +2249,8 @@ function createApp(options = {}) {
           // encuentra en SessionService.
           conversation.push({
             role: 'user',
-            content: cleanMessage
+            content: cleanMessage,
+            channel: activeChannel
           });
 
           const customerIdentifier =
@@ -2051,6 +2280,13 @@ function createApp(options = {}) {
                 customerIdentifier
               );
           }
+
+          const handoffContinuity =
+            touchChannel(
+              activeSessionId,
+              CHANNELS.ADVISOR,
+              { event: 'HANDOFF' }
+            );
 
           const caso =
             crearCaso({
@@ -2082,6 +2318,9 @@ function createApp(options = {}) {
                       null
                   }
                 ),
+
+              omnichannelContext:
+                handoffContinuity,
 
               // Transferimos un snapshot de los datos que el bot
               // ya utilizó. El asesor recibe contexto útil sin tener
@@ -2129,13 +2368,15 @@ function createApp(options = {}) {
           addMessage(
             activeSessionId,
             'user',
-            cleanMessage
+            cleanMessage,
+            { channel: activeChannel }
           );
 
           addMessage(
             activeSessionId,
             'assistant',
-            reply
+            reply,
+            { channel: activeChannel }
           );
 
 
@@ -2572,6 +2813,94 @@ function createApp(options = {}) {
               activeSessionId
           });
       }
+    }
+
+  app.post(
+    '/api/chat',
+    handleChatRequest
+  );
+
+  app.post(
+    '/api/channels/whatsapp/inbound',
+    requireApiAuth,
+    async (req, res) => {
+      let prepared;
+
+      try {
+        prepared =
+          whatsappAdapterService
+            .prepareInbound(
+              req.body || {}
+            );
+      } catch (error) {
+        return res
+          .status(400)
+          .json({
+            error:
+              error.message ||
+              'Mensaje de WhatsApp inválido',
+            code:
+              error.code ||
+              'WHATSAPP_ADAPTER_ERROR'
+          });
+      }
+
+      if (prepared.duplicate) {
+        const duplicateSession =
+          getOrCreateSession(
+            prepared.envelope.sessionId
+          );
+
+        const authenticatedCustomerId =
+          req.auth.session.user.customerId;
+
+        if (
+          duplicateSession.context
+            .customerIdentifier !==
+          authenticatedCustomerId
+        ) {
+          return res
+            .status(403)
+            .json({
+              error:
+                'La conversación de WhatsApp no coincide con el cliente autenticado'
+            });
+        }
+
+        return res.json({
+          ok: true,
+          duplicate: true,
+          processed: false,
+          sessionId:
+            prepared.envelope
+              .sessionId,
+          channel:
+            CHANNELS.WHATSAPP,
+          adapter:
+            prepared.adapter,
+          continuity:
+            getContinuitySnapshot(
+              prepared.envelope
+                .sessionId
+            )
+        });
+      }
+
+      req.omnichannelChannel =
+        CHANNELS.WHATSAPP;
+      req.omnichannelAdapter =
+        prepared.adapter;
+      req.body = {
+        message:
+          prepared.envelope.message,
+        sessionId:
+          prepared.envelope.sessionId
+      };
+
+      return handleChatRequest(
+        req,
+        res
+      );
     }
   );
 

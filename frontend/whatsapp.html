@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp simulado | Movistar</title>
+  <link rel="stylesheet" href="./whatsapp.css">
+  <link rel="stylesheet" href="./demo-nav.css">
+</head>
+<body>
+  <header class="wa-header">
+    <div class="wa-brand">
+      <div class="wa-avatar" aria-hidden="true">M</div>
+      <div>
+        <strong>Movistar · Lucía</strong>
+        <span>Canal WhatsApp simulado</span>
+      </div>
+    </div>
+
+    <nav class="demo-nav" aria-label="Navegación de demo">
+      <a class="demo-nav-link home-link" href="/">Inicio demo</a>
+      <a class="demo-nav-link" href="/app">Mi Movistar</a>
+      <a class="demo-nav-link" href="/chat?source=whatsapp">Lucía web</a>
+      <a class="demo-nav-link" href="/advisor">Asesor</a>
+      <a class="demo-nav-link" href="/dashboard">Dashboard</a>
+    </nav>
+  </header>
+
+  <main class="wa-shell">
+    <section class="wa-contract" aria-label="Estado del adaptador">
+      <div>
+        <span class="eyebrow">FASE 20 · ADAPTADOR DE CANAL</span>
+        <h1>Continuidad por WhatsApp</h1>
+        <p>
+          Esta vista simula el adaptador de WhatsApp sobre el mismo contexto de
+          Mi Movistar y Lucía. No está conectada a Meta/Twilio ni ejecuta envíos reales.
+        </p>
+      </div>
+      <div class="wa-contract-badges">
+        <span>Proveedor: simulado</span>
+        <span>Contexto: compartido</span>
+      </div>
+    </section>
+
+    <section class="wa-card">
+      <div class="wa-chat-header">
+        <div>
+          <strong id="waCustomerName">Validando sesión...</strong>
+          <span id="waContinuityLabel">Preparando continuidad</span>
+        </div>
+        <div class="wa-status">
+          <span class="wa-status-dot"></span>
+          <span>Adapter activo</span>
+        </div>
+      </div>
+
+      <div class="wa-journey" id="waJourney" aria-live="polite"></div>
+
+      <div class="wa-messages" id="waMessages" aria-live="polite">
+        <div class="wa-empty" id="waEmpty">
+          Tu conversación aparecerá aquí. Si vienes desde Lucía, recuperaremos el contexto de la misma sesión.
+        </div>
+      </div>
+
+      <form class="wa-composer" id="waForm">
+        <textarea
+          id="waInput"
+          rows="1"
+          placeholder="Escribe un mensaje para continuar la consulta..."
+          aria-label="Mensaje de WhatsApp"
+        ></textarea>
+        <button type="submit" id="waSendButton">Enviar</button>
+      </form>
+
+      <p class="wa-footnote" id="waFootnote">
+        El adaptador reutiliza el mismo motor determinista; no confía en un teléfono o customerId enviado por el navegador.
+      </p>
+    </section>
+  </main>
+
+  <script src="./whatsapp.js"></script>
+</body>
+</html>

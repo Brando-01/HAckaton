@@ -958,6 +958,84 @@
     container.appendChild(section);
   }
 
+
+  function channelLabel(channel) {
+    const labels = {
+      MI_MOVISTAR: 'Mi Movistar',
+      LUCIA_WEB: 'Lucía web',
+      WHATSAPP: 'WhatsApp',
+      ADVISOR: 'Asesor'
+    };
+
+    return labels[channel] ||
+      channel ||
+      'Canal';
+  }
+
+  function renderizarContinuidad(
+    container,
+    caso
+  ) {
+    const continuity =
+      caso.omnichannel;
+
+    if (
+      !continuity ||
+      !Array.isArray(
+        continuity.visitedChannels
+      ) ||
+      !continuity.visitedChannels.length
+    ) {
+      return;
+    }
+
+    const section =
+      crearSeccion(
+        'Continuidad omnicanal',
+        'omnichannel-section'
+      );
+
+    const intro =
+      crearElemento(
+        'p',
+        'omnichannel-copy',
+        continuity.isOmnichannel
+          ? 'El caso conserva la ruta de canales recorrida antes del handoff.'
+          : 'El caso conserva el canal desde el que llegó la consulta.'
+      );
+
+    const journey =
+      crearElemento(
+        'div',
+        'omnichannel-journey'
+      );
+
+    continuity.visitedChannels
+      .forEach((channel, index) => {
+        if (index > 0) {
+          journey.appendChild(
+            crearElemento(
+              'span',
+              'omnichannel-arrow',
+              '→'
+            )
+          );
+        }
+
+        journey.appendChild(
+          crearElemento(
+            'span',
+            'omnichannel-chip',
+            channelLabel(channel)
+          )
+        );
+      });
+
+    section.appendChild(intro);
+    section.appendChild(journey);
+    container.appendChild(section);
+  }
+
   function renderizarConversacion(
     container,
     caso
@@ -990,12 +1068,34 @@
             ? 'Cliente'
             : 'Lucía';
 
+        const roleRow =
+          crearElemento(
+            'div',
+            'conversation-role-row'
+          );
+
         const roleElement =
           crearElemento(
             'strong',
             'conversation-role',
             role
           );
+
+        roleRow.appendChild(
+          roleElement
+        );
+
+        if (mensaje.channel) {
+          roleRow.appendChild(
+            crearElemento(
+              'span',
+              'conversation-channel',
+              channelLabel(
+                mensaje.channel
+              )
+            )
+          );
+        }
 
         const content =
           crearElemento(
@@ -1005,7 +1105,7 @@
           );
 
         bubble.appendChild(
-          roleElement
+          roleRow
         );
 
         bubble.appendChild(
@@ -1069,6 +1169,11 @@
     caseDetail.appendChild(header);
 
     renderizarResumen(
+      caseDetail,
+      caso
+    );
+
+    renderizarContinuidad(
       caseDetail,
       caso
     );
