@@ -5,6 +5,7 @@ backend/node_modules/
 # Environment files
 *.env
 backend/.env
+backend/data/auth-users.json
 
 # Logs
 npm-debug.log*

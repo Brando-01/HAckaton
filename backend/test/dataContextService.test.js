@@ -95,3 +95,12 @@ test('buildCustomerBillingSummary produces a structured billing outcome', async 
   assert.match(summary, /2026-09-15/);
   assert.match(summary, /Recarga adicional/);
 });
+
+test('buildCustomerBillingSummary no duplica una factura presente en dos extractos', () => {
+  const dataDir = path.resolve(__dirname, '../data');
+  const summary = buildCustomerBillingSummary(dataDir, '100548096');
+
+  assert.match(summary, /S\/ 84\.48/);
+  assert.doesNotMatch(summary, /S\/ 168\.96/);
+  assert.doesNotMatch(summary, /Disney\+/);
+});

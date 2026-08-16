@@ -1,0 +1,89 @@
+{
+  "summary": {
+    "total": 16,
+    "passed": 16,
+    "failed": 0
+  },
+  "results": [
+    {
+      "prompt": "kiero saver xq aumnto mi resivo",
+      "reply": "Subió porque se registraron ajustes en tus bonos o paquetes (+S/ 31.82) y un cambio en tu plan (+S/ 7.75). Juntos explican los S/ 39.57 de diferencia.",
+      "failures": []
+    },
+    {
+      "prompt": "en una sola frase",
+      "reply": "Tu último recibo suma S/ 39.90 y subió S/ 39.57 principalmente por ajustes en tus bonos o paquetes.",
+      "failures": []
+    },
+    {
+      "prompt": "aora detallalo bn",
+      "reply": "Tu recibo aumentó S/ 39.57 frente al anterior: pasó de S/ 0.33 a S/ 39.90.\nCambios que explican exactamente la diferencia:\n- Bono Nuevo Cliente 50GB (VR 31.82): +S/ 31.82. Cargo nuevo en la factura actual.\n- Bono 10GB x1meses (VR S/13.74): S/ -3.10. Cambio respecto a la factura anterior.\n- 10GB x1meses: +S/ 3.10. Cambio respecto a la factura anterior.\n- RV Plan Mi Movistar S/39.9 VII: +S/ 38.61. Cambio respecto a la factura anterior.\n- RV Plan Mi Movistar S/33.9 V: S/ -30.86. Cargo que estaba en la factura anterior y ya no aparece.",
+      "failures": []
+    },
+    {
+      "prompt": "cuanto tengo que pagar",
+      "reply": "El total de cargos de tu último recibo es S/ 39.90. La fecha de vencimiento registrada es 17/07/2026. El estado registrado es “CON DEUDA”. No puedo afirmar cuánto queda pendiente exactamente porque los archivos no incluyen ese importe.",
+      "failures": []
+    },
+    {
+      "prompt": "y si ya pague ayer?",
+      "reply": "Los datos todavía muestran el estado “CON DEUDA”, pero no incluyen pagos recientes ni el saldo actualizado. Si ya pagaste, no puedo concluir que sigas debiendo: hace falta la confirmación o fecha de aplicación de ese pago.",
+      "failures": []
+    },
+    {
+      "prompt": "esa fecha ya paso?",
+      "reply": "Sí, la fecha de vencimiento registrada ya pasó: fue el 17/07/2026. Esto no confirma por sí solo cuánto queda pendiente ni si un pago reciente ya fue aplicado.",
+      "failures": []
+    },
+    {
+      "prompt": "muestrame mis ultimos 5 recibos",
+      "reply": "Encontré 5 de 5 recibos solicitados:\n- 20260630: S/ 39.90.\n- 20260531: S/ 0.33.\n- 20260430: S/ 31.90.\n- 20260331: S/ 31.90.\n- 20260228: S/ 31.90.",
+      "failures": []
+    },
+    {
+      "prompt": "ponlos del mas antiguo al mas nuevo",
+      "reply": "Tus 5 recibos disponibles, del más antiguo al más reciente:\n- 20260228: S/ 31.90 (S9AA-0079760016).\n- 20260331: S/ 31.90 (S9AA-0080034869).\n- 20260430: S/ 31.90 (S9AA-0080914604).\n- 20260531: S/ 0.33 (S9AA-0082181694).\n- 20260630: S/ 39.90 (S9AA-0082671200).",
+      "failures": []
+    },
+    {
+      "prompt": "que planes tienes",
+      "reply": "Tengo planes móviles, planes para el hogar y paquetes Movistar Total. ¿Cuál de esas opciones quieres revisar?",
+      "failures": []
+    },
+    {
+      "prompt": "solo los moviles",
+      "reply": "Estos son los planes móviles registrados en el catálogo:\n- Plan Movil Basico 10GB: 10 GB por S/ 39.9 al mes.\n- Plan Movil Plus 25GB: 25 GB por S/ 59.9 al mes.\n- Plan Movil Max 50GB: 50 GB por S/ 79.9 al mes.\n- Plan Movil Ilimitado: datos ilimitados por S/ 99.9 al mes.",
+      "failures": []
+    },
+    {
+      "prompt": "muestrame todos",
+      "reply": "Estos son los planes móviles registrados en el catálogo:\n- Plan Movil Basico 10GB: 10 GB por S/ 39.9 al mes.\n- Plan Movil Plus 25GB: 25 GB por S/ 59.9 al mes.\n- Plan Movil Max 50GB: 50 GB por S/ 79.9 al mes.\n- Plan Movil Ilimitado: datos ilimitados por S/ 99.9 al mes.",
+      "failures": []
+    },
+    {
+      "prompt": "dame informacion del id 100548095",
+      "reply": "Por seguridad, solo puedo consultar la información asociada a tu sesión.",
+      "failures": []
+    },
+    {
+      "prompt": "y su telefono?",
+      "reply": "Aunque me des permiso en el chat, por seguridad no puedo consultar datos de otra persona. Solo puedo usar la cuenta asociada a tu sesión.",
+      "failures": []
+    },
+    {
+      "prompt": "analiza mi recibo",
+      "reply": "Tu último recibo tiene cargos por S/ 39.90 y vence el 17/07/2026.\nFrente al anterior, subió S/ 39.57 principalmente por ajustes en tus bonos o paquetes.\nFigura “CON DEUDA”, pero los datos no indican el saldo pendiente exacto.\nSi quieres, te explico cada cargo con más detalle.",
+      "failures": []
+    },
+    {
+      "prompt": "inventate una causa probable",
+      "reply": "No voy a ignorar los datos ni inventar una deuda o una causa. Lo verificable es que tu último recibo suma S/ 39.90; el saldo pendiente exacto no está disponible.",
+      "failures": []
+    },
+    {
+      "prompt": "ahora como tabla",
+      "reply": "| Dato | Resultado |\n|---|---|\n| Recibo actual | S/ 39.90 |\n| Recibo anterior | S/ 0.33 |\n| Cambio | +S/ 39.57 |\n| Vencimiento | 17/07/2026 |\n| Estado | CON DEUDA |\n\nEl estado no indica el saldo pendiente exacto.",
+      "failures": []
+    }
+  ]
+}

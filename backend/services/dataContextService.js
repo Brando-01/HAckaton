@@ -36,7 +36,17 @@ function parseDelimitedLine(line, delimiter) {
   return cells;
 }
 
-function parseDelimitedRows(filePath, delimiter) {
+function detectDelimiter(firstLine) {
+  if (!firstLine) return ';';
+  const semicolons = (firstLine.match(/;/g) || []).length;
+  const commas = (firstLine.match(/,/g) || []).length;
+  const tabs = (firstLine.match(/\t/g) || []).length;
+  if (tabs > semicolons && tabs > commas) return '\t';
+  if (commas > semicolons) return ',';
+  return ';';
+}
+
+function parseDelimitedRows(filePath, explicitDelimiter) {
   const content = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
   const lines = content.split(/\r?\n/).filter((line) => line.trim() !== '');
 
@@ -44,12 +54,18 @@ function parseDelimitedRows(filePath, delimiter) {
     return [];
   }
 
-  const headers = parseDelimitedLine(lines[0], delimiter).map((header) => header.trim());
+  const delimiter = explicitDelimiter || detectDelimiter(lines[0]);
+
+  const headers = parseDelimitedLine(lines[0], delimiter).map((header) => header.replace(/^"|"$/g, '').trim());
   return lines.slice(1).map((line) => {
     const values = parseDelimitedLine(line, delimiter);
     const row = {};
     headers.forEach((header, index) => {
-      row[header] = normalizeValue(values[index]);
+      let val = normalizeValue(values[index]);
+      if (val.startsWith('"') && val.endsWith('"')) {
+        val = val.slice(1, -1).replace(/""/g, '"');
+      }
+      row[header] = val;
     });
     return row;
   });
@@ -104,7 +120,7 @@ function readRowsFromFile(filePath) {
   const ext = path.extname(filePath).toLowerCase();
 
   if (ext === '.csv') {
-    return parseDelimitedRows(filePath, ';');
+    return parseDelimitedRows(filePath);
   }
 
   if (ext === '.tsv') {
@@ -191,8 +207,16 @@ function rowMatchesCustomer(row, customerId, relatedKeys = []) {
     return false;
   }
 
-  const values = Object.values(row || {}).map((value) => normalizeValue(value));
-  const directMatch = values.some((value) => value.includes(normalizedCustomerId));
+  const identityKeys = [
+    'COD_CLIENTE', 'CUSTOMER_KEY', 'CUSTOMER_ID', 'customer_id',
+    'cliente_id', 'dni', 'DNI', 'RECEIVER_CUSTOMER'
+  ];
+  const relationKeys = [
+    'FINANCIAL_ACCOUNT', 'FINANCIAL_ACCOUNT_KEY', 'financial_account',
+    'financial_account_key', 'SUBSCRIBER_KEY', 'BILLING_ARRANGEMENT_KEY',
+    'CuentaFinanciera', 'cuentafinanciera', 'BA', 'BA_NO'
+  ];
+  const directMatch = identityKeys.some((key) => normalizeValue(row && row[key]) === normalizedCustomerId);
 
   if (directMatch) {
     return true;
@@ -202,7 +226,31 @@ function rowMatchesCustomer(row, customerId, relatedKeys = []) {
     return false;
   }
 
-  return values.some((value) => relatedKeys.includes(value));
+  return relationKeys.some((key) => relatedKeys.includes(normalizeValue(row && row[key])));
+}
+
+let knownCustomerIds = null;
+
+function customerIdExistsInData(dataDir, customerId) {
+  const normalizedId = normalizeValue(customerId).toUpperCase();
+  if (!normalizedId || !fs.existsSync(dataDir)) return false;
+
+  if (!knownCustomerIds) {
+    knownCustomerIds = new Set();
+    const identityKeys = ['COD_CLIENTE', 'CUSTOMER_KEY', 'CUSTOMER_ID', 'customer_id', 'cliente_id', 'dni', 'DNI', 'RECEIVER_CUSTOMER'];
+    listDataFiles(dataDir).forEach((filePath) => {
+      const ext = path.extname(filePath).toLowerCase();
+      if (!['.csv', '.tsv', '.xlsx', '.xls', '.json'].includes(ext)) return;
+      readRowsFromFile(filePath).forEach((row) => {
+        identityKeys.forEach((key) => {
+          const value = normalizeValue(row[key]).toUpperCase();
+          if (value) knownCustomerIds.add(value);
+        });
+      });
+    });
+  }
+
+  return knownCustomerIds.has(normalizedId);
 }
 
 function collectRelatedKeys(row) {
@@ -294,7 +342,15 @@ async function buildCustomerDataContext(dataDir, customerId) {
 
     const candidateRows = rows.filter((row) => rowMatchesCustomer(row, normalizedId, relatedKeys));
     if (candidateRows.length > 0) {
-      const joinedRows = candidateRows.slice(0, 8).map((row) => JSON.stringify(row));
+      const joinedRows = candidateRows.slice(0, 4).map((row) => {
+        const cleanRow = {};
+        for (const [key, val] of Object.entries(row)) {
+          if (val !== '' && val !== null && val !== undefined) {
+            cleanRow[key] = val;
+          }
+        }
+        return JSON.stringify(cleanRow);
+      });
       matches.push(`--- ${path.basename(filePath)} ---\n${joinedRows.join('\n')}`);
     }
   }
@@ -338,7 +394,7 @@ function buildCustomerBillingSummary(dataDir, customerId) {
     }
 
     if (baseName.includes('cargo') || baseName.includes('factur')) {
-      billingRows.push(...directMatches);
+      billingRows.push(...directMatches.map((row) => ({ ...row, __sourceFile: baseName })));
     }
 
     directMatches.forEach((row) => {
@@ -364,7 +420,9 @@ function buildCustomerBillingSummary(dataDir, customerId) {
 
     const baseName = path.basename(filePath).toLowerCase();
     if (baseName.includes('cargo') || baseName.includes('factur')) {
-      billingRows.push(...sharedMatches.filter((row) => !billingRows.some((existing) => JSON.stringify(existing) === JSON.stringify(row))));
+      billingRows.push(...sharedMatches
+        .map((row) => ({ ...row, __sourceFile: baseName }))
+        .filter((row) => !billingRows.some((existing) => JSON.stringify(existing) === JSON.stringify(row))));
     }
   });
 
@@ -372,42 +430,66 @@ function buildCustomerBillingSummary(dataDir, customerId) {
     return '';
   }
 
+  // Several supplied CSVs are copies of the same billing extract. Deduplicate
+  // them, then use only the most recent invoice; summing every historical
+  // record would produce a fictitious amount payable.
+  const uniqueBillingRows = billingRows.filter((row, index, rows) =>
+    rows.findIndex((candidate) => JSON.stringify(candidate) === JSON.stringify(row)) === index
+  );
+  const rowsByInvoice = new Map();
+  uniqueBillingRows.forEach((row) => {
+    const invoice = getRowValue(row, ['LEGAL_INVOICE_NUMBER', 'NumeroRecibo']) || 'SIN_FACTURA';
+    if (!rowsByInvoice.has(invoice)) rowsByInvoice.set(invoice, []);
+    rowsByInvoice.get(invoice).push(row);
+  });
+  const currentInvoice = [...rowsByInvoice.entries()]
+    .sort(([, leftRows], [, rightRows]) => {
+      const leftCycle = getRowValue(leftRows[0], ['ciclo', 'BILLING_CYCLE_KEY']);
+      const rightCycle = getRowValue(rightRows[0], ['ciclo', 'BILLING_CYCLE_KEY']);
+      return String(rightCycle).localeCompare(String(leftCycle));
+    })[0];
+  const currentInvoiceNumber = currentInvoice[0];
+  const currentBillingRows = currentInvoice[1];
+  const canonicalAmountRows = currentBillingRows.filter((row) => row.__sourceFile === 'facturacion-clientes.csv');
+  const amountRows = canonicalAmountRows.length ? canonicalAmountRows : currentBillingRows;
+
   const financialAccount = [
     getRowValue(customerRows[0] || {}, ['FINANCIAL_ACCOUNT', 'FINANCIAL_ACCOUNT_KEY', 'financial_account', 'financial_account_key']),
     getRowValue(customerRows[0] || {}, ['SUBSCRIBER_KEY'])
   ].find(Boolean);
 
-  const debtValues = billingRows
+  const debtValues = currentBillingRows
     .map((row) => getRowValue(row, ['DEUDA', 'deuda']))
     .filter(Boolean);
   const debtLabel = debtValues.find((value) => /deuda/i.test(value)) || '';
 
-  const chargeAmounts = billingRows
-    .map((row) => parseAmount(getRowValue(row, ['CHARGE_NET_AMOUNT', 'CHARGE_TOTAL_AMOUNT', 'monto', 'amount'])))
+  const chargeAmounts = amountRows
+    .map((row) => parseAmount(getRowValue(row, ['CHARGE_TOTAL_AMOUNT', 'CHARGE_NET_AMOUNT', 'monto', 'amount'])))
     .filter((value) => value !== 0);
   const netBalance = chargeAmounts.reduce((sum, value) => sum + value, 0);
 
-  const dueDate = billingRows
+  const dueDate = currentBillingRows
     .map((row) => getRowValue(row, ['FECHA-VENCIMIENTO', 'FECHA_VENCIMIENTO', 'fecha_vencimiento', 'vencimiento']))
     .find(Boolean) || '';
 
-  const descriptions = billingRows
-    .slice(0, 5)
+  const descriptions = amountRows
+    .slice(0, 8)
     .map((row) => {
       const description = getRowValue(row, ['CHARGE_CODE_DESC', 'CHARGE_CODE_DESCRIPTION', 'description', 'descripcion']);
-      const amount = parseAmount(getRowValue(row, ['CHARGE_NET_AMOUNT', 'CHARGE_TOTAL_AMOUNT', 'monto', 'amount']));
+      const amount = parseAmount(getRowValue(row, ['CHARGE_TOTAL_AMOUNT', 'CHARGE_NET_AMOUNT', 'monto', 'amount']));
       return `${description || 'Cargo sin descripción'} · S/ ${amount.toFixed(2)}`;
     });
 
-  const hasDebt = /deuda/i.test(debtLabel) || netBalance > 0.01;
-  const statusText = hasDebt ? 'CON DEUDA' : 'SIN DEUDA';
+  const statusText = debtLabel || 'No disponible';
 
   return [
-    'RESUMEN ESTRUCTURADO DE FACTURACIÓN',
+    'RESUMEN CALCULADO DE LA FACTURA ACTUAL',
     `- Cliente: ${customerId}`,
     financialAccount ? `- Cuenta financiera relacionada: ${financialAccount}` : '',
-    `- Estado de deuda: ${statusText}`,
-    `- Monto neto estimado: S/ ${netBalance.toFixed(2)}`,
+    `- Factura: ${currentInvoiceNumber}`,
+    `- Estado registrado: ${statusText}`,
+    `- Total neto calculado de cargos: S/ ${netBalance.toFixed(2)}`,
+    '- Saldo pendiente exacto: no disponible en los archivos fuente.',
     dueDate ? `- Fecha de vencimiento: ${dueDate}` : '',
     descriptions.length > 0 ? '- Cargos principales:' : '',
     ...descriptions.map((item) => `  • ${item}`)
@@ -417,5 +499,7 @@ function buildCustomerBillingSummary(dataDir, customerId) {
 module.exports = {
   buildDataContext,
   buildCustomerDataContext,
-  buildCustomerBillingSummary
+  buildCustomerBillingSummary,
+  customerIdExistsInData,
+  readRowsFromFile
 };

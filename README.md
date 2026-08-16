@@ -31,6 +31,8 @@ npm install
 ```env
 PORT=3000
 GROQ_API_KEY=tu_clave_groq_aqui
+# Clave interna que tú mismo generas; no es otra clave de Groq.
+ADVISOR_API_KEY=pega_aqui_un_secreto_aleatorio_largo
 ```
 
 4. Arranca el servidor:

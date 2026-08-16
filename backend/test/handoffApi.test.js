@@ -1,6 +1,7 @@
 process.env.GROQ_API_KEY =
   process.env.GROQ_API_KEY ||
   'gsk_test_placeholder';
+process.env.ADVISOR_API_KEY = 'test-advisor-key';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -92,6 +93,7 @@ test(
 
     const baseUrl =
       `http://127.0.0.1:${port}`;
+    const advisorHeaders = { 'x-advisor-key': 'test-advisor-key' };
 
     // 1. El cliente solicita asesor.
     const handoffResponse =
@@ -152,7 +154,7 @@ test(
     // 2. El panel lista el caso.
     const listResponse =
       await fetch(
-        `${baseUrl}/api/advisor/cases`
+        `${baseUrl}/api/advisor/cases`, { headers: advisorHeaders }
       );
 
     assert.equal(
@@ -176,7 +178,7 @@ test(
     // 3. El asesor consulta el caso.
     const caseResponse =
       await fetch(
-        `${baseUrl}/api/advisor/cases/${caseId}`
+        `${baseUrl}/api/advisor/cases/${caseId}`, { headers: advisorHeaders }
       );
 
     assert.equal(
@@ -278,6 +280,7 @@ test(
           method: 'PATCH',
 
           headers: {
+            ...advisorHeaders,
             'Content-Type':
               'application/json'
           },
@@ -305,7 +308,7 @@ test(
     // realmente quedó guardado.
     const finalResponse =
       await fetch(
-        `${baseUrl}/api/advisor/cases/${caseId}`
+        `${baseUrl}/api/advisor/cases/${caseId}`, { headers: advisorHeaders }
       );
 
     const finalCase =

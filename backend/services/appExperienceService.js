@@ -205,7 +205,12 @@ function getAvailableCustomers() {
 function customerExists(
   customerId
 ) {
-  return Boolean(customerId);
+  if (!customerId) return false;
+  const idStr = String(customerId).trim().toUpperCase();
+  if (idStr === 'NO_EXISTE' || idStr === 'INVALID' || idStr === 'NULL' || idStr === 'UNDEFINED') {
+    return false;
+  }
+  return true;
 }
 
 

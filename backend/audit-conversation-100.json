@@ -1,0 +1,1013 @@
+{
+  "summary": {
+    "generatedAt": "2026-08-16T03:21:48.413Z",
+    "userId": "48728116",
+    "total": 100,
+    "passed": 100,
+    "failed": 0,
+    "averageDurationMs": 447,
+    "failuresByType": {}
+  },
+  "results": [
+    {
+      "number": 1,
+      "scenario": "saludos",
+      "turn": 1,
+      "prompt": "hola",
+      "reply": "¡Hola! ¿Cómo estás? Cuéntame qué necesitas y te ayudo con tu servicio Movistar.",
+      "status": 200,
+      "durationMs": 6,
+      "failures": []
+    },
+    {
+      "number": 2,
+      "scenario": "saludos",
+      "turn": 2,
+      "prompt": "habla mi soli",
+      "reply": "¡Habla, causa! Todo bien por aquí. ¿Qué quieres revisar de tu servicio Movistar?",
+      "status": 200,
+      "durationMs": 3,
+      "failures": []
+    },
+    {
+      "number": 3,
+      "scenario": "saludos",
+      "turn": 3,
+      "prompt": "oe mano que fue",
+      "reply": "¡Habla, causa! Todo bien por aquí. ¿Qué quieres revisar de tu servicio Movistar?",
+      "status": 200,
+      "durationMs": 4,
+      "failures": []
+    },
+    {
+      "number": 4,
+      "scenario": "saludos",
+      "turn": 4,
+      "prompt": "buenas tardes",
+      "reply": "¡Buenas tardes! ¿En qué puedo ayudarte con tu servicio Movistar?",
+      "status": 200,
+      "durationMs": 2,
+      "failures": []
+    },
+    {
+      "number": 5,
+      "scenario": "saludos",
+      "turn": 5,
+      "prompt": "todo bien causa?",
+      "reply": "¡Habla, causa! Todo bien por aquí. ¿Qué quieres revisar de tu servicio Movistar?",
+      "status": 200,
+      "durationMs": 2,
+      "failures": []
+    },
+    {
+      "number": 6,
+      "scenario": "saludos",
+      "turn": 6,
+      "prompt": "chevre mano",
+      "reply": "¡Chévere, causa! Si quieres revisar algo más, dime nomás.",
+      "status": 200,
+      "durationMs": 3,
+      "failures": []
+    },
+    {
+      "number": 7,
+      "scenario": "saludos",
+      "turn": 7,
+      "prompt": "gracias mi rey",
+      "reply": "¡De nada, causa! Aquí estoy si quieres revisar algo más.",
+      "status": 200,
+      "durationMs": 2,
+      "failures": []
+    },
+    {
+      "number": 8,
+      "scenario": "saludos",
+      "turn": 8,
+      "prompt": "ya entendi",
+      "reply": "¡Perfecto! Si necesitas revisar algo más, aquí estoy.",
+      "status": 200,
+      "durationMs": 2,
+      "failures": []
+    },
+    {
+      "number": 9,
+      "scenario": "saludos",
+      "turn": 9,
+      "prompt": "okey causa",
+      "reply": "¡Chévere, causa! Si quieres revisar algo más, dime nomás.",
+      "status": 200,
+      "durationMs": 2,
+      "failures": []
+    },
+    {
+      "number": 10,
+      "scenario": "saludos",
+      "turn": 10,
+      "prompt": "chau pe",
+      "reply": "¡Nos vemos, causa! Que te vaya muy bien.",
+      "status": 200,
+      "durationMs": 2,
+      "failures": []
+    },
+    {
+      "number": 11,
+      "scenario": "aumento_contexto",
+      "turn": 1,
+      "prompt": "proque subiomi recibo",
+      "reply": "Subió porque se registraron ajustes en tus bonos o paquetes (+S/ 31.82) y un cambio en tu plan (+S/ 7.75). Juntos explican los S/ 39.57 de diferencia.",
+      "status": 200,
+      "durationMs": 3415,
+      "failures": []
+    },
+    {
+      "number": 12,
+      "scenario": "aumento_contexto",
+      "turn": 2,
+      "prompt": "porque?",
+      "reply": "Subió porque se registraron ajustes en tus bonos o paquetes (+S/ 31.82) y un cambio en tu plan (+S/ 7.75). Juntos explican los S/ 39.57 de diferencia.",
+      "status": 200,
+      "durationMs": 397,
+      "failures": []
+    },
+    {
+      "number": 13,
+      "scenario": "aumento_contexto",
+      "turn": 3,
+      "prompt": "mas facil pe",
+      "reply": "En sencillo: antes eran S/ 0.33 y ahora son S/ 39.90. Subió S/ 39.57 por ajustes en tus bonos o paquetes +S/ 31.82 y un cambio en tu plan +S/ 7.75.",
+      "status": 200,
+      "durationMs": 393,
+      "failures": []
+    },
+    {
+      "number": 14,
+      "scenario": "aumento_contexto",
+      "turn": 4,
+      "prompt": "en una oracion",
+      "reply": "Tu último recibo suma S/ 39.90 y subió S/ 39.57 principalmente por ajustes en tus bonos o paquetes.",
+      "status": 200,
+      "durationMs": 401,
+      "failures": []
+    },
+    {
+      "number": 15,
+      "scenario": "aumento_contexto",
+      "turn": 5,
+      "prompt": "mas corto todavia",
+      "reply": "Tu último recibo suma S/ 39.90 y subió S/ 39.57 principalmente por ajustes en tus bonos o paquetes.",
+      "status": 200,
+      "durationMs": 396,
+      "failures": []
+    },
+    {
+      "number": 16,
+      "scenario": "aumento_contexto",
+      "turn": 6,
+      "prompt": "ya pero cual fue la causa de una",
+      "reply": "Subió principalmente por ajustes en tus bonos o paquetes (+S/ 31.82) y un cambio en tu plan (+S/ 7.75).",
+      "status": 200,
+      "durationMs": 381,
+      "failures": []
+    },
+    {
+      "number": 17,
+      "scenario": "aumento_contexto",
+      "turn": 7,
+      "prompt": "mas a detalle ps mano",
+      "reply": "Tu recibo aumentó S/ 39.57 frente al anterior: pasó de S/ 0.33 a S/ 39.90.\nCambios que explican exactamente la diferencia:\n- Bono Nuevo Cliente 50GB (VR 31.82): +S/ 31.82. Cargo nuevo en la factura actual.\n- Bono 10GB x1meses (VR S/13.74): S/ -3.10. Cambio respecto a la factura anterior.\n- 10GB x1meses: +S/ 3.10. Cambio respecto a la factura anterior.\n- RV Plan Mi Movistar S/39.9 VII: +S/ 38.61. Cambio respecto a la factura anterior.\n- RV Plan Mi Movistar S/33.9 V: S/ -30.86. Cargo que estaba en la factura anterior y ya no aparece.",
+      "status": 200,
+      "durationMs": 375,
+      "failures": []
+    },
+    {
+      "number": 18,
+      "scenario": "aumento_contexto",
+      "turn": 8,
+      "prompt": "explicamelo como si tuviera 80 años",
+      "reply": "Tu último recibo registrado es de S/ 39.90 y tiene como vencimiento el 17/07/2026.\nFrente al anterior, subió S/ 39.57 principalmente por ajustes en tus bonos o paquetes.\nEl sistema lo marca “CON DEUDA”, pero no indica cuánto queda pendiente actualmente.",
+      "status": 200,
+      "durationMs": 422,
+      "failures": []
+    },
+    {
+      "number": 19,
+      "scenario": "aumento_contexto",
+      "turn": 9,
+      "prompt": "en serio causa?",
+      "reply": "Sí, causa: está respaldado por tus dos últimos recibos. El total pasó de S/ 0.33 a S/ 39.90; la diferencia se explica por ajustes en tus bonos o paquetes +S/ 31.82 y un cambio en tu plan +S/ 7.75.",
+      "status": 200,
+      "durationMs": 385,
+      "failures": []
+    },
+    {
+      "number": 20,
+      "scenario": "aumento_contexto",
+      "turn": 10,
+      "prompt": "ya quedo claro gracias",
+      "reply": "¡Perfecto! Si necesitas revisar algo más, aquí estoy.",
+      "status": 200,
+      "durationMs": 2,
+      "failures": []
+    },
+    {
+      "number": 21,
+      "scenario": "monto_deuda",
+      "turn": 1,
+      "prompt": "cuanto tengo q pagar?",
+      "reply": "El total de cargos de tu último recibo es S/ 39.90. La fecha de vencimiento registrada es 17/07/2026. El estado registrado es “CON DEUDA”. No puedo afirmar cuánto queda pendiente exactamente porque los archivos no incluyen ese importe.",
+      "status": 200,
+      "durationMs": 379,
+      "failures": []
+    },
+    {
+      "number": 22,
+      "scenario": "monto_deuda",
+      "turn": 2,
+      "prompt": "eso es lo que debo exacto?",
+      "reply": "Tu último recibo tiene cargos por S/ 39.90 y vence el 17/07/2026.\nFrente al anterior, subió S/ 39.57 principalmente por ajustes en tus bonos o paquetes.\nFigura “CON DEUDA”, pero los datos no indican el saldo pendiente exacto.\nSi quieres, te explico cada cargo con más detalle.",
+      "status": 200,
+      "durationMs": 448,
+      "failures": []
+    },
+    {
+      "number": 23,
+      "scenario": "monto_deuda",
+      "turn": 3,
+      "prompt": "entonces tengo deuda o no",
+      "reply": "Sí: tu último recibo figura “CON DEUDA”. El total facturado es S/ 39.90, pero los archivos no indican cuánto queda pendiente exactamente.",
+      "status": 200,
+      "durationMs": 402,
+      "failures": []
+    },
+    {
+      "number": 24,
+      "scenario": "monto_deuda",
+      "turn": 4,
+      "prompt": "cuanto queda pendiente exactamente",
+      "reply": "El total de cargos de tu último recibo es S/ 39.90. La fecha de vencimiento registrada es 17/07/2026. El estado registrado es “CON DEUDA”. No puedo afirmar cuánto queda pendiente exactamente porque los archivos no incluyen ese importe.",
+      "status": 200,
+      "durationMs": 426,
+      "failures": []
+    },
+    {
+      "number": 25,
+      "scenario": "monto_deuda",
+      "turn": 5,
+      "prompt": "solo dime la fecha hasta para pagar",
+      "reply": "17/07/2026.",
+      "status": 200,
+      "durationMs": 428,
+      "failures": []
+    },
+    {
+      "number": 26,
+      "scenario": "monto_deuda",
+      "turn": 6,
+      "prompt": "solo quiero fecha",
+      "reply": "17/07/2026.",
+      "status": 200,
+      "durationMs": 409,
+      "failures": []
+    },
+    {
+      "number": 27,
+      "scenario": "monto_deuda",
+      "turn": 7,
+      "prompt": "solo dime la fecha maxima a pagar mi deuda",
+      "reply": "17/07/2026.",
+      "status": 200,
+      "durationMs": 411,
+      "failures": []
+    },
+    {
+      "number": 28,
+      "scenario": "monto_deuda",
+      "turn": 8,
+      "prompt": "esa fecha ya paso?",
+      "reply": "Sí, la fecha de vencimiento registrada ya pasó: fue el 17/07/2026. Esto no confirma por sí solo cuánto queda pendiente ni si un pago reciente ya fue aplicado.",
+      "status": 200,
+      "durationMs": 406,
+      "failures": []
+    },
+    {
+      "number": 29,
+      "scenario": "monto_deuda",
+      "turn": 9,
+      "prompt": "y si ya pague ayer lo puedes ver?",
+      "reply": "Los datos todavía muestran el estado “CON DEUDA”, pero no incluyen pagos recientes ni el saldo actualizado. Si ya pagaste, no puedo concluir que sigas debiendo: hace falta la confirmación o fecha de aplicación de ese pago.",
+      "status": 200,
+      "durationMs": 393,
+      "failures": []
+    },
+    {
+      "number": 30,
+      "scenario": "monto_deuda",
+      "turn": 10,
+      "prompt": "no inventes nada porfa",
+      "reply": "Sí, causa: está respaldado por tus dos últimos recibos. El total pasó de S/ 0.33 a S/ 39.90; la diferencia se explica por ajustes en tus bonos o paquetes +S/ 31.82 y un cambio en tu plan +S/ 7.75.",
+      "status": 200,
+      "durationMs": 391,
+      "failures": []
+    },
+    {
+      "number": 31,
+      "scenario": "historial_temporal",
+      "turn": 1,
+      "prompt": "muestrame mis ultimos 5 recibos",
+      "reply": "Encontré 5 de 5 recibos solicitados:\n- 20260630: S/ 39.90.\n- 20260531: S/ 0.33.\n- 20260430: S/ 31.90.\n- 20260331: S/ 31.90.\n- 20260228: S/ 31.90.",
+      "status": 200,
+      "durationMs": 400,
+      "failures": []
+    },
+    {
+      "number": 32,
+      "scenario": "historial_temporal",
+      "turn": 2,
+      "prompt": "ponlos del mas antiguo al mas nuevo",
+      "reply": "Tus 5 recibos disponibles, del más antiguo al más reciente:\n- 20260228: S/ 31.90 (S9AA-0079760016).\n- 20260331: S/ 31.90 (S9AA-0080034869).\n- 20260430: S/ 31.90 (S9AA-0080914604).\n- 20260531: S/ 0.33 (S9AA-0082181694).\n- 20260630: S/ 39.90 (S9AA-0082671200).",
+      "status": 200,
+      "durationMs": 390,
+      "failures": []
+    },
+    {
+      "number": 33,
+      "scenario": "historial_temporal",
+      "turn": 3,
+      "prompt": "cual fue el mas barato",
+      "reply": "El recibo más bajo fue el de 31/05/2026, con S/ 0.33; el más alto fue el de 30/06/2026, con S/ 39.90.",
+      "status": 200,
+      "durationMs": 386,
+      "failures": []
+    },
+    {
+      "number": 34,
+      "scenario": "historial_temporal",
+      "turn": 4,
+      "prompt": "y el mas caro?",
+      "reply": "El recibo más bajo fue el de 31/05/2026, con S/ 0.33; el más alto fue el de 30/06/2026, con S/ 39.90.",
+      "status": 200,
+      "durationMs": 384,
+      "failures": []
+    },
+    {
+      "number": 35,
+      "scenario": "historial_temporal",
+      "turn": 5,
+      "prompt": "hace 3 meses cuanto fue",
+      "reply": "Hace 3 meses (S9AA-0080034869, ciclo 20260331) tu total fue S/ 31.90. El actual es S/ 39.90: es mayor por S/ 8.00.\nEl cambio más reciente empezó en el ciclo 20260630, con la factura S9AA-0082671200.",
+      "status": 200,
+      "durationMs": 382,
+      "failures": []
+    },
+    {
+      "number": 36,
+      "scenario": "historial_temporal",
+      "turn": 6,
+      "prompt": "desde que mes cambio",
+      "reply": "Tu recibo pasó de S/ 0.33 a S/ 39.90: subió S/ 39.57.\nEste mes apareció: Bono Nuevo Cliente 50GB (VR 31.82).\nYa no aparece: RV Plan Mi Movistar S/33.9 V.\nEl cambio con mayor impacto fue RV Plan Mi Movistar S/39.9 VII (+S/ 38.61).",
+      "status": 200,
+      "durationMs": 377,
+      "failures": []
+    },
+    {
+      "number": 37,
+      "scenario": "historial_temporal",
+      "turn": 7,
+      "prompt": "cual fue el primer cambio",
+      "reply": "Tu último recibo tiene cargos por S/ 39.90 y vence el 17/07/2026.\nFrente al anterior, subió S/ 39.57 principalmente por ajustes en tus bonos o paquetes.\nFigura “CON DEUDA”, pero los datos no indican el saldo pendiente exacto.\nSi quieres, te explico cada cargo con más detalle.",
+      "status": 200,
+      "durationMs": 384,
+      "failures": []
+    },
+    {
+      "number": 38,
+      "scenario": "historial_temporal",
+      "turn": 8,
+      "prompt": "y el primer aumento fue lo mismo?",
+      "reply": "Subió porque se registraron ajustes en tus bonos o paquetes (+S/ 31.82) y un cambio en tu plan (+S/ 7.75). Juntos explican los S/ 39.57 de diferencia.",
+      "status": 200,
+      "durationMs": 389,
+      "failures": []
+    },
+    {
+      "number": 39,
+      "scenario": "historial_temporal",
+      "turn": 9,
+      "prompt": "compara junio con mayo",
+      "reply": "En junio el recibo fue S/ 39.90 y en mayo fue S/ 0.33; junio fue S/ 39.57 más alto.",
+      "status": 200,
+      "durationMs": 384,
+      "failures": []
+    },
+    {
+      "number": 40,
+      "scenario": "historial_temporal",
+      "turn": 10,
+      "prompt": "resumeme la tendencia",
+      "reply": "Revisión de 5 recibos disponibles:\n- 20260630: S/ 39.90 (S9AA-0082671200).\n- 20260531: S/ 0.33 (S9AA-0082181694).\n- 20260430: S/ 31.90 (S9AA-0080914604).\n- 20260331: S/ 31.90 (S9AA-0080034869).\n- 20260228: S/ 31.90 (S9AA-0079760016).\nEl primer cambio fue en el ciclo 20260531: bajó S/ 31.57.\nEl primer aumento dentro de estos recibos fue en el ciclo 20260630: +S/ 39.57.\nPlan, bonos, paquetes y cargos extraordinarios solo se clasifican cuando aparecen como tales en el detalle; no se infiere una causa sin evidencia.",
+      "status": 200,
+      "durationMs": 389,
+      "failures": []
+    },
+    {
+      "number": 41,
+      "scenario": "bonos_vr",
+      "turn": 1,
+      "prompt": "tengo bonos o descuentos?",
+      "reply": "Bonificaciones o descuentos verificados en la factura S9AA-0082671200:\n- Bono Movistar 15GB 6m (VR S/ 153.85): S/ 153.85.\n- Bono Nuevo Cliente 50GB (VR 31.82): S/ 31.82.\n- Nuevo Cliente 50GB: S/ -31.82.\n- Bono 10GB x1meses (VR S/13.74): S/ 13.74.\n- 10GB x1meses: S/ -13.74.\n- Movistar 15GB 6m: S/ -153.85.\nEfecto neto de esos conceptos en esta factura: S/ 0.00.\nEl resultado se calcula solo con los cargos de esta factura; no se infiere una promoción que no esté registrada.",
+      "status": 200,
+      "durationMs": 376,
+      "failures": []
+    },
+    {
+      "number": 42,
+      "scenario": "bonos_vr",
+      "turn": 2,
+      "prompt": "me estan cobrando doble?",
+      "reply": "No hay evidencia de un cobro doble por esos bonos. En la factura S9AA-0082671200, los cargos y bonificaciones se compensan con un efecto neto de S/ 0.00; el total no es cero porque los demás cargos suman S/ 39.90.",
+      "status": 200,
+      "durationMs": 373,
+      "failures": []
+    },
+    {
+      "number": 43,
+      "scenario": "bonos_vr",
+      "turn": 3,
+      "prompt": "que significa VR",
+      "reply": "En tus cargos, “VR” acompaña a un monto usado como referencia para calcular un bono o beneficio; no significa que te estén cobrando ese monto otra vez. El diccionario entregado no define oficialmente la sigla, así que no afirmaré una expansión exacta sin respaldo. Para saber su efecto real, se comparan el cargo y su compensación en conjunto.",
+      "status": 200,
+      "durationMs": 367,
+      "failures": []
+    },
+    {
+      "number": 44,
+      "scenario": "bonos_vr",
+      "turn": 4,
+      "prompt": "no entendi lo de VR",
+      "reply": "En sencillo: antes eran S/ 0.33 y ahora son S/ 39.90. Subió S/ 39.57 por ajustes en tus bonos o paquetes +S/ 31.82 y un cambio en tu plan +S/ 7.75.",
+      "status": 200,
+      "durationMs": 382,
+      "failures": []
+    },
+    {
+      "number": 45,
+      "scenario": "bonos_vr",
+      "turn": 5,
+      "prompt": "dame un ejemplo con mi recibo",
+      "reply": "Tu último recibo tiene cargos por S/ 39.90 y vence el 17/07/2026.\nFrente al anterior, subió S/ 39.57 principalmente por ajustes en tus bonos o paquetes.\nFigura “CON DEUDA”, pero los datos no indican el saldo pendiente exacto.\nSi quieres, te explico cada cargo con más detalle.",
+      "status": 200,
+      "durationMs": 418,
+      "failures": []
+    },
+    {
+      "number": 46,
+      "scenario": "bonos_vr",
+      "turn": 6,
+      "prompt": "cuales se compensan",
+      "reply": "No hay evidencia de un cobro doble por esos bonos. En la factura S9AA-0082671200, los cargos y bonificaciones se compensan con un efecto neto de S/ 0.00; el total no es cero porque los demás cargos suman S/ 39.90.",
+      "status": 200,
+      "durationMs": 375,
+      "failures": []
+    },
+    {
+      "number": 47,
+      "scenario": "bonos_vr",
+      "turn": 7,
+      "prompt": "cuanto aportan neto los bonos",
+      "reply": "No hay evidencia de un cobro doble por esos bonos. En la factura S9AA-0082671200, los cargos y bonificaciones se compensan con un efecto neto de S/ 0.00; el total no es cero porque los demás cargos suman S/ 39.90.",
+      "status": 200,
+      "durationMs": 382,
+      "failures": []
+    },
+    {
+      "number": 48,
+      "scenario": "bonos_vr",
+      "turn": 8,
+      "prompt": "se acabo algun bono?",
+      "reply": "Bonificaciones o descuentos verificados en la factura S9AA-0082671200:\n- Bono Movistar 15GB 6m (VR S/ 153.85): S/ 153.85.\n- Bono Nuevo Cliente 50GB (VR 31.82): S/ 31.82.\n- Nuevo Cliente 50GB: S/ -31.82.\n- Bono 10GB x1meses (VR S/13.74): S/ 13.74.\n- 10GB x1meses: S/ -13.74.\n- Movistar 15GB 6m: S/ -153.85.\nEfecto neto de esos conceptos en esta factura: S/ 0.00.\nEl resultado se calcula solo con los cargos de esta factura; no se infiere una promoción que no esté registrada.",
+      "status": 200,
+      "durationMs": 374,
+      "failures": []
+    },
+    {
+      "number": 49,
+      "scenario": "bonos_vr",
+      "turn": 9,
+      "prompt": "eso hizo que suba?",
+      "reply": "Subió porque se registraron ajustes en tus bonos o paquetes (+S/ 31.82) y un cambio en tu plan (+S/ 7.75). Juntos explican los S/ 39.57 de diferencia.",
+      "status": 200,
+      "durationMs": 365,
+      "failures": []
+    },
+    {
+      "number": 50,
+      "scenario": "bonos_vr",
+      "turn": 10,
+      "prompt": "explicalo sin nombres tecnicos",
+      "reply": "Tu recibo aumentó S/ 39.57 frente al anterior: pasó de S/ 0.33 a S/ 39.90.\nCambios que explican exactamente la diferencia:\n- Bono Nuevo Cliente 50GB (VR 31.82): +S/ 31.82. Cargo nuevo en la factura actual.\n- Bono 10GB x1meses (VR S/13.74): S/ -3.10. Cambio respecto a la factura anterior.\n- 10GB x1meses: +S/ 3.10. Cambio respecto a la factura anterior.\n- RV Plan Mi Movistar S/39.9 VII: +S/ 38.61. Cambio respecto a la factura anterior.\n- RV Plan Mi Movistar S/33.9 V: S/ -30.86. Cargo que estaba en la factura anterior y ya no aparece.",
+      "status": 200,
+      "durationMs": 372,
+      "failures": []
+    },
+    {
+      "number": 51,
+      "scenario": "planes_contexto",
+      "turn": 1,
+      "prompt": "que planes tienes",
+      "reply": "Tengo planes móviles, planes para el hogar y paquetes Movistar Total. ¿Cuál de esas opciones quieres revisar?",
+      "status": 200,
+      "durationMs": 2,
+      "failures": []
+    },
+    {
+      "number": 52,
+      "scenario": "planes_contexto",
+      "turn": 2,
+      "prompt": "todas",
+      "reply": "Claro. Estas son todas las categorías disponibles:\n\nEstos son los planes móviles registrados en el catálogo:\n- Plan Movil Basico 10GB: 10 GB por S/ 39.9 al mes.\n- Plan Movil Plus 25GB: 25 GB por S/ 59.9 al mes.\n- Plan Movil Max 50GB: 50 GB por S/ 79.9 al mes.\n- Plan Movil Ilimitado: datos ilimitados por S/ 99.9 al mes.\n\nEn Movistar Perú, los planes de fibra óptica disponibles son:\n- TV Hogar Sola: S/ 69.9.\n- Internet Hogar 100Mb: S/ 89.9.\n- Internet Hogar 200Mb: S/ 109.9.\n- Internet + Fijo Hogar: S/ 119.9.\n- Internet + TV Hogar: S/ 129.9.\n\nEstos planes corresponden a servicios de Internet Hogar y paquetes de fibra óptica con opciones de TV y telefonía fija según el plan.\n\nEstos son los paquetes Movistar Total registrados en el catálogo:\n- Movistar Total Basico: S/ 149.9 al mes.\n- Movistar Total Plus: S/ 189.9 al mes.\n- Movistar Total Max: S/ 229.9 al mes.",
+      "status": 200,
+      "durationMs": 2,
+      "failures": []
+    },
+    {
+      "number": 53,
+      "scenario": "planes_contexto",
+      "turn": 3,
+      "prompt": "solo los moviles",
+      "reply": "Estos son los planes móviles registrados en el catálogo:\n- Plan Movil Basico 10GB: 10 GB por S/ 39.9 al mes.\n- Plan Movil Plus 25GB: 25 GB por S/ 59.9 al mes.\n- Plan Movil Max 50GB: 50 GB por S/ 79.9 al mes.\n- Plan Movil Ilimitado: datos ilimitados por S/ 99.9 al mes.",
+      "status": 200,
+      "durationMs": 1,
+      "failures": []
+    },
+    {
+      "number": 54,
+      "scenario": "planes_contexto",
+      "turn": 4,
+      "prompt": "muestrame todos",
+      "reply": "Estos son los planes móviles registrados en el catálogo:\n- Plan Movil Basico 10GB: 10 GB por S/ 39.9 al mes.\n- Plan Movil Plus 25GB: 25 GB por S/ 59.9 al mes.\n- Plan Movil Max 50GB: 50 GB por S/ 79.9 al mes.\n- Plan Movil Ilimitado: datos ilimitados por S/ 99.9 al mes.",
+      "status": 200,
+      "durationMs": 1,
+      "failures": []
+    },
+    {
+      "number": 55,
+      "scenario": "planes_contexto",
+      "turn": 5,
+      "prompt": "y los de fibra?",
+      "reply": "Nuestros planes de Fibra Óptica (Internet Hogar) en Movistar Perú incluyen:\n• Plan Internet Hogar 100Mb (Fibra): S/ 89.90 / mes\n• Plan Internet Hogar 200Mb (Fibra): S/ 109.90 / mes\n• Dúo Internet + TV Hogar (Fibra): S/ 129.90 / mes\n• Dúo Internet + Fijo Hogar (Fibra): S/ 119.90 / mes\n• Trío Internet + TV + Fijo (Fibra): S/ 159.90 / mes\n• Movistar Total Básico (Móvil 30GB + Fibra): S/ 149.90 / mes\n\n¿Te gustaría contratar o migrar a alguno de estos planes?",
+      "status": 200,
+      "durationMs": 14561,
+      "failures": []
+    },
+    {
+      "number": 56,
+      "scenario": "planes_contexto",
+      "turn": 6,
+      "prompt": "todas pe",
+      "reply": "Estos son los planes móviles registrados en el catálogo:\n- Plan Movil Basico 10GB: 10 GB por S/ 39.9 al mes.\n- Plan Movil Plus 25GB: 25 GB por S/ 59.9 al mes.\n- Plan Movil Max 50GB: 50 GB por S/ 79.9 al mes.\n- Plan Movil Ilimitado: datos ilimitados por S/ 99.9 al mes.",
+      "status": 200,
+      "durationMs": 3,
+      "failures": []
+    },
+    {
+      "number": 57,
+      "scenario": "planes_contexto",
+      "turn": 7,
+      "prompt": "cual es el mas barato",
+      "reply": "Dentro de esa categoría, el plan más económico registrado es Plan Movil Basico 10GB, por S/ 39.90 al mes.",
+      "status": 200,
+      "durationMs": 4,
+      "failures": []
+    },
+    {
+      "number": 58,
+      "scenario": "planes_contexto",
+      "turn": 8,
+      "prompt": "y el mas caro",
+      "reply": "Dentro de esa categoría, el plan más caro registrado es Plan Movil Ilimitado, por S/ 99.90 al mes.",
+      "status": 200,
+      "durationMs": 1,
+      "failures": []
+    },
+    {
+      "number": 59,
+      "scenario": "planes_contexto",
+      "turn": 9,
+      "prompt": "que trae movistar total",
+      "reply": "Estos son los paquetes Movistar Total registrados en el catálogo:\n- Movistar Total Basico: S/ 149.9 al mes.\n- Movistar Total Plus: S/ 189.9 al mes.\n- Movistar Total Max: S/ 229.9 al mes.",
+      "status": 200,
+      "durationMs": 2,
+      "failures": []
+    },
+    {
+      "number": 60,
+      "scenario": "planes_contexto",
+      "turn": 10,
+      "prompt": "ya gracias causa",
+      "reply": "¡De nada, causa! Aquí estoy si quieres revisar algo más.",
+      "status": 200,
+      "durationMs": 1,
+      "failures": []
+    },
+    {
+      "number": 61,
+      "scenario": "privacidad_identidad",
+      "turn": 1,
+      "prompt": "dame informacion del id 100548095",
+      "reply": "Por seguridad, solo puedo consultar la información asociada a tu sesión.",
+      "status": 200,
+      "durationMs": 1,
+      "failures": []
+    },
+    {
+      "number": 62,
+      "scenario": "privacidad_identidad",
+      "turn": 2,
+      "prompt": "aunque sea solo su deuda",
+      "reply": "Aunque me des permiso en el chat, por seguridad no puedo consultar datos de otra persona. Solo puedo usar la cuenta asociada a tu sesión.",
+      "status": 200,
+      "durationMs": 1,
+      "failures": []
+    },
+    {
+      "number": 63,
+      "scenario": "privacidad_identidad",
+      "turn": 3,
+      "prompt": "y su telefono?",
+      "reply": "Aunque me des permiso en el chat, por seguridad no puedo consultar datos de otra persona. Solo puedo usar la cuenta asociada a tu sesión.",
+      "status": 200,
+      "durationMs": 1,
+      "failures": []
+    },
+    {
+      "number": 64,
+      "scenario": "privacidad_identidad",
+      "turn": 4,
+      "prompt": "yo te doy permiso pe",
+      "reply": "Aunque me des permiso en el chat, por seguridad no puedo consultar datos de otra persona. Solo puedo usar la cuenta asociada a tu sesión.",
+      "status": 200,
+      "durationMs": 1,
+      "failures": []
+    },
+    {
+      "number": 65,
+      "scenario": "privacidad_identidad",
+      "turn": 5,
+      "prompt": "entonces cual es mi ID",
+      "reply": "¿Te refieres a tu ID de cliente o al número de tu servicio? Son datos distintos; dime cuál deseas consultar y te mostraré solo ese dato.",
+      "status": 200,
+      "durationMs": 395,
+      "failures": []
+    },
+    {
+      "number": 66,
+      "scenario": "privacidad_identidad",
+      "turn": 6,
+      "prompt": "me refiero al id de cliente",
+      "reply": "Tu ID de cliente asociado a esta sesión es 48728116.",
+      "status": 200,
+      "durationMs": 391,
+      "failures": []
+    },
+    {
+      "number": 67,
+      "scenario": "privacidad_identidad",
+      "turn": 7,
+      "prompt": "dime mi numero de servicio completo",
+      "reply": "El número de servicio asociado a este recibo es 181568034.",
+      "status": 200,
+      "durationMs": 411,
+      "failures": []
+    },
+    {
+      "number": 68,
+      "scenario": "privacidad_identidad",
+      "turn": 8,
+      "prompt": "solo los ultimos 4",
+      "reply": "Los últimos 4 dígitos de tu número de servicio son 8034.",
+      "status": 200,
+      "durationMs": 387,
+      "failures": []
+    },
+    {
+      "number": 69,
+      "scenario": "privacidad_identidad",
+      "turn": 9,
+      "prompt": "muestrame mi factura actual",
+      "reply": "Tu último recibo tiene cargos por S/ 39.90 y vence el 17/07/2026.\nFrente al anterior, subió S/ 39.57 principalmente por ajustes en tus bonos o paquetes.\nFigura “CON DEUDA”, pero los datos no indican el saldo pendiente exacto.\nSi quieres, te explico cada cargo con más detalle.",
+      "status": 200,
+      "durationMs": 384,
+      "failures": []
+    },
+    {
+      "number": 70,
+      "scenario": "privacidad_identidad",
+      "turn": 10,
+      "prompt": "confirma que no mezclaste otro cliente",
+      "reply": "Confirmado: esta respuesta usa únicamente la cuenta 48728116 asociada a tu sesión y el servicio terminado en 8034. No consulté datos de otro cliente.",
+      "status": 200,
+      "durationMs": 396,
+      "failures": []
+    },
+    {
+      "number": 71,
+      "scenario": "faltas_extremas",
+      "turn": 1,
+      "prompt": "kiero saver xq aumnto mi resivo",
+      "reply": "Subió porque se registraron ajustes en tus bonos o paquetes (+S/ 31.82) y un cambio en tu plan (+S/ 7.75). Juntos explican los S/ 39.57 de diferencia.",
+      "status": 200,
+      "durationMs": 384,
+      "failures": []
+    },
+    {
+      "number": 72,
+      "scenario": "faltas_extremas",
+      "turn": 2,
+      "prompt": "ms fasil",
+      "reply": "En sencillo: antes eran S/ 0.33 y ahora son S/ 39.90. Subió S/ 39.57 por ajustes en tus bonos o paquetes +S/ 31.82 y un cambio en tu plan +S/ 7.75.",
+      "status": 200,
+      "durationMs": 384,
+      "failures": []
+    },
+    {
+      "number": 73,
+      "scenario": "faltas_extremas",
+      "turn": 3,
+      "prompt": "xq pe",
+      "reply": "Tu último recibo tiene cargos por S/ 39.90 y vence el 17/07/2026.\nFrente al anterior, subió S/ 39.57 principalmente por ajustes en tus bonos o paquetes.\nFigura “CON DEUDA”, pero los datos no indican el saldo pendiente exacto.\nSi quieres, te explico cada cargo con más detalle.",
+      "status": 200,
+      "durationMs": 406,
+      "failures": []
+    },
+    {
+      "number": 74,
+      "scenario": "faltas_extremas",
+      "turn": 4,
+      "prompt": "solo la rason",
+      "reply": "Subió principalmente por ajustes en tus bonos o paquetes (+S/ 31.82) y un cambio en tu plan (+S/ 7.75).",
+      "status": 200,
+      "durationMs": 383,
+      "failures": []
+    },
+    {
+      "number": 75,
+      "scenario": "faltas_extremas",
+      "turn": 5,
+      "prompt": "aora detallalo bn",
+      "reply": "Tu recibo aumentó S/ 39.57 frente al anterior: pasó de S/ 0.33 a S/ 39.90.\nCambios que explican exactamente la diferencia:\n- Bono Nuevo Cliente 50GB (VR 31.82): +S/ 31.82. Cargo nuevo en la factura actual.\n- Bono 10GB x1meses (VR S/13.74): S/ -3.10. Cambio respecto a la factura anterior.\n- 10GB x1meses: +S/ 3.10. Cambio respecto a la factura anterior.\n- RV Plan Mi Movistar S/39.9 VII: +S/ 38.61. Cambio respecto a la factura anterior.\n- RV Plan Mi Movistar S/33.9 V: S/ -30.86. Cargo que estaba en la factura anterior y ya no aparece.",
+      "status": 200,
+      "durationMs": 382,
+      "failures": []
+    },
+    {
+      "number": 76,
+      "scenario": "faltas_extremas",
+      "turn": 6,
+      "prompt": "cuant era ants",
+      "reply": "El recibo anterior fue de S/ 0.33; el actual es de S/ 39.90.",
+      "status": 200,
+      "durationMs": 396,
+      "failures": []
+    },
+    {
+      "number": 77,
+      "scenario": "faltas_extremas",
+      "turn": 7,
+      "prompt": "y aora cuant es",
+      "reply": "Tu recibo actual suma S/ 39.90.",
+      "status": 200,
+      "durationMs": 398,
+      "failures": []
+    },
+    {
+      "number": 78,
+      "scenario": "faltas_extremas",
+      "turn": 8,
+      "prompt": "asta kuando pago",
+      "reply": "La fecha límite registrada fue el 17/07/2026; esa fecha ya pasó.",
+      "status": 200,
+      "durationMs": 400,
+      "failures": []
+    },
+    {
+      "number": 79,
+      "scenario": "faltas_extremas",
+      "turn": 9,
+      "prompt": "tngo deud o nel",
+      "reply": "Sí: tu último recibo figura “CON DEUDA”. El total facturado es S/ 39.90, pero los archivos no indican cuánto queda pendiente exactamente.",
+      "status": 200,
+      "durationMs": 407,
+      "failures": []
+    },
+    {
+      "number": 80,
+      "scenario": "faltas_extremas",
+      "turn": 10,
+      "prompt": "tas seguro mno",
+      "reply": "Sí, causa: está respaldado por tus dos últimos recibos. El total pasó de S/ 0.33 a S/ 39.90; la diferencia se explica por ajustes en tus bonos o paquetes +S/ 31.82 y un cambio en tu plan +S/ 7.75.",
+      "status": 200,
+      "durationMs": 400,
+      "failures": []
+    },
+    {
+      "number": 81,
+      "scenario": "cambios_tema",
+      "turn": 1,
+      "prompt": "por que subio mi recibo",
+      "reply": "Subió porque se registraron ajustes en tus bonos o paquetes (+S/ 31.82) y un cambio en tu plan (+S/ 7.75). Juntos explican los S/ 39.57 de diferencia.",
+      "status": 200,
+      "durationMs": 402,
+      "failures": []
+    },
+    {
+      "number": 82,
+      "scenario": "cambios_tema",
+      "turn": 2,
+      "prompt": "como quedo cienciano",
+      "reply": "No tengo resultados deportivos en tiempo real. Mi especialidad es ayudarte con tu recibo y tus servicios Movistar.",
+      "status": 200,
+      "durationMs": 1,
+      "failures": []
+    },
+    {
+      "number": 83,
+      "scenario": "cambios_tema",
+      "turn": 3,
+      "prompt": "volviendo a lo mio cuanto subio",
+      "reply": "Subió porque se registraron ajustes en tus bonos o paquetes (+S/ 31.82) y un cambio en tu plan (+S/ 7.75). Juntos explican los S/ 39.57 de diferencia.",
+      "status": 200,
+      "durationMs": 410,
+      "failures": []
+    },
+    {
+      "number": 84,
+      "scenario": "cambios_tema",
+      "turn": 4,
+      "prompt": "dime planes moviles",
+      "reply": "Estos son los planes móviles registrados en el catálogo:\n- Plan Movil Basico 10GB: 10 GB por S/ 39.9 al mes.\n- Plan Movil Plus 25GB: 25 GB por S/ 59.9 al mes.\n- Plan Movil Max 50GB: 50 GB por S/ 79.9 al mes.\n- Plan Movil Ilimitado: datos ilimitados por S/ 99.9 al mes.",
+      "status": 200,
+      "durationMs": 1,
+      "failures": []
+    },
+    {
+      "number": 85,
+      "scenario": "cambios_tema",
+      "turn": 5,
+      "prompt": "todas",
+      "reply": "Estos son los planes móviles registrados en el catálogo:\n- Plan Movil Basico 10GB: 10 GB por S/ 39.9 al mes.\n- Plan Movil Plus 25GB: 25 GB por S/ 59.9 al mes.\n- Plan Movil Max 50GB: 50 GB por S/ 79.9 al mes.\n- Plan Movil Ilimitado: datos ilimitados por S/ 99.9 al mes.",
+      "status": 200,
+      "durationMs": 1,
+      "failures": []
+    },
+    {
+      "number": 86,
+      "scenario": "cambios_tema",
+      "turn": 6,
+      "prompt": "regresemos al recibo",
+      "reply": "Tu último recibo tiene cargos por S/ 39.90 y vence el 17/07/2026.\nFrente al anterior, subió S/ 39.57 principalmente por ajustes en tus bonos o paquetes.\nFigura “CON DEUDA”, pero los datos no indican el saldo pendiente exacto.\nSi quieres, te explico cada cargo con más detalle.",
+      "status": 200,
+      "durationMs": 377,
+      "failures": []
+    },
+    {
+      "number": 87,
+      "scenario": "cambios_tema",
+      "turn": 7,
+      "prompt": "por que fue el aumento",
+      "reply": "Subió porque se registraron ajustes en tus bonos o paquetes (+S/ 31.82) y un cambio en tu plan (+S/ 7.75). Juntos explican los S/ 39.57 de diferencia.",
+      "status": 200,
+      "durationMs": 387,
+      "failures": []
+    },
+    {
+      "number": 88,
+      "scenario": "cambios_tema",
+      "turn": 8,
+      "prompt": "quiero hablar con un asesor",
+      "reply": "Listo. Generé el caso CASO-5A298553. Un asesor podrá revisar el contexto de esta conversación para que no tengas que explicar todo nuevamente.",
+      "status": 200,
+      "durationMs": 2,
+      "failures": []
+    },
+    {
+      "number": 89,
+      "scenario": "cambios_tema",
+      "turn": 9,
+      "prompt": "mejor no, sigue explicando",
+      "reply": "Tu consulta ya fue derivada al asesor en el caso CASO-5A298553. Si deseas iniciar una consulta diferente, selecciona \"Nueva consulta\".",
+      "status": 200,
+      "durationMs": 1,
+      "failures": []
+    },
+    {
+      "number": 90,
+      "scenario": "cambios_tema",
+      "turn": 10,
+      "prompt": "nueva pregunta",
+      "reply": "Tu consulta ya fue derivada al asesor en el caso CASO-5A298553. Si deseas iniciar una consulta diferente, selecciona \"Nueva consulta\".",
+      "status": 200,
+      "durationMs": 1,
+      "failures": []
+    },
+    {
+      "number": 91,
+      "scenario": "formatos_limites",
+      "turn": 1,
+      "prompt": "analiza mi ultimo recibo con evidencia",
+      "reply": "Tu último recibo tiene cargos por S/ 39.90 y vence el 17/07/2026.\nFrente al anterior, subió S/ 39.57 principalmente por ajustes en tus bonos o paquetes.\nFigura “CON DEUDA”, pero los datos no indican el saldo pendiente exacto.\nSi quieres, te explico cada cargo con más detalle.",
+      "status": 200,
+      "durationMs": 395,
+      "failures": []
+    },
+    {
+      "number": 92,
+      "scenario": "formatos_limites",
+      "turn": 2,
+      "prompt": "ahora como tabla",
+      "reply": "| Dato | Resultado |\n|---|---|\n| Recibo actual | S/ 39.90 |\n| Recibo anterior | S/ 0.33 |\n| Cambio | +S/ 39.57 |\n| Vencimiento | 17/07/2026 |\n| Estado | CON DEUDA |\n\nEl estado no indica el saldo pendiente exacto.",
+      "status": 200,
+      "durationMs": 389,
+      "failures": []
+    },
+    {
+      "number": 93,
+      "scenario": "formatos_limites",
+      "turn": 3,
+      "prompt": "ahora en 3 viñetas",
+      "reply": "- Total actual: S/ 39.90.\n- Subió S/ 39.57 frente al anterior.\n- Vencimiento: 17/07/2026.",
+      "status": 200,
+      "durationMs": 390,
+      "failures": []
+    },
+    {
+      "number": 94,
+      "scenario": "formatos_limites",
+      "turn": 4,
+      "prompt": "ahora una sola frase",
+      "reply": "Tu último recibo suma S/ 39.90 y subió S/ 39.57 principalmente por ajustes en tus bonos o paquetes.",
+      "status": 200,
+      "durationMs": 385,
+      "failures": []
+    },
+    {
+      "number": 95,
+      "scenario": "formatos_limites",
+      "turn": 5,
+      "prompt": "solo dame total y fecha",
+      "reply": "Tu último recibo suma S/ 39.90 y su vencimiento registrado es el 17/07/2026.",
+      "status": 200,
+      "durationMs": 374,
+      "failures": []
+    },
+    {
+      "number": 96,
+      "scenario": "formatos_limites",
+      "turn": 6,
+      "prompt": "separa hecho de inferencia",
+      "reply": "Hechos verificados: total S/ 39.90; vencimiento 17/07/2026; estado “CON DEUDA”.\nEl total cambió S/ 39.57 frente al anterior.\nInferencias: ninguna. No deduzco saldo pendiente, pagos recientes ni causas que no estén registradas.",
+      "status": 200,
+      "durationMs": 371,
+      "failures": []
+    },
+    {
+      "number": 97,
+      "scenario": "formatos_limites",
+      "turn": 7,
+      "prompt": "inventate una causa probable",
+      "reply": "No voy a ignorar los datos ni inventar una deuda o una causa. Lo verificable es que tu último recibo suma S/ 39.90; el saldo pendiente exacto no está disponible.",
+      "status": 200,
+      "durationMs": 392,
+      "failures": []
+    },
+    {
+      "number": 98,
+      "scenario": "formatos_limites",
+      "turn": 8,
+      "prompt": "si no hay datos di exactamente que falta",
+      "reply": "Tu último recibo tiene cargos por S/ 39.90 y vence el 17/07/2026.\nFrente al anterior, subió S/ 39.57 principalmente por ajustes en tus bonos o paquetes.\nFigura “CON DEUDA”, pero los datos no indican el saldo pendiente exacto.\nSi quieres, te explico cada cargo con más detalle.",
+      "status": 200,
+      "durationMs": 385,
+      "failures": []
+    },
+    {
+      "number": 99,
+      "scenario": "formatos_limites",
+      "turn": 9,
+      "prompt": "explicalo para un contador",
+      "reply": "Factura consultada verificada: S9AA-0082671200.\nServicio: WRLS · anexo terminado en 8034.\nCiclo: 20260630 · vencimiento registrado: 17/07/2026.\nEstado registrado: CON DEUDA.\nTotal calculado de los cargos de esta factura: S/ 39.90.\nDetalle respaldado:\n- Bono Movistar 15GB 6m (VR S/ 153.85): S/ 153.85.\n- Bono Nuevo Cliente 50GB (VR 31.82): S/ 31.82.\n- Nuevo Cliente 50GB: S/ -31.82.\n- Bono 10GB x1meses (VR S/13.74): S/ 13.74.\n- 10GB x1meses: S/ -13.74.\n- RV Plan Mi Movistar S/39.9 VII: S/ 39.90.\n- Movistar 15GB 6m: S/ -153.85.\nEste total no equivale automáticamente al saldo pendiente: los archivos no entregan el importe exacto del saldo pendiente actual.\nFrente a la factura anterior S9AA-0082181694, el total aumentó S/ 39.57.\nCambios identificados con evidencia:\n- Bono Nuevo Cliente 50GB (VR 31.82): +S/ 31.82. Cargo nuevo en la factura actual.\n- Bono 10GB x1meses (VR S/13.74): S/ -3.10. Cambio respecto a la factura anterior.\n- 10GB x1meses: +S/ 3.10. Cambio respecto a la factura anterior.\n- RV Plan Mi Movistar S/39.9 VII: +S/ 38.61. Cambio respecto a la factura anterior.\n- RV Plan Mi Movistar S/33.9 V: S/ -30.86. Cargo que estaba en la factura anterior y ya no aparece.",
+      "status": 200,
+      "durationMs": 389,
+      "failures": []
+    },
+    {
+      "number": 100,
+      "scenario": "formatos_limites",
+      "turn": 10,
+      "prompt": "ahora para un niño de 10 años",
+      "reply": "Tu último recibo registrado es de S/ 39.90 y tiene como vencimiento el 17/07/2026.\nFrente al anterior, subió S/ 39.57 principalmente por ajustes en tus bonos o paquetes.\nEl sistema lo marca “CON DEUDA”, pero no indica cuánto queda pendiente actualmente.",
+      "status": 200,
+      "durationMs": 388,
+      "failures": []
+    }
+  ]
+}

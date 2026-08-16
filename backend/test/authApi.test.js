@@ -19,7 +19,7 @@ test('permite registrar, iniciar sesión y obtener los datos del usuario autenti
   );
 
   const port = server.address().port;
-  const testPhone = '99988877';
+  const testUserId = '115358834';
   const testPassword = 'Password123!';
 
   // 1. Registro exitoso
@@ -27,23 +27,22 @@ test('permite registrar, iniciar sesión y obtener los datos del usuario autenti
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      phone: testPhone,
-      password: testPassword,
-      customerId: '52115748'
+      userId: testUserId,
+      password: testPassword
     })
   });
 
   assert.equal(regResp.status, 201);
   const regData = await regResp.json();
   assert.equal(regData.ok, true);
-  assert.equal(regData.user.phone, testPhone);
+  assert.equal(regData.user.userId, testUserId);
 
   // 2. Intento de registro duplicado
   const dupResp = await fetch(`http://127.0.0.1:${port}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      phone: testPhone,
+      userId: testUserId,
       password: testPassword
     })
   });
@@ -54,7 +53,7 @@ test('permite registrar, iniciar sesión y obtener los datos del usuario autenti
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      phone: testPhone,
+      userId: testUserId,
       password: testPassword
     })
   });
@@ -69,7 +68,7 @@ test('permite registrar, iniciar sesión y obtener los datos del usuario autenti
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      phone: '98765432',
+      userId: 'CLI000001',
       password: 'Demo1234!'
     })
   });
@@ -89,8 +88,8 @@ test('permite registrar, iniciar sesión y obtener los datos del usuario autenti
   assert.equal(meResp.status, 200);
   const meData = await meResp.json();
   assert.equal(meData.ok, true);
-  assert.equal(meData.user.phone, testPhone);
-  assert.equal(meData.user.customerId, '52115748');
+  assert.equal(meData.user.userId, testUserId);
+  assert.equal(meData.user.customerId, testUserId);
 });
 
 test('responde las recomendaciones NBO correctamente', async (t) => {
@@ -110,18 +109,26 @@ test('responde las recomendaciones NBO correctamente', async (t) => {
 
   const port = server.address().port;
 
-  const nboResp = await fetch(`http://127.0.0.1:${port}/api/nbo/recomendar`, {
+  const loginResp = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId: 'CLI000001', password: 'Demo1234!' })
+  });
+  assert.equal(loginResp.status, 200);
+  const loginData = await loginResp.json();
+  const nboResp = await fetch(`http://127.0.0.1:${port}/api/nbo/recomendar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${loginData.token}` },
     body: JSON.stringify({
-      cliente_id: 'CLI001',
+      cliente_id: 'CLI000001',
       consumo_datos_gb_prom: 25,
-      es_movistar_total: 'NO'
+      es_movistar_total: 'NO',
+      resolution: 'RESOLVED'
     })
   });
 
   assert.equal(nboResp.status, 200);
   const nboData = await nboResp.json();
-  assert.equal(nboData.cliente_id, 'CLI001');
+  assert.equal(nboData.cliente_id, 'CLI000001');
   assert.ok(nboData.recomendacion);
 });

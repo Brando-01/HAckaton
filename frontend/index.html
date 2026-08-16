@@ -39,6 +39,35 @@
             </button>
         </div>
 
+        <section id="billingDashboard" class="billing-dashboard hidden" aria-live="polite" aria-label="Resumen de mi recibo">
+            <div class="billing-dashboard-head">
+                <span class="billing-dashboard-eyebrow">Mi recibo</span>
+                <span id="billingDashboardStatus" class="billing-status-chip">Cargando</span>
+            </div>
+            <select id="billingServiceSelect" class="billing-service-select hidden" aria-label="Seleccionar servicio"></select>
+            <div class="billing-amount-wrap">
+                <span class="billing-amount-label">Total facturado</span>
+                <strong id="billingDashboardAmount" class="billing-dashboard-amount">S/ --</strong>
+            </div>
+            <div class="billing-mini-grid">
+                <div class="billing-mini-card">
+                    <span>Vence</span>
+                    <strong id="billingDashboardDue">--</strong>
+                </div>
+                <div class="billing-mini-card">
+                    <span>Variación</span>
+                    <strong id="billingDashboardVariation">--</strong>
+                </div>
+            </div>
+            <div class="billing-cause-card">
+                <span>¿Qué cambió?</span>
+                <strong id="billingDashboardCause">Sin comparación anterior</strong>
+            </div>
+            <button id="billingDashboardAsk" class="billing-dashboard-action" type="button" disabled>
+                Ver recibo completo <span aria-hidden="true">↗</span>
+            </button>
+        </section>
+
         <div class="sidebar-footer">
             <div class="timer-card">
                 <span class="timer-title">Tiempo de sesión</span>
@@ -89,6 +118,13 @@
                     placeholder="Escribe tu consulta sobre tu servicio o recibo..."
                     rows="1"
                 ></textarea>
+                <button id="voiceInputButton" class="btn-voice-input" type="button" aria-label="Dictar consulta por voz" aria-pressed="false" title="Hablar para escribir">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                        <line x1="12" y1="19" x2="12" y2="22"></line>
+                    </svg>
+                </button>
                 <button id="sendButton" title="Enviar mensaje">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -96,10 +132,37 @@
                     </svg>
                 </button>
             </div>
-            <p class="disclaimer">Asistente impulsado por IA. Si vienes desde Mi Movistar, tu identidad se conserva automáticamente.</p>
+            <div class="voice-toolbar" aria-label="Opciones de audio">
+                <button id="autoReadToggle" class="voice-toolbar-button" type="button" aria-pressed="false" title="Leer automáticamente las respuestas">
+                    <span aria-hidden="true">🔊</span> Leer respuestas
+                </button>
+                <button id="stopSpeechButton" class="voice-toolbar-button hidden" type="button" title="Detener lectura">
+                    <span aria-hidden="true">■</span> Detener
+                </button>
+                <span id="voiceStatus" class="voice-status" role="status" aria-live="polite"></span>
+            </div>
+        <p class="disclaimer">Asistente impulsado por IA. El micrófono solo se activa cuando lo tocas y el audio se usa únicamente para transcribir tu consulta.</p>
         </footer>
 
     </main>
+
+    <div id="billingDetailModal" class="billing-detail-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="billingDetailTitle">
+        <article class="billing-detail-panel">
+            <header class="billing-detail-header">
+                <div>
+                    <span class="billing-detail-eyebrow">Resumen personalizado</span>
+                    <h2 id="billingDetailTitle">Tu recibo, explicado fácil</h2>
+                </div>
+                <button id="closeBillingDetail" class="billing-detail-close" type="button" aria-label="Cerrar detalle del recibo">×</button>
+            </header>
+            <div id="billingDetailContent" class="billing-detail-content"></div>
+            <footer class="billing-detail-footer">
+                <p>Los importes muestran cargos facturados; el saldo pendiente exacto no está disponible.</p>
+                <button id="billingDetailAsk" type="button">Preguntarle a Lucía</button>
+            </footer>
+        </article>
+    </div>
+
     <!-- ENCUESTA DE SATISFACCIÓN -->
 <div
     class="satisfaction-modal hidden"
@@ -216,7 +279,7 @@
                         <div class="login-brand-icon">🔑</div>
                         <div>
                             <h2>Iniciar sesión</h2>
-                            <p class="login-subtitle">Ingresa tu celular y contraseña</p>
+                            <p class="login-subtitle">Ingresa tu ID de usuario y contraseña</p>
                         </div>
                     </div>
 
@@ -236,9 +299,9 @@
                     <p id="loginMessage" class="login-message"></p>
 
                     <div class="form-group">
-                        <label for="loginPhone">Número celular (9 dígitos)</label>
-                        <input id="loginPhone" type="tel" inputmode="numeric" maxlength="9"
-                            placeholder="Ej: 987654321" autocomplete="tel">
+                        <label for="loginPhone">ID de usuario</label>
+                        <input id="loginPhone" type="text" maxlength="64"
+                            placeholder="Ej: CLI000001" autocomplete="username" aria-label="ID de usuario">
                     </div>
 
                     <div class="form-group">
@@ -261,26 +324,26 @@
                         <div class="login-brand-icon">📋</div>
                         <div>
                             <h2>Crear cuenta</h2>
-                            <p class="login-subtitle">Registra tu número para guardar tu historial</p>
+                            <p class="login-subtitle">Crea tu cuenta con un ID de usuario y contraseña</p>
                         </div>
                     </div>
 
                     <p id="registerMessage" class="login-message"></p>
 
                     <div class="form-group">
-                        <label for="regPhone">Número celular (9 dígitos)</label>
-                        <input id="regPhone" type="tel" inputmode="numeric" maxlength="9"
-                            placeholder="Ej: 987654321" autocomplete="tel">
+                        <label for="regPhone">ID de usuario</label>
+                        <input id="regPhone" type="text" maxlength="64"
+                            placeholder="Ej: CLI000001" autocomplete="username" aria-label="ID de usuario">
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group" hidden>
                         <label for="regDni">DNI / Documento de identidad</label>
                         <input id="regDni" type="text" inputmode="numeric" maxlength="12"
                             placeholder="Ej: 52115748" autocomplete="off">
                     </div>
 
                     <div class="form-group">
-                        <label for="regPassword">Contraseña (mínimo 4 caracteres)</label>
+                        <label for="regPassword">Contraseña (mínimo 8 caracteres)</label>
                         <input id="regPassword" type="password" placeholder="Crea una contraseña" autocomplete="new-password">
                     </div>
 

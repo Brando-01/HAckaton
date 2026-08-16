@@ -14,6 +14,16 @@ const {
   getSessionSnapshot
 } = require('../services/sessionService');
 
+async function loginDemo(port) {
+  const response = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId: 'CLI000001', password: 'Demo1234!' })
+  });
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  return { Authorization: `Bearer ${data.token}` };
+}
 
 test(
   'lista los perfiles disponibles de Mi Movistar',
@@ -45,33 +55,19 @@ test(
     const port =
       server.address().port;
 
-    const response =
-      await fetch(
-        `http://127.0.0.1:${port}/api/app/customers`
-      );
+    const response = await fetch(`http://127.0.0.1:${port}/api/app/customers`, {
+      headers: await loginDemo(port)
+    });
 
     assert.equal(
       response.status,
-      200
+      403
     );
 
     const data =
       await response.json();
 
-    assert.ok(
-      Array.isArray(
-        data.customers
-      )
-    );
-
-    assert.ok(
-      data.customers.length >= 2
-    );
-
-    assert.equal(
-      data.customers[0].customerId,
-      'CLI000001'
-    );
+    assert.match(data.error, /otros usuarios/i);
   }
 );
 
@@ -106,10 +102,9 @@ test(
     const port =
       server.address().port;
 
-    const response =
-      await fetch(
-        `http://127.0.0.1:${port}/api/app/customers/CLI000001`
-      );
+    const response = await fetch(`http://127.0.0.1:${port}/api/app/customers/CLI000001`, {
+      headers: await loginDemo(port)
+    });
 
     assert.equal(
       response.status,
@@ -185,14 +180,13 @@ test(
     const port =
       server.address().port;
 
-    const response =
-      await fetch(
-        `http://127.0.0.1:${port}/api/app/customers/NO_EXISTE`
-      );
+    const response = await fetch(`http://127.0.0.1:${port}/api/app/customers/NO_EXISTE`, {
+      headers: await loginDemo(port)
+    });
 
     assert.equal(
       response.status,
-      404
+      403
     );
 
     const data =
@@ -200,7 +194,7 @@ test(
 
     assert.equal(
       data.error,
-      'Cliente no encontrado'
+      'Solo puedes consultar tu propia información.'
     );
   }
 );
@@ -243,16 +237,14 @@ test(
     const port =
       server.address().port;
 
+    const authHeaders = await loginDemo(port);
     const response =
       await fetch(
         `http://127.0.0.1:${port}/api/session/${sessionId}/customer`,
         {
           method: 'POST',
 
-          headers: {
-            'Content-Type':
-              'application/json'
-          },
+          headers: { ...authHeaders, 'Content-Type': 'application/json' },
 
           body: JSON.stringify({
             customerId:
@@ -331,16 +323,14 @@ test(
     const port =
       server.address().port;
 
+    const authHeaders = await loginDemo(port);
     const response =
       await fetch(
         `http://127.0.0.1:${port}/api/session/${sessionId}/customer`,
         {
           method: 'POST',
 
-          headers: {
-            'Content-Type':
-              'application/json'
-          },
+          headers: { ...authHeaders, 'Content-Type': 'application/json' },
 
           body: JSON.stringify({
             customerId:
@@ -351,7 +341,7 @@ test(
 
     assert.equal(
       response.status,
-      400
+      403
     );
 
     const data =
@@ -359,7 +349,7 @@ test(
 
     assert.equal(
       data.error,
-      'Cliente inválido'
+      'El cliente no coincide con la sesión autenticada'
     );
   }
 );

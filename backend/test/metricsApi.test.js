@@ -1,6 +1,7 @@
 process.env.GROQ_API_KEY =
   process.env.GROQ_API_KEY ||
   'gsk_test_placeholder';
+process.env.ADVISOR_API_KEY = 'test-advisor-key';
 
 const test =
   require('node:test');
@@ -74,6 +75,7 @@ test(
 
     const baseUrl =
       `http://127.0.0.1:${port}`;
+    const advisorHeaders = { 'x-advisor-key': 'test-advisor-key' };
 
 
     // 1. Finalizamos.
@@ -148,7 +150,7 @@ test(
     // 3. Consultamos dashboard.
     const dashboardResponse =
       await fetch(
-        `${baseUrl}/api/metrics/dashboard`
+        `${baseUrl}/api/metrics/dashboard`, { headers: advisorHeaders }
       );
 
 
@@ -221,7 +223,7 @@ test(
     // 4. Verificamos detalle.
     const interactionsResponse =
       await fetch(
-        `${baseUrl}/api/metrics/interactions`
+        `${baseUrl}/api/metrics/interactions`, { headers: advisorHeaders }
       );
 
 
