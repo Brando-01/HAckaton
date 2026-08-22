@@ -9,6 +9,7 @@ const sessionsByToken = new Map();
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const AUTH_USERS_PATH = process.env.AUTH_USERS_PATH || path.resolve(__dirname, '../data/auth-users.json');
 const PERSIST_USERS = !process.env.NODE_TEST_CONTEXT && AUTH_USERS_PATH !== ':memory:';
+const TEST_DEMO_USER_IDS = new Set(['CLI000001', 'CLI000002']);
 
 function normalizeUserId(userId) {
   return String(userId || '').trim().toUpperCase();
@@ -41,6 +42,7 @@ function loadPersistedUsers() {
     storedUsers.forEach((user) => {
       if (user && validateUserId(user.userId) && user.passwordHash) {
         const id = normalizeUserId(user.userId);
+        if (!process.env.NODE_TEST_CONTEXT && TEST_DEMO_USER_IDS.has(id)) return;
         usersById.set(id, { userId: id, customerId: normalizeUserId(user.customerId || id), name: user.name || null, passwordHash: user.passwordHash });
       }
     });
@@ -69,14 +71,16 @@ function createSession(user) {
   return token;
 }
 
-// Test/demo accounts. Their user ID is also the only customer identifier the
-// server will ever use for their data context.
-[
-  { userId: 'CLI000001', password: 'Demo1234!', name: 'Carlos Mendoza' },
-  { userId: 'CLI000002', password: 'Demo1234!', name: 'Ana Torres' }
-].forEach(({ userId, password, name }) => {
-  usersById.set(userId, { userId, customerId: userId, name, passwordHash: hashPassword(password) });
-});
+// Las cuentas ficticias se conservan únicamente como fixtures de las pruebas
+// automatizadas. Nunca deben estar disponibles al ejecutar la aplicación.
+if (process.env.NODE_TEST_CONTEXT) {
+  [
+    { userId: 'CLI000001', password: 'Demo1234!', name: 'Carlos Mendoza' },
+    { userId: 'CLI000002', password: 'Demo1234!', name: 'Ana Torres' }
+  ].forEach(({ userId, password, name }) => {
+    usersById.set(userId, { userId, customerId: userId, name, passwordHash: hashPassword(password) });
+  });
+}
 loadPersistedUsers();
 
 function registerUser({ userId, password }) {

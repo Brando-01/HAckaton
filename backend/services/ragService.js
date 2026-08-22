@@ -31,6 +31,7 @@ const {
 
 
 let groq = null;
+const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-20b';
 
 function getGroqClient() {
   if (!groq) {
@@ -812,9 +813,10 @@ async function humanizarRespuestaVerificada(mensajeUsuario, borrador) {
     const client = getGroqClient();
     if (!client) return borrador;
     const completion = await client.chat.completions.create({
-      model: (process.env.GROQ_MODEL || 'llama-3.1-8b-instant').trim(),
+      model: (process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL).trim(),
       temperature: 0.2,
       max_tokens: Number(process.env.GROQ_MAX_TOKENS || '500'),
+      reasoning_effort: 'low',
       messages: [
         {
           role: 'system',
@@ -824,6 +826,8 @@ async function humanizarRespuestaVerificada(mensajeUsuario, borrador) {
             'Reescribe el borrador verificado para responder de forma humana, útil y directamente conectada con la petición del usuario.',
             'Por defecto responde en 1 a 3 frases cortas: primero la respuesta concreta y después una explicación sencilla solo si aporta valor.',
             'Evita respuestas secas, textos de plantilla, repeticiones del turno anterior y listas largas si el usuario no las pidió.',
+            'Si el usuario pide más detalle, conserva el resumen inicial y usa como máximo 5 viñetas breves; combina en una sola viñeta los cargos y bonificaciones que se compensan.',
+            'No enumeres metadatos como factura, anexo, ciclo, servicio y estado antes de responder; menciona solo los que ayuden directamente a resolver la duda.',
             'No muestres códigos internos de factura, ciclo, anexo o nombres técnicos si no son necesarios para contestar. Si aparecen en el borrador puedes omitirlos, nunca sustituirlos por otros.',
             'Si el usuario está confundido, reconoce la duda brevemente y explícalo con palabras cotidianas. Si agradece o confirma, responde con naturalidad sin volver a descargar su recibo.',
             'Respeta el formato, extensión y nivel de sencillez que solicite el usuario.',
@@ -1050,9 +1054,10 @@ async function interpretarSeguimientoConIA(texto, lastBillingIntent) {
     const client = getGroqClient();
     if (!client) return null;
     const completion = await client.chat.completions.create({
-      model: (process.env.GROQ_MODEL || 'llama-3.1-8b-instant').trim(),
+      model: (process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL).trim(),
       temperature: 0,
-      max_tokens: 12,
+      max_tokens: 96,
+      reasoning_effort: 'low',
       messages: [
         {
           role: 'system',
@@ -1108,6 +1113,47 @@ function agruparCargosParaMostrar(charges = []) {
   return [...grouped.values()];
 }
 
+function limpiarDescripcionCargo(value) {
+  return String(value || 'Cargo')
+    .replace(/\s*\(\s*VR\s*:[^)]+\)\s*$/i, '')
+    .replace(/\s+(?:INC\s+)?RV\b.*$/i, '')
+    .trim();
+}
+
+function resumirDetalleCargos(charges = []) {
+  const used = new Set();
+  const lines = [];
+  const isNamedAdjustment = (charge) => /descuento|bonificaci[oó]n|bono|promo|gratuidad/i
+    .test(String(charge.description || ''));
+
+  charges.forEach((charge, index) => {
+    if (used.has(index)) return;
+    const oppositeIndex = charges.findIndex((candidate, candidateIndex) => (
+      candidateIndex !== index
+      && !used.has(candidateIndex)
+      && Math.abs(Number(candidate.amount || 0) + Number(charge.amount || 0)) < 0.01
+      && isNamedAdjustment(candidate) !== isNamedAdjustment(charge)
+    ));
+
+    if (oppositeIndex >= 0) {
+      const opposite = charges[oppositeIndex];
+      const concept = isNamedAdjustment(charge) ? opposite : charge;
+      const adjustment = isNamedAdjustment(charge) ? charge : opposite;
+      const amount = Math.abs(Number(concept.amount || adjustment.amount || 0));
+      lines.push(`- ${limpiarDescripcionCargo(concept.description || concept.code)}: S/ ${amount.toFixed(2)}, compensado por ${limpiarDescripcionCargo(adjustment.description || adjustment.code)} del mismo monto. Impacto final: S/ 0.00.`);
+      used.add(index);
+      used.add(oppositeIndex);
+      return;
+    }
+
+    const amount = Number(charge.amount || 0);
+    lines.push(`- ${limpiarDescripcionCargo(charge.description || charge.code)}: ${amount < 0 ? '-' : ''}S/ ${Math.abs(amount).toFixed(2)}.`);
+    used.add(index);
+  });
+
+  return lines;
+}
+
 function resumirCausasAmigables(variation) {
   const labels = {
     RECONNECTION: 'un cargo por reconexión',
@@ -1141,9 +1187,10 @@ async function interpretarIntencionFacturacion(texto) {
     const client = getGroqClient();
     if (!client) return fallback;
     const completion = await client.chat.completions.create({
-      model: (process.env.GROQ_MODEL || 'llama-3.1-8b-instant').trim(),
+      model: (process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL).trim(),
       temperature: 0,
-      max_tokens: 12,
+      max_tokens: 96,
+      reasoning_effort: 'low',
       messages: [
         {
           role: 'system',
@@ -1637,30 +1684,24 @@ function construirRespuestaFacturaVerificada(analysis, intent = 'DETAIL') {
   }
 
   const lines = [
-    `Factura consultada verificada: ${current.invoiceId}.`,
-    `Servicio: ${service.serviceType || 'no especificado'} · anexo terminado en ${current.subscriberId.slice(-4)}.`,
-    `Ciclo: ${current.cycle || 'no disponible'} · vencimiento registrado: ${dueDate || 'no disponible'}.`,
-    `Estado registrado: ${current.status || 'no disponible'}.`,
-    `Total calculado de los cargos de esta factura: S/ ${current.total.toFixed(2)}.`
+    `Claro. Tu recibo suma S/ ${current.total.toFixed(2)}${dueDate ? ` y vence el ${dueDate}` : ''}.`
   ];
 
-  lines.push('Detalle respaldado:');
-  displayedCharges.forEach((charge) => lines.push(`- ${charge.description || charge.code}: S/ ${charge.amount.toFixed(2)}.`));
-  lines.push('Este total no equivale automáticamente al saldo pendiente: los archivos no entregan el importe exacto del saldo pendiente actual.');
-  if (dataWarning) lines.push(`Advertencia de calidad del dato: ${dataWarning}`);
-
   if (previous && variation.available) {
-    const direction = variation.difference > 0 ? 'aumentó' : variation.difference < 0 ? 'disminuyó' : 'no varió';
-    lines.push(`Frente a la factura anterior ${previous.invoiceId}, el total ${direction} S/ ${Math.abs(variation.difference).toFixed(2)}.`);
-    if (variation.causes.length) {
-      lines.push('Cambios identificados con evidencia:');
-      variation.causes.forEach((cause) => lines.push(`- ${cause.description}: ${cause.delta >= 0 ? '+' : ''}S/ ${cause.delta.toFixed(2)}. ${cause.evidence}`));
+    if (Math.abs(variation.difference) < 0.01) {
+      lines.push(`No subió frente al recibo anterior: ambos fueron de S/ ${current.total.toFixed(2)}.`);
     } else {
-      lines.push('No encontré una diferencia de cargos verificable entre ambas facturas.');
+      const direction = variation.difference > 0 ? 'subió' : 'bajó';
+      lines.push(`Frente al anterior, ${direction} S/ ${Math.abs(variation.difference).toFixed(2)}${principalCause ? ` principalmente por ${principalCause.description}` : ''}.`);
     }
-  } else {
-    lines.push('No se afirma una variación porque no hay una factura anterior comparable para este mismo anexo.');
   }
+
+  lines.push('Así se forma el total:');
+  lines.push(...resumirDetalleCargos(displayedCharges));
+
+  if (debtStatus) lines.push(`Importante: figura “${debtStatus}”, pero los datos no indican el saldo pendiente exacto.`);
+  else lines.push('Los datos no indican el saldo pendiente exacto.');
+  if (dataWarning) lines.push(`Ojo: ${dataWarning}`);
 
   if (events.reconnections.length) {
     const event = events.reconnections[0];
@@ -2410,7 +2451,7 @@ No se entrega contexto personal en conversaciones generales.
       throw new Error('GROQ_API_KEY missing');
     }
 
-    const modelName = (process.env.GROQ_MODEL || 'llama-3.1-8b-instant').trim();
+    const modelName = (process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL).trim();
     const temperature = Number(process.env.GROQ_TEMPERATURE || '0.1');
     const maxTokens = Number(process.env.GROQ_MAX_TOKENS || '500');
 
@@ -2424,7 +2465,8 @@ No se entrega contexto personal en conversaciones generales.
         ],
         model: modelName,
         temperature,
-        max_tokens: maxTokens
+        max_tokens: maxTokens,
+        reasoning_effort: 'low'
       });
     } catch (err) {
       // If rate-limited, immediately return a safe fallback reply

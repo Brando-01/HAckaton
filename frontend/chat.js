@@ -36,6 +36,9 @@
   const toggleSidebarBtn =
     document.getElementById('toggleSidebar');
 
+  const sidebarBackdrop =
+    document.getElementById('sidebarBackdrop');
+
   const newChatButton =
     document.getElementById('newChatButton');
 
@@ -131,6 +134,8 @@
   let preferredSpeechVoice = null;
 
   let neuralTtsAvailable = false;
+
+  let neuralTtsTemporarilyDisabled = false;
 
   let activeNeuralAudio = null;
 
@@ -478,7 +483,7 @@
 
   async function tryNeuralSpeech(spokenText, button) {
     const token = localStorage.getItem('authToken') || '';
-    if (!neuralTtsAvailable || !token) return false;
+    if (!neuralTtsAvailable || neuralTtsTemporarilyDisabled || !token) return false;
     try {
       setVoiceStatus('Preparando la voz peruana de Lucía…', 'processing');
       const response = await fetch('/api/audio/speech', {
@@ -488,9 +493,16 @@
       });
       if (!response.ok) {
         const problem = await response.json().catch(() => ({}));
-        setVoiceStatus(problem.error || 'La voz neural no pudo generar el audio.', 'error');
-        return true;
+        if (response.status === 401) {
+          clearClientAuthState();
+          setVoiceStatus('Tu sesión venció. Usaré la voz en español del dispositivo.', 'ready');
+        } else {
+          neuralTtsTemporarilyDisabled = true;
+          setVoiceStatus(problem.error || 'La voz neural no pudo generar el audio. Usaré la voz del dispositivo.', 'ready');
+        }
+        return false;
       }
+      neuralTtsTemporarilyDisabled = false;
       const audioBlob = await response.blob();
       activeNeuralAudioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(activeNeuralAudioUrl);
@@ -510,12 +522,13 @@
       return true;
     } catch (error) {
       stopSpeech(false);
-      setVoiceStatus('No pude conectar con la voz neural. Inténtalo nuevamente.', 'error');
-      return true;
+      neuralTtsTemporarilyDisabled = true;
+      setVoiceStatus('No pude conectar con la voz neural. Usaré la voz del dispositivo.', 'ready');
+      return false;
     }
   }
 
-  async function speakMessage(rawText, button, voicesReadyRetry = false) {
+  async function speakMessage(rawText, button, voiceLoadAttempt = 0) {
     if (!speechSynthesisSupported) {
       setVoiceStatus('La lectura de voz no está disponible en este navegador.', 'error');
       return;
@@ -549,9 +562,9 @@
     if (await tryNeuralSpeech(spokenText, button)) return;
 
     const selectedVoice = peruvianSpanishVoice();
-    if (!selectedVoice && !voicesReadyRetry) {
+    if (!selectedVoice && voiceLoadAttempt < 8) {
       setVoiceStatus('Preparando una voz más natural…', 'processing');
-      window.setTimeout(() => speakMessage(rawText, button, true), 350);
+      window.setTimeout(() => speakMessage(rawText, button, voiceLoadAttempt + 1), 250);
       return;
     }
 
@@ -1786,19 +1799,43 @@
   // SIDEBAR
   // =========================================================
 
-  if (
-    toggleSidebarBtn &&
-    sidebar
-  ) {
-    toggleSidebarBtn.addEventListener(
-      'click',
-      () => {
-        sidebar.classList.toggle(
-          'collapsed'
-        );
-      }
-    );
+  function isMobileSidebar() {
+    return window.matchMedia('(max-width: 760px)').matches;
   }
+
+  function setMobileSidebarOpen(open) {
+    if (!sidebar) return;
+    sidebar.classList.toggle('mobile-open', open);
+    document.body.classList.toggle('sidebar-open', open);
+    if (toggleSidebarBtn) {
+      toggleSidebarBtn.setAttribute('aria-expanded', String(open));
+      toggleSidebarBtn.setAttribute('aria-label', open ? 'Cerrar menú' : 'Abrir menú');
+    }
+  }
+
+  function closeMobileSidebar() {
+    if (isMobileSidebar()) setMobileSidebarOpen(false);
+  }
+
+  if (toggleSidebarBtn && sidebar) {
+    toggleSidebarBtn.addEventListener('click', () => {
+      if (isMobileSidebar()) {
+        setMobileSidebarOpen(!sidebar.classList.contains('mobile-open'));
+      } else {
+        sidebar.classList.toggle('collapsed');
+      }
+    });
+  }
+
+  sidebarBackdrop?.addEventListener('click', closeMobileSidebar);
+  sidebar?.querySelectorAll('.sidebar-menu button').forEach((button) => {
+    button.addEventListener('click', closeMobileSidebar);
+  });
+  newChatButton?.addEventListener('click', closeMobileSidebar);
+
+  window.addEventListener('resize', () => {
+    if (!isMobileSidebar()) setMobileSidebarOpen(false);
+  });
 
   let currentUserState = null;
   let billingDashboardServices = [];
@@ -2129,6 +2166,14 @@
     }
   }
 
+  function clearClientAuthState() {
+    localStorage.removeItem('authToken');
+    sessionStorage.removeItem('movistarDemoCustomerId');
+    currentUserState = null;
+    updateAuthUI(null);
+    setBillingDashboardVisible(false);
+  }
+
   async function associateAuthenticatedCustomer(
     sessionId
   ) {
@@ -2149,19 +2194,13 @@
       });
 
       if (resp.status === 401) {
-        localStorage.removeItem('authToken');
-        sessionStorage.removeItem('movistarDemoCustomerId');
-        currentUserState = null;
-        updateAuthUI(null);
-        setBillingDashboardVisible(false);
+        clearClientAuthState();
         return null;
       }
 
       const data = await resp.json();
       if (!data || !data.user) {
-        currentUserState = null;
-        updateAuthUI(null);
-        setBillingDashboardVisible(false);
+        clearClientAuthState();
         return null;
       }
 
@@ -2406,14 +2445,15 @@
 
       if (!resp.ok) {
         if (resp.status === 409) {
-          setMsg(msgId, 'Número ya registrado. Iniciando sesión...', false);
-          await new Promise(r => setTimeout(r, 800));
           showLoginView();
           const lp = document.getElementById('loginPhone');
           const lpw = document.getElementById('loginPassword');
           if (lp) lp.value = userId;
-          if (lpw) lpw.value = password;
-          await submitLogin(userId, password);
+          if (lpw) {
+            lpw.value = '';
+            lpw.focus();
+          }
+          setMsg('loginMessage', 'Este usuario ya está registrado. Inicia sesión con tu contraseña.', false);
           return;
         }
         const errMsg = (data && data.error) ? data.error : 'No se pudo registrar';
@@ -2560,22 +2600,6 @@
       document.getElementById(id)?.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') submitRegister();
       });
-    });
-
-    // Demo shortcuts — use the same user IDs accepted by the current auth API.
-    document.getElementById('demoUserCarlos')?.addEventListener('click', () => {
-      const lp = document.getElementById('loginPhone');
-      const lpw = document.getElementById('loginPassword');
-      if (lp) lp.value = 'CLI000001';
-      if (lpw) lpw.value = 'Demo1234!';
-      submitLogin('CLI000001', 'Demo1234!');
-    });
-    document.getElementById('demoUserAna')?.addEventListener('click', () => {
-      const lp = document.getElementById('loginPhone');
-      const lpw = document.getElementById('loginPassword');
-      if (lp) lp.value = 'CLI000002';
-      if (lpw) lpw.value = 'Demo1234!';
-      submitLogin('CLI000002', 'Demo1234!');
     });
 
     startTimer();

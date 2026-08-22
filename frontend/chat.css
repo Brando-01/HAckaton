@@ -25,6 +25,10 @@ body {
     overflow: hidden;
 }
 
+.sidebar-backdrop {
+    display: none;
+}
+
 /* SIDEBAR CON EL LOGO */
 .sidebar {
     width: var(--sidebar-width);
@@ -467,6 +471,7 @@ body {
 /* ÁREA DE CHAT */
 .chat-container {
     flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     height: 100vh;
@@ -818,6 +823,12 @@ body {
     font-size: 14px;
     line-height: 1.4;
     background: transparent;
+    scrollbar-width: none;
+}
+
+#userInput::-webkit-scrollbar {
+    width: 0;
+    height: 0;
 }
 
 #sendButton {
@@ -1221,6 +1232,162 @@ body {
     .billing-detail-footer button { width: 100%; }
 }
 
+@media (max-width: 760px) {
+    body {
+        width: 100%;
+        height: 100dvh;
+    }
+
+    .sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: min(86vw, 310px);
+        height: 100dvh;
+        padding: 18px 16px max(18px, env(safe-area-inset-bottom));
+        transform: translateX(-102%);
+        margin-left: 0;
+        box-shadow: 18px 0 42px rgba(2, 18, 29, .28);
+        transition: transform .28s cubic-bezier(.22,.8,.3,1);
+        z-index: 60;
+    }
+
+    .sidebar.collapsed {
+        margin-left: 0;
+    }
+
+    .sidebar.mobile-open {
+        transform: translateX(0);
+    }
+
+    .sidebar-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 55;
+        display: block;
+        border: 0;
+        background: rgba(4, 20, 31, .5);
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: opacity .25s ease, visibility .25s ease;
+    }
+
+    body.sidebar-open .sidebar-backdrop {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+    }
+
+    .chat-container {
+        width: 100%;
+        height: 100dvh;
+    }
+
+    .chat-topbar {
+        min-height: 58px;
+        padding: 8px 12px;
+        gap: 8px;
+    }
+
+    .topbar-left {
+        min-width: 0;
+        gap: 8px;
+    }
+
+    .btn-toggle-sidebar {
+        width: 38px;
+        height: 38px;
+        flex: 0 0 38px;
+        border-radius: 50%;
+    }
+
+    .btn-toggle-sidebar:active {
+        background: #eaf4f8;
+    }
+
+    .topbar-right {
+        min-width: 0;
+    }
+
+    .user-profile-badge {
+        max-width: min(48vw, 180px);
+        padding: 5px 10px 5px 8px;
+        font-size: 12px;
+    }
+
+    #loginButton {
+        padding: 6px 11px;
+        font-size: 12px;
+    }
+
+    .chat-messages-wrapper {
+        padding: 16px 12px;
+    }
+
+    .chat-messages {
+        gap: 14px;
+    }
+
+    .message {
+        max-width: 94%;
+        padding: 12px 14px;
+        font-size: 14px;
+    }
+
+    .chat-input-wrapper {
+        flex: 0 0 auto;
+        padding: 8px 10px max(10px, env(safe-area-inset-bottom));
+        gap: 6px;
+        background: linear-gradient(180deg, rgba(244,247,251,0), var(--bg-main) 14%);
+    }
+
+    .chat-input-box {
+        min-width: 0;
+        padding: 8px 9px 8px 13px;
+        gap: 7px;
+        border-radius: 22px;
+    }
+
+    #userInput {
+        min-width: 0;
+        font-size: 16px;
+    }
+
+    #sendButton,
+    .btn-voice-input {
+        width: 38px;
+        height: 38px;
+        flex-basis: 38px;
+    }
+
+    .voice-toolbar {
+        min-height: 24px;
+        gap: 5px;
+    }
+
+    .voice-toolbar-button {
+        min-height: 25px;
+        padding: 4px 8px;
+    }
+
+    .disclaimer {
+        max-width: 94%;
+        font-size: 10px;
+        line-height: 1.35;
+        text-align: center;
+    }
+
+    .login-modal {
+        padding: 12px;
+    }
+
+    .login-card {
+        width: min(100%, 430px);
+        max-height: calc(100dvh - 24px);
+        overflow-y: auto;
+    }
+}
+
 .auth-context-badge {
     display: inline-flex;
     align-items: center;
@@ -1331,54 +1498,6 @@ body {
     margin: 2px 0 0;
     font-size: 13px;
     color: var(--text-muted);
-}
-
-.demo-quick-login {
-    background: #F4F7FB;
-    border: 1px dashed #CBD5E1;
-    border-radius: 12px;
-    padding: 12px 14px;
-    margin-bottom: 18px;
-}
-
-.demo-label {
-    display: block;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
-}
-
-.demo-buttons {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.btn-demo-user {
-    background: #FFFFFF;
-    border: 1px solid #CBD5E1;
-    border-radius: 20px;
-    padding: 6px 14px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--movistar-navy);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.btn-demo-user:hover {
-    background: #00A9E0;
-    color: #FFFFFF;
-    border-color: #00A9E0;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 10px rgba(0, 169, 224, 0.25);
 }
 
 .form-group {

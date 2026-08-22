@@ -4,13 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Asistente Virtual | Movistar Perú</title>
+    <link rel="icon" type="image/png" href="./logo.png">
     <link rel="stylesheet" href="./chat.css">
     <!-- demo-nav.css removed; chat-only UI -->
 </head>
 <body>
 
     <!-- SIDEBAR TIPO GEMINI CON MARCA MOVISTAR -->
-    <aside class="sidebar" id="sidebar">
+    <aside class="sidebar" id="sidebar" aria-label="Menú principal">
         <div class="sidebar-header">
             <img src="./logo.png" alt="Movistar Logo" class="brand-logo">
             <div class="brand-info">
@@ -82,13 +83,15 @@
             </div>
     </aside>
 
+    <button class="sidebar-backdrop" id="sidebarBackdrop" type="button" aria-label="Cerrar menú"></button>
+
     <!-- CONTENEDOR PRINCIPAL -->
     <main class="chat-container">
 
         <!-- HEADER TOPBAR -->
         <header class="chat-topbar">
             <div class="topbar-left">
-                <button class="btn-toggle-sidebar" id="toggleSidebar" title="Menú">☰</button>
+                <button class="btn-toggle-sidebar" id="toggleSidebar" type="button" title="Menú" aria-label="Abrir menú" aria-controls="sidebar" aria-expanded="false">☰</button>
                 <div class="status-indicator">
                     <span class="status-dot"></span>
                     <span>En línea • Respuestas con IA</span>
@@ -115,7 +118,7 @@
             <div class="chat-input-box">
                 <textarea
                     id="userInput"
-                    placeholder="Escribe tu consulta sobre tu servicio o recibo..."
+                    placeholder="Escribe tu consulta..."
                     rows="1"
                 ></textarea>
                 <button id="voiceInputButton" class="btn-voice-input" type="button" aria-label="Dictar consulta por voz" aria-pressed="false" title="Hablar para escribir">
@@ -283,25 +286,12 @@
                         </div>
                     </div>
 
-                    <!-- Demo shortcuts -->
-                    <div class="demo-quick-login">
-                        <span class="demo-label">Acceso rápido Demo:</span>
-                        <div class="demo-buttons">
-                            <button type="button" class="btn-demo-user" id="demoUserCarlos">
-                                👤 Carlos Mendoza
-                            </button>
-                            <button type="button" class="btn-demo-user" id="demoUserAna">
-                                👤 Ana Torres
-                            </button>
-                        </div>
-                    </div>
-
-                    <p id="loginMessage" class="login-message"></p>
+                    <p id="loginMessage" class="login-message" role="status" aria-live="polite"></p>
 
                     <div class="form-group">
                         <label for="loginPhone">ID de usuario</label>
                         <input id="loginPhone" type="text" maxlength="64"
-                            placeholder="Ej: CLI000001" autocomplete="username" aria-label="ID de usuario">
+                            placeholder="Ej: 115358834" autocomplete="username" aria-label="ID de usuario">
                     </div>
 
                     <div class="form-group">
@@ -328,18 +318,12 @@
                         </div>
                     </div>
 
-                    <p id="registerMessage" class="login-message"></p>
+                    <p id="registerMessage" class="login-message" role="status" aria-live="polite"></p>
 
                     <div class="form-group">
                         <label for="regPhone">ID de usuario</label>
                         <input id="regPhone" type="text" maxlength="64"
-                            placeholder="Ej: CLI000001" autocomplete="username" aria-label="ID de usuario">
-                    </div>
-
-                    <div class="form-group" hidden>
-                        <label for="regDni">DNI / Documento de identidad</label>
-                        <input id="regDni" type="text" inputmode="numeric" maxlength="12"
-                            placeholder="Ej: 52115748" autocomplete="off">
+                            placeholder="Ej: 115358834" autocomplete="username" aria-label="ID de usuario">
                     </div>
 
                     <div class="form-group">

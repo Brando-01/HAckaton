@@ -478,7 +478,6 @@ function createApp() {
   // =========================================================
   app.post('/api/auth/register', (req, res) => {
     const body = req.body || {};
-    console.log('[API] /api/auth/register body=', body);
 
     const userId   = (body.userId || '').toString().trim();
     const password = (body.password || '').toString();

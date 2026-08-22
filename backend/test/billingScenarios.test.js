@@ -72,6 +72,21 @@ test('entiende una solicitud breve de aumento aun con un error común de tipeo',
   assert.doesNotMatch(result.reply, /Factura consultada verificada/);
 });
 
+test('desglosa un recibo sin abrumar ni mostrar identificadores internos', async () => {
+  const sessionId = 'scenario-friendly-breakdown';
+  resetSession(sessionId);
+  updateContext(sessionId, { customerIdentifier: '115358834', ownerUserId: '115358834' });
+
+  await procesarConsultaFactura('Ayúdame a entender mi recibo con palabras simples. Primero dime el total y luego explícame el cambio más importante.', sessionId);
+  const result = await procesarConsultaFactura('sí, a más detalle', sessionId);
+
+  assert.match(result.reply, /^Claro\. Tu recibo suma S\/ 83\.99/);
+  assert.match(result.reply, /No subió frente al recibo anterior/);
+  assert.match(result.reply, /Disney\+.*compensado.*Impacto final: S\/ 0\.00/i);
+  assert.doesNotMatch(result.reply, /S5AA-|anexo|ciclo|Factura consultada verificada|Detalle respaldado/);
+  assert.ok(result.reply.split('\n').length <= 7);
+});
+
 test('distingue comparación, pago directo y explicación conceptual de un bono', async () => {
   const sessionId = 'scenario-adaptive-intents';
   resetSession(sessionId);
